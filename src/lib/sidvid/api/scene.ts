@@ -21,7 +21,7 @@ export async function generateScene(
     response_format: 'url',
   });
 
-  const imageData = response.data[0];
+  const imageData = response.data?.[0];
   if (!imageData?.url) {
     throw new Error('No image URL returned from DALL-E');
   }

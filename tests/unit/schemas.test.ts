@@ -5,7 +5,7 @@ import {
   characterOptionsSchema,
   sceneOptionsSchema,
   videoOptionsSchema,
-} from '../../src/schemas';
+} from '../../src/lib/sidvid/schemas';
 
 describe('sidVidConfigSchema', () => {
   it('validates valid config', () => {
