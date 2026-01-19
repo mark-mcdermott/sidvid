@@ -3,8 +3,11 @@ export { SidVid } from './client';
 export type {
   SidVidConfig,
   StoryOptions,
+  EditStoryOptions,
   Story,
   StoryScene,
+  StoryCharacter,
+  StorySceneVisual,
   CharacterOptions,
   Character,
   SceneOptions,

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import type {
   SidVidConfig,
   StoryOptions,
+  EditStoryOptions,
   Story,
   CharacterOptions,
   Character,
@@ -13,7 +14,7 @@ import type {
   Video,
 } from './types';
 import { sidVidConfigSchema } from './schemas';
-import { generateStory } from './api/story';
+import { generateStory, editStory } from './api/story';
 import { generateCharacter } from './api/character';
 import { generateScene } from './api/scene';
 import { generateStoryboard } from './api/storyboard';
@@ -29,6 +30,10 @@ export class SidVid {
 
   async generateStory(options: StoryOptions): Promise<Story> {
     return generateStory(this.client, options);
+  }
+
+  async editStory(options: EditStoryOptions): Promise<Story> {
+    return editStory(this.client, options);
   }
 
   async generateCharacter(options: CharacterOptions): Promise<Character> {

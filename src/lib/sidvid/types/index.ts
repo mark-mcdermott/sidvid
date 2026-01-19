@@ -12,6 +12,13 @@ export interface StoryOptions {
   maxTokens?: number;
 }
 
+export interface EditStoryOptions {
+  currentStory: Story;
+  editPrompt: string;
+  length?: string;
+  maxTokens?: number;
+}
+
 export interface StoryCharacter {
   name: string;
   description: string;
