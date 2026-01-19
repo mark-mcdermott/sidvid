@@ -65,10 +65,27 @@ Return the updated story in the same JSON format with the following structure:
       "dialogue": "Any dialogue in the scene (optional)",
       "action": "What happens in the scene"
     }
+  ],
+  "characters": [
+    {
+      "name": "Character Name",
+      "description": "Physical description of the character as mentioned in the story, no embellishment"
+    }
+  ],
+  "sceneVisuals": [
+    {
+      "sceneNumber": 1,
+      "setting": "Description of the background/setting",
+      "charactersPresent": ["Character Name 1", "Character Name 2"],
+      "visualDescription": "How the scene looks as a static image, including setting and character positions/appearance"
+    }
   ]
 }
 
-Keep the same number of scenes and maintain the overall structure. Return only valid JSON.`;
+Keep the same number of scenes and maintain the overall structure.
+Update the characters and sceneVisuals arrays to reflect any changes from the edit.
+Extract information directly from the story text without adding creative embellishments.
+Return only valid JSON.`;
 
 			const completion = await client.chat.completions.create({
 				model: 'gpt-4o',
@@ -90,7 +107,9 @@ Keep the same number of scenes and maintain the overall structure. Return only v
 				story: {
 					title: parsed.title,
 					scenes: parsed.scenes,
-					rawContent: content
+					rawContent: content,
+					characters: parsed.characters,
+					sceneVisuals: parsed.sceneVisuals
 				}
 			};
 		} catch (error) {

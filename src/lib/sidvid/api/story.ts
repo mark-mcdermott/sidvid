@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { StoryOptions, Story, StoryScene } from '../types';
+import type { StoryOptions, Story, StoryScene, StoryCharacter, StorySceneVisual } from '../types';
 import { storyOptionsSchema } from '../schemas';
 
 const STORY_SYSTEM_PROMPT = `You are a creative story writer for video production.
@@ -14,9 +14,24 @@ Format your response as JSON with the following structure:
       "dialogue": "Any dialogue in the scene (optional)",
       "action": "What happens in the scene"
     }
+  ],
+  "characters": [
+    {
+      "name": "Character Name",
+      "description": "Physical description of the character as mentioned in the story, no embellishment"
+    }
+  ],
+  "sceneVisuals": [
+    {
+      "sceneNumber": 1,
+      "setting": "Description of the background/setting",
+      "charactersPresent": ["Character Name 1", "Character Name 2"],
+      "visualDescription": "How the scene looks as a static image, including setting and character positions/appearance"
+    }
   ]
 }
-Keep descriptions vivid and visual, suitable for video generation.`;
+Keep descriptions vivid and visual, suitable for video generation.
+For characters and sceneVisuals, extract information directly from the story text without adding creative embellishments.`;
 
 export async function generateStory(
   client: OpenAI,
@@ -44,11 +59,18 @@ Return only valid JSON.`;
     throw new Error('No content returned from ChatGPT');
   }
 
-  const parsed = JSON.parse(content) as { title: string; scenes: StoryScene[] };
+  const parsed = JSON.parse(content) as {
+    title: string;
+    scenes: StoryScene[];
+    characters?: StoryCharacter[];
+    sceneVisuals?: StorySceneVisual[];
+  };
 
   return {
     title: parsed.title,
     scenes: parsed.scenes,
     rawContent: content,
+    characters: parsed.characters,
+    sceneVisuals: parsed.sceneVisuals,
   };
 }

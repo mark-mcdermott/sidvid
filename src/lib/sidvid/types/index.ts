@@ -12,10 +12,24 @@ export interface StoryOptions {
   maxTokens?: number;
 }
 
+export interface StoryCharacter {
+  name: string;
+  description: string;
+}
+
+export interface StorySceneVisual {
+  sceneNumber: number;
+  setting: string;
+  charactersPresent: string[];
+  visualDescription: string;
+}
+
 export interface Story {
   title: string;
   scenes: StoryScene[];
   rawContent: string;
+  characters?: StoryCharacter[];
+  sceneVisuals?: StorySceneVisual[];
 }
 
 export interface StoryScene {

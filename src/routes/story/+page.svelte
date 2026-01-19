@@ -3,49 +3,104 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Select from '$lib/components/ui/select';
 	import { enhance } from '$app/forms';
+	import { untrack } from 'svelte';
+	import { storyStore } from '$lib/stores/storyStore';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
 
-	let prompt = $state('sci-fi anime');
-	let isGenerating = $state(false);
-	let isEditingManually = $state(false);
-	let isEditingWithPrompt = $state(false);
-	let editedStoryContent = $state('');
-	let editPrompt = $state('');
+	// DOM element references (not persisted in store)
 	let storyCardElement: HTMLDivElement | undefined = $state();
-	let selectedLength = $state<{ value: string; label: string } | undefined>({
-		value: '5s',
-		label: '5s'
+	let tryAgainElement: HTMLDivElement | undefined = $state();
+	let editPromptElement: HTMLDivElement | undefined = $state();
+	let latestStoryCardElement: HTMLDivElement | undefined = $state();
+	let lastStoryRawContent = $state<string>('');
+	let capturedPromptForNextStory = $state<string>('');
+
+	$effect(() => {
+		if (form?.success && form?.story) {
+			// Check if this is a new story by comparing rawContent
+			const currentRawContent = form.story.rawContent;
+			const lastContent = untrack(() => lastStoryRawContent);
+
+			if (currentRawContent !== lastContent) {
+				untrack(() => {
+					// Use the captured prompt if available, otherwise determine from current state
+					let storyPrompt: string;
+					if (capturedPromptForNextStory) {
+						storyPrompt = capturedPromptForNextStory;
+						capturedPromptForNextStory = ''; // Clear after use
+					} else if ($storyStore.isTryingAgain) {
+						storyPrompt = $storyStore.tryAgainPrompt;
+					} else {
+						storyPrompt = $storyStore.prompt;
+					}
+
+					// Store story with its prompt and length
+					storyStore.update(state => ({
+						...state,
+						stories: [...state.stories, {
+							story: form.story!,
+							prompt: storyPrompt,
+							length: (state.isTryingAgain ? state.tryAgainLength?.label : state.selectedLength?.label) || '5s'
+						}],
+						// Reset edit states when a new story is added
+						isEditingManually: false,
+						editedStoryContent: ''
+					}));
+					lastStoryRawContent = currentRawContent;
+				});
+			}
+		}
 	});
 
 	function startManualEdit() {
-		if (form?.story) {
-			editedStoryContent = form.story.rawContent;
-			isEditingManually = true;
+		const latestEntry = $storyStore.stories[$storyStore.stories.length - 1];
+		if (latestEntry) {
+			storyStore.update(state => ({
+				...state,
+				editedStoryContent: latestEntry.story.rawContent,
+				isEditingManually: true
+			}));
 			// Scroll to the story card
 			setTimeout(() => {
-				storyCardElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				latestStoryCardElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 			}, 0);
 		}
 	}
 
 	function cancelEdit() {
-		isEditingManually = false;
-		editedStoryContent = '';
+		storyStore.update(state => ({
+			...state,
+			isEditingManually: false,
+			editedStoryContent: ''
+		}));
 	}
 
 	function saveChanges() {
-		if (form?.story && editedStoryContent) {
-			// Parse the edited JSON content and update the form story
+		const latestEntry = $storyStore.stories[$storyStore.stories.length - 1];
+		if (latestEntry && $storyStore.editedStoryContent) {
+			// Parse the edited JSON content and update the latest story
 			try {
-				const parsed = JSON.parse(editedStoryContent);
-				if (form.story) {
-					form.story.rawContent = editedStoryContent;
-					if (parsed.title) form.story.title = parsed.title;
-					if (parsed.scenes) form.story.scenes = parsed.scenes;
-				}
-				isEditingManually = false;
+				const parsed = JSON.parse($storyStore.editedStoryContent);
+				// Update the latest story in the array
+				storyStore.update(state => {
+					const updatedStories = [...state.stories];
+					updatedStories[updatedStories.length - 1] = {
+						...latestEntry,
+						story: {
+							...latestEntry.story,
+							rawContent: state.editedStoryContent,
+							title: parsed.title || latestEntry.story.title,
+							scenes: parsed.scenes || latestEntry.story.scenes
+						}
+					};
+					return {
+						...state,
+						stories: updatedStories,
+						isEditingManually: false
+					};
+				});
 			} catch (error) {
 				alert('Invalid JSON format. Please check your edits.');
 			}
@@ -53,17 +108,46 @@
 	}
 
 	function startPromptEdit() {
-		isEditingWithPrompt = true;
-		editPrompt = '';
-		// Scroll to the story card
+		storyStore.update(state => ({
+			...state,
+			isEditingWithPrompt: true,
+			editPrompt: ''
+		}));
+		// Scroll to the edit prompt form
 		setTimeout(() => {
-			storyCardElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			editPromptElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}, 0);
 	}
 
 	function cancelPromptEdit() {
-		isEditingWithPrompt = false;
-		editPrompt = '';
+		storyStore.update(state => ({
+			...state,
+			isEditingWithPrompt: false,
+			editPrompt: ''
+		}));
+	}
+
+	function startTryAgain() {
+		if ($storyStore.stories.length > 0) {
+			storyStore.update(state => ({
+				...state,
+				tryAgainPrompt: state.prompt,
+				tryAgainLength: state.selectedLength,
+				isTryingAgain: true
+			}));
+			// Scroll to the try again section
+			setTimeout(() => {
+				tryAgainElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}, 0);
+		}
+	}
+
+	function cancelTryAgain() {
+		storyStore.update(state => ({
+			...state,
+			isTryingAgain: false,
+			tryAgainPrompt: ''
+		}));
 	}
 
 	const lengthOptions = [
@@ -85,10 +169,10 @@
 	method="POST"
 	action="?/generateStory"
 	use:enhance={() => {
-		isGenerating = true;
+		storyStore.update(state => ({ ...state, isGenerating: true }));
 		return async ({ update }) => {
 			await update();
-			isGenerating = false;
+			storyStore.update(state => ({ ...state, isGenerating: false }));
 		};
 	}}
 >
@@ -105,9 +189,9 @@
 		<div class="w-full xl:max-w-[32rem]">
 			<div class="mb-2">
 				<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
-				<Select.Root bind:selected={selectedLength}>
+				<Select.Root bind:selected={$storyStore.selectedLength}>
 					<Select.Trigger class="w-32">
-						{selectedLength?.label || 'Select length'}
+						{$storyStore.selectedLength?.label || 'Select length'}
 					</Select.Trigger>
 					<Select.Content>
 						{#each lengthOptions as option}
@@ -117,11 +201,11 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
-				<input type="hidden" name="length" value={selectedLength?.value || '5s'} />
+				<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
 			</div>
 
 			<Textarea
-				bind:value={prompt}
+				bind:value={$storyStore.prompt}
 				name="prompt"
 				placeholder="Enter your story prompt (e.g., 'A detective solving a mystery in a futuristic city')"
 				class="min-h-32"
@@ -130,32 +214,77 @@
 		</div>
 
 		<div class="flex gap-2">
-			<Button type="submit" disabled={isGenerating || !prompt.trim()}>
-				{isGenerating ? 'Generating...' : 'Generate Story'}
+			<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
+				{$storyStore.isGenerating ? 'Generating...' : 'Generate Story'}
 			</Button>
 		</div>
 
-		{#if form?.success && form?.story}
-			<div bind:this={storyCardElement} class="flex flex-col gap-4 rounded-md border p-4">
-				{#if isEditingManually}
-					<div class="flex flex-col gap-4">
-						<h2 class="text-xl font-semibold">Edit Story</h2>
-						<Textarea
-							bind:value={editedStoryContent}
-							class="min-h-96 font-mono text-sm"
-							placeholder="Edit your story here..."
-						/>
-						<div class="flex gap-2">
-							<Button onclick={cancelEdit} variant="outline">Cancel</Button>
-							<Button onclick={saveChanges}>Save Changes</Button>
+		{#each $storyStore.stories as entry, index}
+			{#if index > 0}
+				<div class="my-4 rounded-md bg-muted/30 p-3 text-sm">
+					<p class="font-medium text-muted-foreground">Prompt ({entry.length}):</p>
+					<p class="mt-1">{entry.prompt}</p>
+				</div>
+			{/if}
+
+			{#if index === $storyStore.stories.length - 1}
+				<div bind:this={latestStoryCardElement} class="flex flex-col gap-4 rounded-md border p-4">
+					{#if $storyStore.isEditingManually}
+						<div class="flex flex-col gap-4">
+							<h2 class="text-xl font-semibold">Edit Story</h2>
+							<Textarea
+								bind:value={$storyStore.editedStoryContent}
+								class="min-h-96 font-mono text-sm"
+								placeholder="Edit your story here..."
+							/>
+							<div class="flex gap-2">
+								<Button onclick={cancelEdit} variant="outline">Cancel</Button>
+								<Button onclick={saveChanges}>Save Changes</Button>
+							</div>
 						</div>
-					</div>
-				{:else}
+					{:else}
+						<div>
+							<h2 class="text-xl font-semibold">{entry.story.title}</h2>
+						</div>
+						<div class="space-y-4">
+							{#each entry.story.scenes as scene}
+								<div class="rounded-md bg-muted/50 p-3">
+									<h3 class="mb-2 font-semibold">Scene {scene.number}</h3>
+
+									<div class="mb-2">
+										<p class="text-xs font-medium text-muted-foreground uppercase">Description:</p>
+										<p class="text-sm">{scene.description}</p>
+									</div>
+
+									{#if scene.dialogue}
+										<div class="mb-2">
+											<p class="text-xs font-medium text-muted-foreground uppercase">Dialogue:</p>
+											<p class="text-sm italic">"{scene.dialogue}"</p>
+										</div>
+									{/if}
+
+									{#if scene.action}
+										<div>
+											<p class="text-xs font-medium text-muted-foreground uppercase">Action:</p>
+											<p class="text-sm">{scene.action}</p>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+						<details class="text-sm">
+							<summary class="cursor-pointer font-medium">View raw content</summary>
+							<p class="mt-2 whitespace-pre-wrap text-muted-foreground">{entry.story.rawContent}</p>
+						</details>
+					{/if}
+				</div>
+			{:else}
+				<div class="flex flex-col gap-4 rounded-md border p-4">
 					<div>
-						<h2 class="text-xl font-semibold">{form.story.title}</h2>
+						<h2 class="text-xl font-semibold">{entry.story.title}</h2>
 					</div>
 					<div class="space-y-4">
-						{#each form.story.scenes as scene}
+						{#each entry.story.scenes as scene}
 							<div class="rounded-md bg-muted/50 p-3">
 								<h3 class="mb-2 font-semibold">Scene {scene.number}</h3>
 
@@ -182,56 +311,120 @@
 					</div>
 					<details class="text-sm">
 						<summary class="cursor-pointer font-medium">View raw content</summary>
-						<p class="mt-2 whitespace-pre-wrap text-muted-foreground">{form.story.rawContent}</p>
+						<p class="mt-2 whitespace-pre-wrap text-muted-foreground">{entry.story.rawContent}</p>
 					</details>
-				{/if}
-			</div>
+				</div>
+			{/if}
 
-			{#if !isEditingManually}
+			{#if !$storyStore.isEditingManually && index === $storyStore.stories.length - 1}
 				<div class="flex gap-2">
-					<Button type="submit" variant="outline">Try Again</Button>
+					<Button type="button" onclick={startTryAgain} variant="outline">Try Again</Button>
 					<Button onclick={startManualEdit} variant="outline">Edit Story Manually</Button>
 					<Button onclick={startPromptEdit} variant="outline">Edit Story with Prompt</Button>
 					<Button href="/characters">Send to Character Generation</Button>
 				</div>
 
-				{#if isEditingWithPrompt}
+				{#if $storyStore.isEditingWithPrompt}
 					<form
 						method="POST"
 						action="?/editStory"
 						use:enhance={() => {
-							isGenerating = true;
+							storyStore.update(state => ({ ...state, isGenerating: true }));
+							// Capture the edit prompt for the next story BEFORE form submission
+							capturedPromptForNextStory = `Edit: ${$storyStore.editPrompt}`;
 							return async ({ update }) => {
 								await update();
-								isGenerating = false;
-								isEditingWithPrompt = false;
-								editPrompt = '';
+								storyStore.update(state => ({
+									...state,
+									isGenerating: false,
+									isEditingWithPrompt: false,
+									editPrompt: ''
+								}));
 							};
 						}}
 					>
-						<div class="flex flex-col gap-4 rounded-md border p-4">
+						<div bind:this={editPromptElement} class="flex flex-col gap-4 rounded-md border p-4">
 							<h3 class="text-lg font-semibold">Edit Story with Prompt</h3>
 							<p class="text-sm text-muted-foreground">
 								Describe the changes you want to make to the story
 							</p>
-							<input type="hidden" name="currentStory" value={form.story.rawContent} />
-							<input type="hidden" name="length" value={selectedLength?.value || '5s'} />
+							<input type="hidden" name="currentStory" value={entry.story.rawContent} />
+							<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
 							<Textarea
-								bind:value={editPrompt}
+								bind:value={$storyStore.editPrompt}
 								name="editPrompt"
 								placeholder="E.g., 'Add more action to scene 2' or 'Make the dialogue more dramatic'"
 								class="min-h-32"
 							/>
 							<div class="flex gap-2">
 								<Button type="button" onclick={cancelPromptEdit} variant="outline">Cancel</Button>
-								<Button type="submit" disabled={isGenerating || !editPrompt.trim()}>
-									{isGenerating ? 'Regenerating...' : 'Regenerate Story'}
+								<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.editPrompt.trim()}>
+									{$storyStore.isGenerating ? 'Regenerating...' : 'Regenerate Story'}
+								</Button>
+							</div>
+						</div>
+					</form>
+				{/if}
+
+				{#if $storyStore.isTryingAgain}
+					<form
+						method="POST"
+						action="?/generateStory"
+						use:enhance={() => {
+							storyStore.update(state => ({ ...state, isGenerating: true }));
+							return async ({ update }) => {
+								await update();
+								storyStore.update(state => ({
+									...state,
+									isGenerating: false,
+									isTryingAgain: false
+								}));
+							};
+						}}
+					>
+						<div bind:this={tryAgainElement} class="flex flex-col gap-4 rounded-md border p-4">
+							<h3 class="text-lg font-semibold">Try Again</h3>
+							<p class="text-sm text-muted-foreground">
+								Generate a new version of the story
+							</p>
+
+							<div>
+								<label for="tryAgainLength" class="mb-1 block text-sm font-medium"
+									>Video Length</label
+								>
+								<Select.Root bind:selected={$storyStore.tryAgainLength}>
+									<Select.Trigger class="w-32">
+										{$storyStore.tryAgainLength?.label || 'Select length'}
+									</Select.Trigger>
+									<Select.Content>
+										{#each lengthOptions as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" name="length" value={$storyStore.tryAgainLength?.value || '5s'} />
+							</div>
+
+							<Textarea
+								bind:value={$storyStore.tryAgainPrompt}
+								name="prompt"
+								placeholder="Enter your story prompt"
+								class="min-h-32"
+								required
+							/>
+
+							<div class="flex gap-2">
+								<Button type="button" onclick={cancelTryAgain} variant="outline">Cancel</Button>
+								<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.tryAgainPrompt.trim()}>
+									{$storyStore.isGenerating ? 'Regenerating...' : 'Regenerate Story'}
 								</Button>
 							</div>
 						</div>
 					</form>
 				{/if}
 			{/if}
-		{/if}
+		{/each}
 	</div>
 </form>

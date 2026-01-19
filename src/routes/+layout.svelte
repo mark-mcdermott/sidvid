@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { page } from '$app/stores';
 	import {
 		SidebarProvider,
 		Sidebar,
@@ -44,7 +45,10 @@
 					<SidebarMenu>
 						{#each menuItems as item}
 							<SidebarMenuItem>
-								<SidebarMenuButton href={item.href}>
+								<SidebarMenuButton
+									href={item.href}
+									class={$page.url.pathname === item.href ? 'font-bold' : ''}
+								>
 									{item.title}
 								</SidebarMenuButton>
 							</SidebarMenuItem>
