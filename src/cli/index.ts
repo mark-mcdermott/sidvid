@@ -188,7 +188,7 @@ async function generateVideo(args: string[]) {
   console.log('\nVideo ID:', video.id);
   console.log('Status:', video.status);
 
-  if (video.status === 'queued' || video.status === 'processing') {
+  if (video.status === 'queued' || video.status === 'in_progress') {
     console.log('\nVideo is being generated. Check status with:');
     console.log(`  sidvid status ${video.id}`);
   }
