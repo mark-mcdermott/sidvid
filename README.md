@@ -1,6 +1,6 @@
 # SidVid
 
-AI-powered video generation platform using OpenAI's ChatGPT, DALL-E 3, and Sora.
+AI-powered video generation platform using OpenAI's ChatGPT, DALL-E 3, and Sora. Create at each stage from idea to finished product (story idea, character generation, still scene generation, storyboard drag and drop and final video) and the product from one stage is input for the next.
 
 ## Architecture
 
@@ -18,13 +18,13 @@ SidVid follows a **headless library** architecture with two thin client wrappers
 │  - generateScene()                  │
 │  - generateVideo()                  │
 └─────────────────────────────────────┘
-           ↑              ↑
-           │              │
-    ┌──────┴──────┐  ┌───┴────────┐
-    │   Web UI    │  │  CLI       │
-    │  (routes/)  │  │  (cli/)    │
-    │  SvelteKit  │  │  Node.js   │
-    └─────────────┘  └────────────┘
+            ↑              ↑
+            │              │
+     ┌──────┴──────┐  ┌───┴────────┐
+     │   Web UI    │  │  CLI       │
+     │  (routes/)  │  │  (cli/)    │
+     │  SvelteKit  │  │  Node.js   │
+     └─────────────┘  └────────────┘
 ```
 
 ### Project Structure
