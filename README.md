@@ -7,24 +7,24 @@ AI-powered video generation platform using OpenAI's ChatGPT, DALL-E 3, and Sora.
 SidVid follows a **headless library** architecture with two thin client wrappers:
 
 ```
-┌─────────────────────────────────────┐
-│  Headless Library (src/lib/sidvid)  │
-│  --------------------------------   │
-│  Pure TypeScript API methods:      │
-│  - generateStory()                  │
-│  - editStory()                      │
-│  - enhanceCharacterDescription()    │
-│  - generateCharacter()              │
-│  - generateScene()                  │
-│  - generateVideo()                  │
-└─────────────────────────────────────┘
-            ↑              ↑
-            │              │
-     ┌──────┴──────┐  ┌───┴────────┐
-     │   Web UI    │  │  CLI       │
-     │  (routes/)  │  │  (cli/)    │
-     │  SvelteKit  │  │  Node.js   │
-     └─────────────┘  └────────────┘
+  ┌─────────────────────────────────────┐
+  │  Headless Library (src/lib/sidvid)  │
+  │  --------------------------------   │
+  │  Pure TypeScript API methods:      │
+  │  - generateStory()                  │
+  │  - editStory()                      │
+  │  - enhanceCharacterDescription()    │
+  │  - generateCharacter()              │
+  │  - generateScene()                  │
+  │  - generateVideo()                  │
+  └─────────────────────────────────────┘
+              ↑              ↑
+              │              │
+       ┌──────┴──────┐  ┌───┴────────┐
+       │   Web UI    │  │  CLI       │
+       │  (routes/)  │  │  (cli/)    │
+       │  SvelteKit  │  │  Node.js   │
+       └─────────────┘  └────────────┘
 ```
 
 ### Project Structure
