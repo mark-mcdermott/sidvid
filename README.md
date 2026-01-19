@@ -296,6 +296,10 @@ The CLI provides command-line access to the library.
 
 2. Run commands:
    ```bash
+   # Using the wrapper script (clean output)
+   ./sidvid <command> [options]
+
+   # Or using pnpm (shows build messages)
    pnpm cli <command> [options]
    ```
 
@@ -305,7 +309,7 @@ The CLI provides command-line access to the library.
 
 ```bash
 # Generate a story
-pnpm cli story "A detective solving a mystery"
+./sidvid story "A detective solving a mystery"
 
 # Output includes:
 # - Story title
@@ -314,17 +318,17 @@ pnpm cli story "A detective solving a mystery"
 # - Full JSON for further processing
 
 # Edit a story (save story JSON to file first)
-pnpm cli edit-story story.json "Make it more dramatic"
+./sidvid edit-story story.json "Make it more dramatic"
 ```
 
 #### Character Generation
 
 ```bash
 # Standalone: Enhance a short description
-pnpm cli enhance-character "A detective"
+./sidvid enhance-character "A detective"
 
 # Generate character image
-pnpm cli character "A tall detective in a trenchcoat with silver hair"
+./sidvid character "A tall detective in a trenchcoat with silver hair"
 
 # From story metadata workflow:
 # 1. Generate story (includes character metadata)
@@ -337,24 +341,24 @@ pnpm cli character "A tall detective in a trenchcoat with silver hair"
 
 ```bash
 # Generate a scene image
-pnpm cli scene "A rainy street at night with neon lights"
+./sidvid scene "A rainy street at night with neon lights"
 ```
 
 #### Video Generation
 
 ```bash
 # Generate a video
-pnpm cli video "A cat playing piano in a jazz club"
+./sidvid video "A cat playing piano in a jazz club"
 
 # Check video status
-pnpm cli status video_abc123
+./sidvid status video_abc123
 ```
 
 #### Help
 
 ```bash
 # Show all commands
-pnpm cli help
+./sidvid help
 ```
 
 ## Development

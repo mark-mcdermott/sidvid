@@ -1,0 +1,3 @@
+#!/bin/bash
+cd "$(dirname "$0")"
+pnpm build:cli --silent >/dev/null 2>&1 && node dist/cli/index.js "$@"
