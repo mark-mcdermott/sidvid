@@ -10,7 +10,7 @@ SidVid follows a **headless library** architecture with two thin client wrappers
 ┌─────────────────────────────────────┐
 │  Headless Library (src/lib/sidvid)  │
 │  --------------------------------   │
-│  Pure TypeScript API methods:      │
+│  Pure TypeScript API methods:       │
 │  - generateStory()                  │
 │  - editStory()                      │
 │  - enhanceCharacterDescription()    │
@@ -20,7 +20,7 @@ SidVid follows a **headless library** architecture with two thin client wrappers
 └─────────────────────────────────────┘
             ↑              ↑
             │              │
-     ┌──────┴──────┐  ┌───┴────────┐
+     ┌──────┴──────┐  ┌─── ┴───────┐
      │   Web UI    │  │  CLI       │
      │  (routes/)  │  │  (cli/)    │
      │  SvelteKit  │  │  Node.js   │
