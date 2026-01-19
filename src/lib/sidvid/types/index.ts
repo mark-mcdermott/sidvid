@@ -53,6 +53,11 @@ export interface CharacterOptions {
   quality?: 'standard' | 'hd';
 }
 
+export interface EnhanceCharacterOptions {
+  description: string;
+  maxTokens?: number;
+}
+
 export interface Character {
   description: string;
   imageUrl: string;

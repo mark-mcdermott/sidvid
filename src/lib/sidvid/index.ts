@@ -9,6 +9,7 @@ export type {
   StoryCharacter,
   StorySceneVisual,
   CharacterOptions,
+  EnhanceCharacterOptions,
   Character,
   SceneOptions,
   Scene,

@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { CharacterOptions, Character } from '../types';
+import type { CharacterOptions, Character, EnhanceCharacterOptions } from '../types';
 import { characterOptionsSchema } from '../schemas';
 
 export async function generateCharacter(
@@ -30,6 +30,29 @@ export async function generateCharacter(
     imageUrl: imageData.url,
     revisedPrompt: imageData.revised_prompt,
   };
+}
+
+export async function enhanceCharacterDescription(
+  client: OpenAI,
+  options: EnhanceCharacterOptions
+): Promise<string> {
+  const { description, maxTokens = 1000 } = options;
+
+  const fullPrompt = `Create a character description from the following input, about 4 or 5 times longer. If no name was included, create a suitable/appropriate one. In both description and name, be creative. If you can detect a genre, write as if you were a top writer in that genre.\n\nInput: ${description}`;
+
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: fullPrompt }],
+    max_tokens: maxTokens,
+    temperature: 0.8
+  });
+
+  const characterText = completion.choices[0]?.message?.content;
+  if (!characterText) {
+    throw new Error('No content returned from ChatGPT');
+  }
+
+  return characterText;
 }
 
 function buildCharacterPrompt(options: CharacterOptions): string {
