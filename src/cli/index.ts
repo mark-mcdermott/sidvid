@@ -16,6 +16,35 @@ const commands = {
 
 let isVerbose = false;
 
+const spinnerFrames = ['←', '↖', '↑', '↗', '→', '↘', '↓', '↙'];
+
+function startSpinner(message: string): { stop: () => void } {
+  // Only show spinner if stdout is a TTY (not piped/redirected)
+  if (!process.stdout.isTTY) {
+    // If not a TTY, just print the message once without spinner
+    process.stdout.write(`${message}\n`);
+    return { stop: () => {} };
+  }
+
+  let frameIndex = 0;
+  const write = (text: string) => process.stdout.write(text);
+
+  write(`${spinnerFrames[frameIndex]} ${message}`);
+
+  const interval = setInterval(() => {
+    frameIndex = (frameIndex + 1) % spinnerFrames.length;
+    write(`\r${spinnerFrames[frameIndex]} ${message}`);
+  }, 100);
+
+  return {
+    stop: () => {
+      clearInterval(interval);
+      // Clear line with carriage return and spaces
+      write('\r' + ' '.repeat(message.length + 2) + '\r');
+    }
+  };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   isVerbose = args.includes('-v') || args.includes('--verbose');
@@ -48,11 +77,12 @@ async function generateStory(args: string[]) {
     process.exit(1);
   }
 
-  console.log('Generating story...');
+  const spinner = startSpinner('Generating story...');
   const client = getClient();
   const story = await client.generateStory({ prompt, scenes: 5 });
+  spinner.stop();
 
-  console.log('\nTitle:', story.title);
+  console.log('Title:', story.title);
   console.log('\nScenes:');
   story.scenes.forEach((scene) => {
     console.log(`\n${scene.number}. ${scene.description}`);
@@ -89,15 +119,16 @@ async function editStory(args: string[]) {
     const storyData = await fs.readFile(storyFile, 'utf-8');
     const currentStory = JSON.parse(storyData);
 
-    console.log('Editing story...');
+    const spinner = startSpinner('Editing story...');
     const client = getClient();
     const story = await client.editStory({
       currentStory,
       editPrompt,
       length: '5s'
     });
+    spinner.stop();
 
-    console.log('\nTitle:', story.title);
+    console.log('Title:', story.title);
     console.log('\nScenes:');
     story.scenes.forEach((scene) => {
       console.log(`\n${scene.number}. ${scene.description}`);
@@ -123,15 +154,16 @@ async function generateScene(args: string[]) {
     process.exit(1);
   }
 
-  console.log('Generating scene image...');
+  const spinner = startSpinner('Generating scene image...');
   const client = getClient();
   const scene = await client.generateScene({
     description,
     style: 'cinematic',
     aspectRatio: '16:9',
   });
+  spinner.stop();
 
-  console.log('\nImage URL:', scene.imageUrl);
+  console.log('Image URL:', scene.imageUrl);
   if (scene.revisedPrompt) {
     console.log('Revised prompt:', scene.revisedPrompt);
   }
@@ -145,14 +177,15 @@ async function generateCharacter(args: string[]) {
     process.exit(1);
   }
 
-  console.log('Generating character image...');
+  const spinner = startSpinner('Generating character image...');
   const client = getClient();
   const character = await client.generateCharacter({
     description,
     style: 'realistic',
   });
+  spinner.stop();
 
-  console.log('\nImage URL:', character.imageUrl);
+  console.log('Image URL:', character.imageUrl);
   if (character.revisedPrompt) {
     console.log('Revised prompt:', character.revisedPrompt);
   }
@@ -166,13 +199,14 @@ async function enhanceCharacter(args: string[]) {
     process.exit(1);
   }
 
-  console.log('Enhancing character description...');
+  const spinner = startSpinner('Enhancing character description...');
   const client = getClient();
   const enhanced = await client.enhanceCharacterDescription({
     description
   });
+  spinner.stop();
 
-  console.log('\nEnhanced Description:');
+  console.log('Enhanced Description:');
   console.log(enhanced);
   console.log('\n---');
   console.log('Use this enhanced description to generate an image:');
@@ -186,14 +220,15 @@ async function generateVideo(args: string[]) {
     process.exit(1);
   }
 
-  console.log('Generating video...');
+  const spinner = startSpinner('Generating video...');
   const client = getClient();
   const video = await client.generateVideo({
     prompt,
     duration: 4,
   });
+  spinner.stop();
 
-  console.log('\nVideo ID:', video.id);
+  console.log('Video ID:', video.id);
   console.log('Status:', video.status);
 
   if (video.status === 'queued' || video.status === 'in_progress') {
@@ -209,11 +244,12 @@ async function checkVideoStatus(args: string[]) {
     process.exit(1);
   }
 
-  console.log('Checking video status...');
+  const spinner = startSpinner('Checking video status...');
   const client = getClient();
   const video = await client.getVideoStatus(videoId);
+  spinner.stop();
 
-  console.log('\nVideo ID:', video.id);
+  console.log('Video ID:', video.id);
   console.log('Status:', video.status);
   console.log('Progress:', `${video.progress}%`);
 
