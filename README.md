@@ -330,10 +330,6 @@ pnpm cli <command> [options]
 
 ### CLI Features
 
-#### Interactive Spinner
-
-All commands show an animated ASCII arrow spinner (← ↖ ↑ ↗ → ↘ ↓ ↙) during API calls to provide visual feedback.
-
 #### Output Modes
 
 **Default (Concise)**: Shows only essential output
