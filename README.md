@@ -57,6 +57,7 @@ core/
 ## Installation
 
 ```bash
+git clone https://github.com/mark-mcdermott/sidvid-core.git
 pnpm install
 ```
 
@@ -64,7 +65,7 @@ pnpm install
 
 The core power of SidVid is its **headless TypeScript library**. Use it in any JavaScript/TypeScript project:
 
-### Installation (as a library)
+### Installation (as a library from NPM)
 
 ```bash
 npm install sidvid
