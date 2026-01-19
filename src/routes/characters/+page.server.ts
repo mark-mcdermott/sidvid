@@ -1,10 +1,9 @@
 import { SidVid } from '$lib/sidvid';
 import { OPENAI_API_KEY } from '$env/static/private';
 import type { Actions } from './$types';
-import OpenAI from 'openai';
 
 export const actions = {
-	generateCharacterText: async ({ request }) => {
+	enhanceDescription: async ({ request }) => {
 		const data = await request.formData();
 		const description = data.get('description');
 
@@ -13,37 +12,27 @@ export const actions = {
 		}
 
 		try {
-			const client = new OpenAI({ apiKey: OPENAI_API_KEY });
+			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
 
-			const fullPrompt = `Create a character description from the following input, about 4 or 5 times longer. If no name was included, create a suitable/appropriate one. In both description and name, be creative. If you can detect a genre, write as if you were a top writer in that genre.\n\nInput: ${description}`;
-
-			const completion = await client.chat.completions.create({
-				model: 'gpt-4o',
-				messages: [{ role: 'user', content: fullPrompt }],
-				max_tokens: 1000,
-				temperature: 0.8
+			const enhancedText = await sidvid.enhanceCharacterDescription({
+				description
 			});
-
-			const characterText = completion.choices[0]?.message?.content;
-			if (!characterText) {
-				throw new Error('No content returned from ChatGPT');
-			}
 
 			return {
 				success: true,
-				characterText,
-				action: 'text'
+				enhancedText,
+				action: 'enhance'
 			};
 		} catch (error) {
-			console.error('Error generating character text:', error);
+			console.error('Error enhancing character description:', error);
 			return {
 				success: false,
-				error: error instanceof Error ? error.message : 'Failed to generate character text'
+				error: error instanceof Error ? error.message : 'Failed to enhance character description'
 			};
 		}
 	},
 
-	generateCharacterImage: async ({ request }) => {
+	generateImage: async ({ request }) => {
 		const data = await request.formData();
 		const description = data.get('description');
 
@@ -67,7 +56,7 @@ export const actions = {
 				action: 'image'
 			};
 		} catch (error) {
-			console.error('Error generating character:', error);
+			console.error('Error generating character image:', error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Failed to generate character image'
