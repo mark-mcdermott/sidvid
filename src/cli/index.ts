@@ -14,12 +14,16 @@ const commands = {
   help: showHelp,
 };
 
+let isVerbose = false;
+
 async function main() {
   const args = process.argv.slice(2);
-  const command = args[0] || 'help';
+  isVerbose = args.includes('-v') || args.includes('--verbose');
+  const filteredArgs = args.filter(arg => arg !== '-v' && arg !== '--verbose');
+  const command = filteredArgs[0] || 'help';
 
   if (command in commands) {
-    await commands[command as keyof typeof commands](args.slice(1));
+    await commands[command as keyof typeof commands](filteredArgs.slice(1));
   } else {
     console.error(`Unknown command: ${command}`);
     showHelp();
@@ -56,16 +60,18 @@ async function generateStory(args: string[]) {
     if (scene.action) console.log(`   Action: ${scene.action}`);
   });
 
-  if (story.characters && story.characters.length > 0) {
-    console.log('\nCharacters:');
-    story.characters.forEach((char) => {
-      console.log(`\n- ${char.name}: ${char.description}`);
-    });
-  }
+  if (isVerbose) {
+    if (story.characters && story.characters.length > 0) {
+      console.log('\nCharacters:');
+      story.characters.forEach((char) => {
+        console.log(`\n- ${char.name}: ${char.description}`);
+      });
+    }
 
-  console.log('\n---');
-  console.log('Raw JSON saved. You can use this for editing:');
-  console.log(JSON.stringify(story, null, 2));
+    console.log('\n---');
+    console.log('Raw JSON saved. You can use this for editing:');
+    console.log(JSON.stringify(story, null, 2));
+  }
 }
 
 async function editStory(args: string[]) {
@@ -99,9 +105,11 @@ async function editStory(args: string[]) {
       if (scene.action) console.log(`   Action: ${scene.action}`);
     });
 
-    console.log('\n---');
-    console.log('Updated story JSON:');
-    console.log(JSON.stringify(story, null, 2));
+    if (isVerbose) {
+      console.log('\n---');
+      console.log('Updated story JSON:');
+      console.log(JSON.stringify(story, null, 2));
+    }
   } catch (error) {
     console.error('Error reading story file:', error);
     process.exit(1);
@@ -218,7 +226,10 @@ function showHelp() {
   console.log(`
 SidVid CLI - AI Video Generation
 
-Usage: sidvid <command> [options]
+Usage: sidvid [-v|--verbose] <command> [options]
+
+Options:
+  -v, --verbose              Show full output including characters and JSON
 
 Commands:
   story <prompt>              Generate a story with scenes and characters
@@ -234,9 +245,15 @@ Environment:
   OPENAI_API_KEY             Your OpenAI API key (required)
 
 Examples:
-  # Story generation
+  # Story generation (default: concise output)
   sidvid story "A detective solving a mystery"
+
+  # Story generation (verbose: with characters and JSON)
+  sidvid -v story "A detective solving a mystery"
+
+  # Edit story
   sidvid edit-story story.json "Make it more dramatic"
+  sidvid -v edit-story story.json "Make it more dramatic"
 
   # Character generation (standalone)
   sidvid enhance-character "A detective"
