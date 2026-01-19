@@ -5,8 +5,10 @@ import { SidVid } from '../lib/sidvid';
 
 const commands = {
   story: generateStory,
+  'edit-story': editStory,
   scene: generateScene,
   character: generateCharacter,
+  'enhance-character': enhanceCharacter,
   video: generateVideo,
   status: checkVideoStatus,
   help: showHelp,
@@ -48,10 +50,62 @@ async function generateStory(args: string[]) {
 
   console.log('\nTitle:', story.title);
   console.log('\nScenes:');
-  story.scenes.forEach((scene, i) => {
-    console.log(`\n${i + 1}. ${scene.title}`);
-    console.log(`   ${scene.description}`);
+  story.scenes.forEach((scene) => {
+    console.log(`\n${scene.number}. ${scene.description}`);
+    if (scene.dialogue) console.log(`   Dialogue: "${scene.dialogue}"`);
+    if (scene.action) console.log(`   Action: ${scene.action}`);
   });
+
+  if (story.characters && story.characters.length > 0) {
+    console.log('\nCharacters:');
+    story.characters.forEach((char) => {
+      console.log(`\n- ${char.name}: ${char.description}`);
+    });
+  }
+
+  console.log('\n---');
+  console.log('Raw JSON saved. You can use this for editing:');
+  console.log(JSON.stringify(story, null, 2));
+}
+
+async function editStory(args: string[]) {
+  if (args.length < 2) {
+    console.error('Usage: sidvid edit-story <story-json-file> <edit-prompt>');
+    console.error('Example: sidvid edit-story story.json "Make it more dramatic"');
+    process.exit(1);
+  }
+
+  const fs = await import('fs/promises');
+  const storyFile = args[0];
+  const editPrompt = args.slice(1).join(' ');
+
+  try {
+    const storyData = await fs.readFile(storyFile, 'utf-8');
+    const currentStory = JSON.parse(storyData);
+
+    console.log('Editing story...');
+    const client = getClient();
+    const story = await client.editStory({
+      currentStory,
+      editPrompt,
+      length: '5s'
+    });
+
+    console.log('\nTitle:', story.title);
+    console.log('\nScenes:');
+    story.scenes.forEach((scene) => {
+      console.log(`\n${scene.number}. ${scene.description}`);
+      if (scene.dialogue) console.log(`   Dialogue: "${scene.dialogue}"`);
+      if (scene.action) console.log(`   Action: ${scene.action}`);
+    });
+
+    console.log('\n---');
+    console.log('Updated story JSON:');
+    console.log(JSON.stringify(story, null, 2));
+  } catch (error) {
+    console.error('Error reading story file:', error);
+    process.exit(1);
+  }
 }
 
 async function generateScene(args: string[]) {
@@ -79,6 +133,7 @@ async function generateCharacter(args: string[]) {
   const description = args.join(' ');
   if (!description) {
     console.error('Usage: sidvid character <description>');
+    console.error('Example: sidvid character "A tall detective in a trenchcoat"');
     process.exit(1);
   }
 
@@ -93,6 +148,27 @@ async function generateCharacter(args: string[]) {
   if (character.revisedPrompt) {
     console.log('Revised prompt:', character.revisedPrompt);
   }
+}
+
+async function enhanceCharacter(args: string[]) {
+  const description = args.join(' ');
+  if (!description) {
+    console.error('Usage: sidvid enhance-character <description>');
+    console.error('Example: sidvid enhance-character "A detective"');
+    process.exit(1);
+  }
+
+  console.log('Enhancing character description...');
+  const client = getClient();
+  const enhanced = await client.enhanceCharacterDescription({
+    description
+  });
+
+  console.log('\nEnhanced Description:');
+  console.log(enhanced);
+  console.log('\n---');
+  console.log('Use this enhanced description to generate an image:');
+  console.log(`sidvid character "${enhanced}"`);
 }
 
 async function generateVideo(args: string[]) {
@@ -145,20 +221,34 @@ SidVid CLI - AI Video Generation
 Usage: sidvid <command> [options]
 
 Commands:
-  story <prompt>        Generate a story with scenes
-  scene <description>   Generate a scene image (DALL-E 3)
-  character <desc>      Generate a character image (DALL-E 3)
-  video <prompt>        Generate a video (Sora)
-  status <video-id>     Check video generation status
-  help                  Show this help message
+  story <prompt>              Generate a story with scenes and characters
+  edit-story <file> <prompt>  Edit an existing story from JSON file
+  enhance-character <desc>    Enhance a character description with GPT-4
+  character <description>     Generate a character image (DALL-E 3)
+  scene <description>         Generate a scene image (DALL-E 3)
+  video <prompt>              Generate a video (Sora)
+  status <video-id>           Check video generation status
+  help                        Show this help message
 
 Environment:
-  OPENAI_API_KEY        Your OpenAI API key (required)
+  OPENAI_API_KEY             Your OpenAI API key (required)
 
 Examples:
+  # Story generation
   sidvid story "A detective solving a mystery"
+  sidvid edit-story story.json "Make it more dramatic"
+
+  # Character generation (standalone)
+  sidvid enhance-character "A detective"
+  sidvid character "A tall detective in a trenchcoat with silver hair"
+
+  # Character generation (from story metadata)
+  # 1. Generate story (includes character metadata)
+  # 2. Extract character descriptions from story JSON
+  # 3. Enhance and generate images for each character
+
+  # Scene and video
   sidvid scene "A rainy street at night with neon lights"
-  sidvid character "A tall detective in a trenchcoat"
   sidvid video "A cat playing piano"
   sidvid status video_abc123
 `);
