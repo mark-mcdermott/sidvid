@@ -25,3 +25,6 @@ vite.config.ts.timestamp-*
 
 # Test
 coverage
+
+# Data (conversations and images)
+/data

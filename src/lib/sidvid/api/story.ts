@@ -50,7 +50,7 @@ Return only valid JSON.`;
       { role: 'user', content: userPrompt },
     ],
     max_tokens: validated.maxTokens,
-    temperature: 0.8,
+    temperature: 1.0,
     response_format: { type: 'json_object' },
   });
 
@@ -87,6 +87,14 @@ ${currentStory.rawContent}
 
 Please modify the story based on this instruction: ${editPrompt}
 
+CRITICAL EDITING RULES:
+1. PRESERVE THE EXACT SAME NUMBER OF SCENES - Do not reduce or increase the scene count unless explicitly requested
+2. Keep the existing story structure intact - only modify the parts requested in the edit instruction
+3. If the edit asks to add something (like "needs exploding stars"), incorporate it INTO the existing scenes
+4. DO NOT start over from scratch - build upon the current story
+5. Only reduce scenes if explicitly asked (e.g., "make it shorter", "combine scenes", "remove scene X")
+6. Only increase scenes if explicitly asked (e.g., "make it longer", "add more scenes")
+
 Return the updated story in the same JSON format with the following structure:
 {
   "title": "Story Title",
@@ -114,7 +122,6 @@ Return the updated story in the same JSON format with the following structure:
   ]
 }
 
-Keep the same number of scenes and maintain the overall structure.
 Update the characters and sceneVisuals arrays to reflect any changes from the edit.
 Extract information directly from the story text without adding creative embellishments.
 Return only valid JSON.`;

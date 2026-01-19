@@ -5,6 +5,8 @@
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
 	import { storyStore } from '$lib/stores/storyStore';
+	import { conversationStore, createMessage, addMessageToConversation } from '$lib/stores/conversationStore';
+	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
@@ -16,6 +18,16 @@
 	let latestStoryCardElement: HTMLDivElement | undefined = $state();
 	let lastStoryRawContent = $state<string>('');
 	let capturedPromptForNextStory = $state<string>('');
+	let mainFormElement: HTMLFormElement | undefined = $state();
+	let editFormElement: HTMLFormElement | undefined = $state();
+	let tryAgainFormElement: HTMLFormElement | undefined = $state();
+
+	function handleKeydown(e: KeyboardEvent, formElement?: HTMLFormElement) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			formElement?.requestSubmit();
+		}
+	}
 
 	$effect(() => {
 		if (form?.success && form?.story) {
@@ -49,6 +61,28 @@
 						editedStoryContent: ''
 					}));
 					lastStoryRawContent = currentRawContent;
+
+					// Save to conversation
+					(async () => {
+						try {
+							// Create conversation with user message
+							const conversation = await createMessage(
+								storyPrompt,
+								'/story',
+								$conversationStore.currentConversationId || undefined
+							);
+
+							// Add assistant response (use rawContent which is already a string)
+							await addMessageToConversation(conversation.id, {
+								role: 'assistant',
+								content: form.story.rawContent,
+								timestamp: Date.now(),
+								route: '/story'
+							});
+						} catch (error) {
+							console.error('Error saving conversation:', error);
+						}
+					})();
 				});
 			}
 		}
@@ -166,13 +200,21 @@
 </script>
 
 <form
+	bind:this={mainFormElement}
 	method="POST"
 	action="?/generateStory"
 	use:enhance={() => {
+		// Capture the prompt before form submission
+		const currentPrompt = $storyStore.prompt;
 		storyStore.update(state => ({ ...state, isGenerating: true }));
 		return async ({ update }) => {
-			await update();
-			storyStore.update(state => ({ ...state, isGenerating: false }));
+			await update({ reset: false }); // Don't reset the form
+			storyStore.update(state => ({
+				...state,
+				isGenerating: false,
+				// Restore prompt if it was cleared
+				prompt: currentPrompt
+			}));
 		};
 	}}
 >
@@ -186,46 +228,52 @@
 			</div>
 		{/if}
 
-		<div class="w-full xl:max-w-[32rem]">
-			<div class="mb-2">
-				<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
-				<Select.Root bind:selected={$storyStore.selectedLength}>
-					<Select.Trigger class="w-32">
-						{$storyStore.selectedLength?.label || 'Select length'}
-					</Select.Trigger>
-					<Select.Content>
-						{#each lengthOptions as option}
-							<Select.Item value={option.value} label={option.label}>
-								{option.label}
-							</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-				<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+		{#if $storyStore.stories.length === 0}
+			<div class="w-full xl:max-w-[32rem]">
+				<div class="mb-2">
+					<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
+					<Select.Root bind:selected={$storyStore.selectedLength}>
+						<Select.Trigger class="w-32">
+							{$storyStore.selectedLength?.label || 'Select length'}
+						</Select.Trigger>
+						<Select.Content>
+							{#each lengthOptions as option}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+					<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+				</div>
+
+				<Textarea
+					bind:value={$storyStore.prompt}
+					name="prompt"
+					placeholder="Enter your story prompt (e.g., 'A detective solving a mystery in a futuristic city'). Press Enter to submit, Shift+Enter for new line."
+					class="min-h-32"
+					required
+					onkeydown={(e) => handleKeydown(e, mainFormElement)}
+				/>
 			</div>
 
-			<Textarea
-				bind:value={$storyStore.prompt}
-				name="prompt"
-				placeholder="Enter your story prompt (e.g., 'A detective solving a mystery in a futuristic city')"
-				class="min-h-32"
-				required
-			/>
-		</div>
-
-		<div class="flex gap-2">
-			<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
-				{$storyStore.isGenerating ? 'Generating...' : 'Generate Story'}
-			</Button>
-		</div>
+			<div class="flex gap-2">
+				<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
+					{#if $storyStore.isGenerating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						Generating...
+					{:else}
+						Generate Story
+					{/if}
+				</Button>
+			</div>
+		{/if}
 
 		{#each $storyStore.stories as entry, index}
-			{#if index > 0}
-				<div class="my-4 rounded-md bg-muted/30 p-3 text-sm">
-					<p class="font-medium text-muted-foreground">Prompt ({entry.length}):</p>
-					<p class="mt-1">{entry.prompt}</p>
-				</div>
-			{/if}
+			<div class="my-4 rounded-md bg-muted/30 p-3 text-sm">
+				<p class="font-medium text-muted-foreground">Prompt ({entry.length}):</p>
+				<p class="mt-1">{entry.prompt}</p>
+			</div>
 
 			{#if index === $storyStore.stories.length - 1}
 				<div bind:this={latestStoryCardElement} class="flex flex-col gap-4 rounded-md border p-4">
@@ -326,6 +374,7 @@
 
 				{#if $storyStore.isEditingWithPrompt}
 					<form
+						bind:this={editFormElement}
 						method="POST"
 						action="?/editStory"
 						use:enhance={() => {
@@ -333,7 +382,7 @@
 							// Capture the edit prompt for the next story BEFORE form submission
 							capturedPromptForNextStory = `Edit: ${$storyStore.editPrompt}`;
 							return async ({ update }) => {
-								await update();
+								await update({ reset: false }); // Don't reset the form
 								storyStore.update(state => ({
 									...state,
 									isGenerating: false,
@@ -353,13 +402,19 @@
 							<Textarea
 								bind:value={$storyStore.editPrompt}
 								name="editPrompt"
-								placeholder="E.g., 'Add more action to scene 2' or 'Make the dialogue more dramatic'"
+								placeholder="E.g., 'Add more action to scene 2' or 'Make the dialogue more dramatic'. Press Enter to submit, Shift+Enter for new line."
 								class="min-h-32"
+								onkeydown={(e) => handleKeydown(e, editFormElement)}
 							/>
 							<div class="flex gap-2">
 								<Button type="button" onclick={cancelPromptEdit} variant="outline">Cancel</Button>
 								<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.editPrompt.trim()}>
-									{$storyStore.isGenerating ? 'Regenerating...' : 'Regenerate Story'}
+									{#if $storyStore.isGenerating}
+										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										Regenerating...
+									{:else}
+										Regenerate Story
+									{/if}
 								</Button>
 							</div>
 						</div>
@@ -368,19 +423,24 @@
 
 				{#if $storyStore.isTryingAgain}
 					<form
+						bind:this={tryAgainFormElement}
 						method="POST"
 						action="?/generateStory"
-						use:enhance={() => {
-							storyStore.update(state => ({ ...state, isGenerating: true }));
-							return async ({ update }) => {
-								await update();
-								storyStore.update(state => ({
-									...state,
-									isGenerating: false,
-									isTryingAgain: false
-								}));
-							};
-						}}
+					use:enhance={() => {
+						// Capture the try again prompt before form submission
+						const currentTryAgainPrompt = $storyStore.tryAgainPrompt;
+						storyStore.update(state => ({ ...state, isGenerating: true }));
+						return async ({ update }) => {
+							await update({ reset: false }); // Don't reset the form
+							storyStore.update(state => ({
+								...state,
+								isGenerating: false,
+								isTryingAgain: false,
+								// Restore prompt if it was cleared
+								tryAgainPrompt: currentTryAgainPrompt
+							}));
+						};
+					}}
 					>
 						<div bind:this={tryAgainElement} class="flex flex-col gap-4 rounded-md border p-4">
 							<h3 class="text-lg font-semibold">Try Again</h3>
@@ -410,15 +470,21 @@
 							<Textarea
 								bind:value={$storyStore.tryAgainPrompt}
 								name="prompt"
-								placeholder="Enter your story prompt"
+								placeholder="Enter your story prompt. Press Enter to submit, Shift+Enter for new line."
 								class="min-h-32"
 								required
+								onkeydown={(e) => handleKeydown(e, tryAgainFormElement)}
 							/>
 
 							<div class="flex gap-2">
 								<Button type="button" onclick={cancelTryAgain} variant="outline">Cancel</Button>
 								<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.tryAgainPrompt.trim()}>
-									{$storyStore.isGenerating ? 'Regenerating...' : 'Regenerate Story'}
+									{#if $storyStore.isGenerating}
+										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										Regenerating...
+									{:else}
+										Regenerate Story
+									{/if}
 								</Button>
 							</div>
 						</div>

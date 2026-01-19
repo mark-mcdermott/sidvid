@@ -4,13 +4,17 @@
 	import { enhance } from '$app/forms';
 	import { characterStore, loadStoryCharacters } from '$lib/stores/characterStore';
 	import { storyStore } from '$lib/stores/storyStore';
+	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import { onMount } from 'svelte';
+	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
 
 	let isGenerating = $state(false);
 	let activeCharacterIndex = $state(0);
+	let lastProcessedEnhancedText = $state<string>('');
+	let lastProcessedImageUrl = $state<string>('');
 
 	// Load story characters if available
 	onMount(() => {
@@ -22,7 +26,9 @@
 
 	// Handle form success
 	$effect(() => {
-		if (form?.success && form?.enhancedText) {
+		if (form?.success && form?.enhancedText && form.enhancedText !== lastProcessedEnhancedText) {
+			lastProcessedEnhancedText = form.enhancedText;
+
 			characterStore.update(state => {
 				const updatedCharacters = [...state.characters];
 				if (activeCharacterIndex < updatedCharacters.length) {
@@ -33,20 +39,75 @@
 				}
 				return { ...state, characters: updatedCharacters };
 			});
+
+			// Save to conversation
+			(async () => {
+				try {
+					const char = $characterStore.characters[activeCharacterIndex];
+					const conversation = await createMessage(
+						`Enhance character description: ${char?.description}`,
+						'/characters',
+						$conversationStore.currentConversationId || undefined
+					);
+					await addMessageToConversation(conversation.id, {
+						role: 'assistant',
+						content: form.enhancedText,
+						timestamp: Date.now(),
+						route: '/characters'
+					});
+				} catch (error) {
+					console.error('Error saving conversation:', error);
+				}
+			})();
 		}
 
-		if (form?.success && form?.character) {
-			characterStore.update(state => {
-				const updatedCharacters = [...state.characters];
-				if (activeCharacterIndex < updatedCharacters.length) {
-					updatedCharacters[activeCharacterIndex] = {
-						...updatedCharacters[activeCharacterIndex],
-						imageUrl: form.character.imageUrl,
-						revisedPrompt: form.character.revisedPrompt
-					};
+		if (form?.success && form?.character && form.character.imageUrl !== lastProcessedImageUrl) {
+			lastProcessedImageUrl = form.character.imageUrl;
+
+			(async () => {
+				try {
+					// Download image and get local path
+					const localPath = await downloadAndReplaceImage(
+						form.character.imageUrl,
+						$conversationStore.currentConversationId || ''
+					);
+
+					// Update character store with local path
+					characterStore.update(state => {
+						const updatedCharacters = [...state.characters];
+						if (activeCharacterIndex < updatedCharacters.length) {
+							updatedCharacters[activeCharacterIndex] = {
+								...updatedCharacters[activeCharacterIndex],
+								imageUrl: `/data/images/${localPath}`,
+								revisedPrompt: form.character.revisedPrompt
+							};
+						}
+						return { ...state, characters: updatedCharacters };
+					});
+
+					// Save to conversation
+					const char = $characterStore.characters[activeCharacterIndex];
+					const description = char?.enhancedDescription || char?.description || '';
+					const conversation = await createMessage(
+						`Generate character image: ${description}`,
+						'/characters',
+						$conversationStore.currentConversationId || undefined
+					);
+					await addMessageToConversation(conversation.id, {
+						role: 'assistant',
+						content: JSON.stringify({
+							character: char?.name,
+							imageUrl: `/data/images/${localPath}`,
+							revisedPrompt: form.character.revisedPrompt
+						}, null, 2),
+						timestamp: Date.now(),
+						route: '/characters',
+						images: [localPath]
+					});
+				} catch (error) {
+					console.error('Error processing image:', error);
 				}
-				return { ...state, characters: updatedCharacters };
-			});
+			})();
 		}
 	});
 
@@ -70,6 +131,13 @@
 	function getCurrentDescription() {
 		const char = $characterStore.characters[activeCharacterIndex];
 		return char?.enhancedDescription || char?.description || '';
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			addCustomCharacter();
+		}
 	}
 </script>
 
@@ -113,8 +181,9 @@
 		<div class="flex gap-2">
 			<Textarea
 				bind:value={$characterStore.customDescription}
-				placeholder="Enter character description (e.g., 'A brave space captain with short silver hair')"
+				placeholder="Enter character description (e.g., 'A brave space captain with short silver hair'). Press Enter to add, Shift+Enter for new line."
 				class="min-h-24 flex-1"
+				onkeydown={handleKeydown}
 			/>
 			<Button onclick={addCustomCharacter} variant="outline">Add</Button>
 		</div>
@@ -170,7 +239,12 @@
 						variant="outline"
 						disabled={isGenerating || !activeChar.description}
 					>
-						{isGenerating && form?.action === 'enhance' ? 'Enhancing...' : 'Enhance Description'}
+						{#if isGenerating && form?.action === 'enhance'}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Enhancing...
+						{:else}
+							Enhance Description
+						{/if}
 					</Button>
 				</form>
 
@@ -187,7 +261,12 @@
 				>
 					<input type="hidden" name="description" value={getCurrentDescription()} />
 					<Button type="submit" disabled={isGenerating || !getCurrentDescription()}>
-						{isGenerating && form?.action === 'image' ? 'Generating...' : 'Generate Image'}
+						{#if isGenerating && form?.action === 'image'}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Generating...
+						{:else}
+							Generate Image
+						{/if}
 					</Button>
 				</form>
 			</div>

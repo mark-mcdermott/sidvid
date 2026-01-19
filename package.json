@@ -28,6 +28,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:storygen": "playwright test --grep @storygen",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
