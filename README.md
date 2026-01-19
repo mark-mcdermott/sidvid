@@ -282,43 +282,88 @@ pnpm build
 pnpm preview
 ```
 
-## Running the CLI Locally
+## Using the CLI
 
-The CLI provides command-line access to the library.
+The CLI provides command-line access to the SidVid library with an interactive spinner and flexible output options.
 
-### Setup
+### Installation Options
 
-1. Set your OpenAI API key:
-   ```bash
-   export OPENAI_API_KEY=sk-your-api-key-here
-   # or add to your .env file
-   ```
+#### Option 1: Install from NPM (Global)
 
-2. Run commands:
-   ```bash
-   # Using the wrapper script (clean output)
-   ./sidvid <command> [options]
+```bash
+npm install -g sidvid
+# or
+pnpm add -g sidvid
 
-   # Or using pnpm (shows build messages)
-   pnpm cli <command> [options]
-   ```
+# Then use anywhere
+sidvid story "A detective solving a mystery"
+```
+
+#### Option 2: Install from NPM (Local to Project)
+
+```bash
+npm install sidvid
+# or
+pnpm add sidvid
+
+# Then use with npx
+npx sidvid story "A detective solving a mystery"
+```
+
+#### Option 3: Run Locally from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/mark-mcdermott/sidvid-core.git
+cd sidvid-core/core
+
+# Set your OpenAI API key
+export OPENAI_API_KEY=sk-your-api-key-here
+# or add to your .env file
+
+# Run commands using the wrapper script (clean output)
+./sidvid <command> [options]
+
+# Or using pnpm (shows build messages)
+pnpm cli <command> [options]
+```
+
+### CLI Features
+
+#### Interactive Spinner
+
+All commands show an animated ASCII arrow spinner (← ↖ ↑ ↗ → ↘ ↓ ↙) during API calls to provide visual feedback.
+
+#### Output Modes
+
+**Default (Concise)**: Shows only essential output
+```bash
+sidvid story "A detective solving a mystery"
+# Output: Title and scenes only
+```
+
+**Verbose (`-v` or `--verbose`)**: Shows full output including character metadata and raw JSON
+```bash
+sidvid -v story "A detective solving a mystery"
+# Output: Title, scenes, characters, and full JSON
+```
 
 ### CLI Commands
 
 #### Story Generation
 
 ```bash
-# Generate a story
-./sidvid story "A detective solving a mystery"
+# Generate a story (concise output)
+sidvid story "A detective solving a mystery"
 
-# Output includes:
-# - Story title
-# - Scene descriptions, dialogue, actions
-# - Character metadata
-# - Full JSON for further processing
+# Generate a story (verbose output with characters and JSON)
+sidvid -v story "A detective solving a mystery"
 
 # Edit a story (save story JSON to file first)
-./sidvid edit-story story.json "Make it more dramatic"
+sidvid edit-story story.json "Make it more dramatic"
+
+# Edit a story (verbose output with updated JSON)
+sidvid -v edit-story story.json "Make it more dramatic"
 ```
 
 #### Character Generation
@@ -357,9 +402,21 @@ The CLI provides command-line access to the library.
 #### Help
 
 ```bash
-# Show all commands
-./sidvid help
+# Show all commands and options
+sidvid help
 ```
+
+### CLI Options
+
+**`-v, --verbose`**: Enable verbose output mode
+- Can be placed anywhere in the command: before command, after command, or at the end
+- Shows full output including character metadata and raw JSON for story commands
+- Examples:
+  ```bash
+  sidvid -v story "test"      # Flag before command
+  sidvid story -v "test"      # Flag after command
+  sidvid story "test" -v      # Flag at end
+  ```
 
 ## Development
 
