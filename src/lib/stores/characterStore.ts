@@ -7,6 +7,7 @@ export interface CharacterEntry {
 	enhancedDescription?: string;
 	imageUrl?: string;
 	revisedPrompt?: string;
+	isExpanded?: boolean;
 }
 
 export interface CharacterState {
@@ -20,6 +21,7 @@ export interface CharacterState {
 	// UI state
 	isGenerating: boolean;
 	selectedCharacterIndex: number | null;
+	expandedCharacterIndices: Set<number>;
 }
 
 const initialState: CharacterState = {
@@ -27,13 +29,14 @@ const initialState: CharacterState = {
 	customDescription: '',
 	characters: [],
 	isGenerating: false,
-	selectedCharacterIndex: null
+	selectedCharacterIndex: null,
+	expandedCharacterIndices: new Set()
 };
 
 export const characterStore = writable<CharacterState>(initialState);
 
 export function resetCharacterStore() {
-	characterStore.set(initialState);
+	characterStore.set({ ...initialState, expandedCharacterIndices: new Set() });
 }
 
 export function loadStoryCharacters(characters: StoryCharacter[]) {
@@ -42,7 +45,36 @@ export function loadStoryCharacters(characters: StoryCharacter[]) {
 		storyCharacters: characters,
 		characters: characters.map(c => ({
 			name: c.name,
-			description: c.description
+			description: c.description,
+			isExpanded: false
 		}))
 	}));
+}
+
+export function toggleCharacterExpanded(index: number) {
+	characterStore.update(state => {
+		const newExpanded = new Set(state.expandedCharacterIndices);
+		if (newExpanded.has(index)) {
+			newExpanded.delete(index);
+		} else {
+			newExpanded.add(index);
+		}
+		return {
+			...state,
+			expandedCharacterIndices: newExpanded,
+			selectedCharacterIndex: index
+		};
+	});
+}
+
+export function ensureCharacterExpanded(index: number) {
+	characterStore.update(state => {
+		const newExpanded = new Set(state.expandedCharacterIndices);
+		newExpanded.add(index);
+		return {
+			...state,
+			expandedCharacterIndices: newExpanded,
+			selectedCharacterIndex: index
+		};
+	});
 }

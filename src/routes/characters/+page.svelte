@@ -2,10 +2,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { enhance } from '$app/forms';
-	import { characterStore, loadStoryCharacters } from '$lib/stores/characterStore';
+	import { characterStore, loadStoryCharacters, ensureCharacterExpanded } from '$lib/stores/characterStore';
 	import { storyStore } from '$lib/stores/storyStore';
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
@@ -15,6 +15,7 @@
 	let activeCharacterIndex = $state(0);
 	let lastProcessedEnhancedText = $state<string>('');
 	let lastProcessedImageUrl = $state<string>('');
+	let characterRefs: { [key: number]: HTMLDivElement } = {};
 
 	// Load story characters if available
 	onMount(() => {
@@ -111,25 +112,44 @@
 		}
 	});
 
-	function addCustomCharacter() {
+	async function addCustomCharacter() {
 		if ($characterStore.customDescription.trim()) {
+			const customDesc = $characterStore.customDescription;
 			characterStore.update(state => ({
 				...state,
 				characters: [
 					...state.characters,
 					{
 						name: 'Custom Character',
-						description: state.customDescription
+						description: customDesc,
+						isExpanded: false
 					}
 				],
 				customDescription: ''
 			}));
-			activeCharacterIndex = $characterStore.characters.length;
+			await tick();
+			const newIndex = $characterStore.characters.length - 1;
+			await handleCharacterClick(newIndex);
 		}
 	}
 
-	function getCurrentDescription() {
-		const char = $characterStore.characters[activeCharacterIndex];
+	async function handleCharacterClick(index: number) {
+		// Check if this character is already expanded
+		if ($characterStore.expandedCharacterIndices.has(index)) {
+			// If already expanded, just scroll to it
+			await tick();
+			characterRefs[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		} else {
+			// If not expanded, expand it
+			ensureCharacterExpanded(index);
+			activeCharacterIndex = index;
+			await tick();
+			characterRefs[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
+	}
+
+	function getCurrentDescription(index: number) {
+		const char = $characterStore.characters[index];
 		return char?.enhancedDescription || char?.description || '';
 	}
 
@@ -157,16 +177,22 @@
 		</div>
 	{/if}
 
-	<!-- Story Characters -->
-	{#if $characterStore.storyCharacters.length > 0}
+	<!-- Character Buttons -->
+	{#if $characterStore.characters.length > 0}
 		<div class="rounded-md border p-4">
-			<h2 class="mb-3 text-lg font-semibold">Characters from Story</h2>
+			<h2 class="mb-3 text-lg font-semibold">
+				{#if $characterStore.storyCharacters.length > 0}
+					Characters from Story
+				{:else}
+					Characters
+				{/if}
+			</h2>
 			<div class="flex flex-wrap gap-2">
 				{#each $characterStore.characters as char, index}
 					<Button
-						variant={activeCharacterIndex === index ? 'default' : 'outline'}
+						variant={$characterStore.expandedCharacterIndices.has(index) ? 'default' : 'outline'}
 						size="sm"
-						onclick={() => (activeCharacterIndex = index)}
+						onclick={() => handleCharacterClick(index)}
 					>
 						{char.name}
 					</Button>
@@ -189,87 +215,93 @@
 		</div>
 	</div>
 
-	<!-- Active Character Actions -->
-	{#if $characterStore.characters.length > 0 && activeCharacterIndex < $characterStore.characters.length}
-		{@const activeChar = $characterStore.characters[activeCharacterIndex]}
-
-		<div class="flex flex-col gap-4 rounded-md border p-4">
-			<div>
-				<h2 class="mb-2 text-xl font-semibold">{activeChar.name}</h2>
-				<p class="text-sm text-muted-foreground">{activeChar.description}</p>
-			</div>
-
-			{#if activeChar.enhancedDescription}
-				<div class="rounded-md bg-muted/50 p-3">
-					<p class="mb-1 text-xs font-medium uppercase text-muted-foreground">
-						Enhanced Description:
-					</p>
-					<p class="text-sm">{activeChar.enhancedDescription}</p>
-				</div>
-			{/if}
-
-			{#if activeChar.imageUrl}
+	<!-- Expanded Characters -->
+	{#each $characterStore.characters as char, index}
+		{#if $characterStore.expandedCharacterIndices.has(index)}
+			<div
+				bind:this={characterRefs[index]}
+				class="flex flex-col gap-4 rounded-md border p-4"
+				data-character-content={index}
+			>
 				<div>
-					<img src={activeChar.imageUrl} alt={activeChar.name} class="rounded-md" />
+					<h2 class="mb-2 text-xl font-semibold">{char.name}</h2>
+					<p class="text-sm text-muted-foreground">{char.description}</p>
 				</div>
-			{/if}
 
-			{#if activeChar.revisedPrompt}
-				<details class="text-sm">
-					<summary class="cursor-pointer font-medium">View DALL-E revised prompt</summary>
-					<p class="mt-2 text-muted-foreground">{activeChar.revisedPrompt}</p>
-				</details>
-			{/if}
+				{#if char.enhancedDescription}
+					<div class="rounded-md bg-muted/50 p-3">
+						<p class="mb-1 text-xs font-medium uppercase text-muted-foreground">
+							Enhanced Description:
+						</p>
+						<p class="text-sm">{char.enhancedDescription}</p>
+					</div>
+				{/if}
 
-			<div class="flex gap-2">
-				<form
-					method="POST"
-					action="?/enhanceDescription"
-					use:enhance={() => {
-						isGenerating = true;
-						return async ({ update }) => {
-							await update();
-							isGenerating = false;
-						};
-					}}
-				>
-					<input type="hidden" name="description" value={getCurrentDescription()} />
-					<Button
-						type="submit"
-						variant="outline"
-						disabled={isGenerating || !activeChar.description}
+				{#if char.imageUrl}
+					<div>
+						<img src={char.imageUrl} alt={char.name} class="rounded-md" />
+					</div>
+				{/if}
+
+				{#if char.revisedPrompt}
+					<details class="text-sm">
+						<summary class="cursor-pointer font-medium">View DALL-E revised prompt</summary>
+						<p class="mt-2 text-muted-foreground">{char.revisedPrompt}</p>
+					</details>
+				{/if}
+
+				<div class="flex gap-2">
+					<form
+						method="POST"
+						action="?/enhanceDescription"
+						use:enhance={() => {
+							isGenerating = true;
+							activeCharacterIndex = index;
+							return async ({ update }) => {
+								await update();
+								isGenerating = false;
+							};
+						}}
 					>
-						{#if isGenerating && form?.action === 'enhance'}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Enhancing...
-						{:else}
-							Enhance Description
-						{/if}
-					</Button>
-				</form>
+						<input type="hidden" name="description" value={getCurrentDescription(index)} />
+						<Button
+							type="submit"
+							variant="outline"
+							disabled={isGenerating || !char.description}
+						>
+							{#if isGenerating && activeCharacterIndex === index && form?.action === 'enhance'}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								Enhancing...
+							{:else}
+								Enhance Description
+							{/if}
+						</Button>
+					</form>
 
-				<form
-					method="POST"
-					action="?/generateImage"
-					use:enhance={() => {
-						isGenerating = true;
-						return async ({ update }) => {
-							await update();
-							isGenerating = false;
-						};
-					}}
-				>
-					<input type="hidden" name="description" value={getCurrentDescription()} />
-					<Button type="submit" disabled={isGenerating || !getCurrentDescription()}>
-						{#if isGenerating && form?.action === 'image'}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Generating...
-						{:else}
-							Generate Image
-						{/if}
-					</Button>
-				</form>
+					<form
+						method="POST"
+						action="?/generateImage"
+						use:enhance={() => {
+							isGenerating = true;
+							activeCharacterIndex = index;
+							return async ({ update }) => {
+								await update();
+								isGenerating = false;
+							};
+						}}
+					>
+						<input type="hidden" name="description" value={getCurrentDescription(index)} />
+						<Button type="submit" disabled={isGenerating || !getCurrentDescription(index)}>
+							{#if isGenerating && activeCharacterIndex === index && form?.action === 'image'}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								Generating...
+							{:else}
+								Generate Image
+							{/if}
+						</Button>
+					</form>
+				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
+	{/each}
 </div>
