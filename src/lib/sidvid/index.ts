@@ -1,4 +1,8 @@
 export { SidVid } from './client';
+export { Session, type SessionMetadata } from './session';
+export { SessionManager } from './session-manager';
+export { MemoryStorageAdapter } from './storage/memory-adapter';
+export type { StorageAdapter } from './storage/adapter';
 
 export type {
   SidVidConfig,
