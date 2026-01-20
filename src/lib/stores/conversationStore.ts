@@ -53,7 +53,8 @@ export async function loadConversation(id: string): Promise<void> {
 export async function createMessage(
   content: string,
   route?: string,
-  conversationId?: string
+  conversationId?: string,
+  title?: string
 ): Promise<Conversation> {
   const response = await fetch('/api/conversations', {
     method: 'POST',
@@ -61,7 +62,8 @@ export async function createMessage(
     body: JSON.stringify({
       message: content,
       conversationId,
-      route
+      route,
+      title
     })
   });
 

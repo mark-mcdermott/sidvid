@@ -15,7 +15,7 @@ export const GET: RequestHandler = async () => {
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { message, conversationId, route } = await request.json();
+    const { message, conversationId, route, title } = await request.json();
 
     if (!message) {
       return json({ error: 'Message content is required' }, { status: 400 });
@@ -33,9 +33,9 @@ export const POST: RequestHandler = async ({ request }) => {
       // Save immediately so it shows up in sidebar
       await storage.saveConversation(conversation);
 
-      // Generate proper title and update
-      const title = await storage.generateTitle(message);
-      conversation.title = title;
+      // Use provided title if available, otherwise generate from message
+      const finalTitle = title || await storage.generateTitle(message);
+      conversation.title = finalTitle;
     }
 
     conversation.messages.push({

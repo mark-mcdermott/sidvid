@@ -6,6 +6,7 @@
 	import { untrack } from 'svelte';
 	import { storyStore } from '$lib/stores/storyStore';
 	import { conversationStore, createMessage, addMessageToConversation } from '$lib/stores/conversationStore';
+	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
 	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
@@ -64,11 +65,15 @@
 					// Save to conversation
 					(async () => {
 						try {
+							// Use truncated story title for conversation name
+							const conversationTitle = truncateTitle(form.story!.title);
+
 							// Create conversation with user message
 							const conversation = await createMessage(
 								storyPrompt,
 								'/story',
-								$conversationStore.currentConversationId || undefined
+								$conversationStore.currentConversationId || undefined,
+								conversationTitle
 							);
 
 							// Add assistant response (use rawContent which is already a string)
