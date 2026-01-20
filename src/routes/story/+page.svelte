@@ -5,10 +5,13 @@
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
 	import { storyStore } from '$lib/stores/storyStore';
+	import { sessionStore } from '$lib/stores/sessionStore';
 	import { conversationStore, createMessage, addMessageToConversation } from '$lib/stores/conversationStore';
 	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
+	import { HistoryViewer } from '$lib/components/sessions';
 	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
+	import type { Story } from '$lib/sidvid';
 
 	let { form }: { form: ActionData } = $props();
 
@@ -21,6 +24,14 @@
 	let mainFormElement: HTMLFormElement | undefined = $state();
 	let editFormElement: HTMLFormElement | undefined = $state();
 	let tryAgainFormElement: HTMLFormElement | undefined = $state();
+	let showHistory = $state(false);
+
+	// Get session story history
+	let sessionStoryHistory = $derived.by(() => {
+		const session = $sessionStore.activeSession;
+		if (!session) return [] as Story[];
+		return session.getStoryHistory();
+	});
 
 	function handleKeydown(e: KeyboardEvent, formElement?: HTMLFormElement) {
 		if (e.key === 'Enter' && !e.shiftKey) {
@@ -190,6 +201,31 @@
 		}
 	}
 
+	function handleRevertToVersion(index: number) {
+		const session = $sessionStore.activeSession;
+		if (!session) return;
+
+		try {
+			session.revertToStory(index);
+			// Force reactivity update
+			sessionStore.update(s => ({ ...s }));
+		} catch (error) {
+			console.error('Error reverting to story version:', error);
+		}
+	}
+
+	function handlePreviewVersion(index: number) {
+		const history = sessionStoryHistory;
+		if (history && history[index]) {
+			console.log('Preview story version:', history[index]);
+			// Could open a modal or scroll to display the version
+		}
+	}
+
+	function toggleHistory() {
+		showHistory = !showHistory;
+	}
+
 
 	const lengthOptions = [
 		{ value: '2s', label: '2s' },
@@ -245,8 +281,27 @@
 	}}
 >
 	<div class="flex flex-col gap-4">
-		<h1 class="text-3xl font-bold">Story Generation</h1>
-		<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
+		<div class="flex items-center justify-between">
+			<div>
+				<h1 class="text-3xl font-bold">Story Generation</h1>
+				<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
+			</div>
+			{#if $sessionStore.activeSession && sessionStoryHistory.length > 0}
+				<Button variant="outline" size="sm" onclick={toggleHistory}>
+					{showHistory ? 'Hide' : 'Show'} History ({sessionStoryHistory.length})
+				</Button>
+			{/if}
+		</div>
+
+		{#if showHistory && $sessionStore.activeSession}
+			<div class="rounded-md border p-4">
+				<HistoryViewer
+					history={sessionStoryHistory}
+					onRevert={handleRevertToVersion}
+					onPreview={handlePreviewVersion}
+				/>
+			</div>
+		{/if}
 
 		{#if form?.error}
 			<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

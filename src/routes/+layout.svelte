@@ -21,8 +21,12 @@
 	import { conversationStore, loadConversations } from '$lib/stores/conversationStore';
 	import { characterStore } from '$lib/stores/characterStore';
 	import { storyStore } from '$lib/stores/storyStore';
+	import { sessionStore, refreshSessions, createNewSession } from '$lib/stores/sessionStore';
+	import { SessionList, SessionDialog } from '$lib/components/sessions';
 
 	let { children } = $props();
+
+	let showNewSessionDialog = $state(false);
 
 	const menuItems = [
 		{ title: 'Story', href: '/story' },
@@ -32,8 +36,13 @@
 		{ title: 'Video', href: '/video' }
 	];
 
+	async function handleNewSession() {
+		showNewSessionDialog = true;
+	}
+
 	onMount(async () => {
 		await loadConversations();
+		await refreshSessions();
 	});
 </script>
 
@@ -65,6 +74,12 @@
 							</SidebarMenuItem>
 						{/each}
 					</SidebarMenu>
+				</SidebarGroupContent>
+			</SidebarGroup>
+
+			<SidebarGroup data-sidebar-section="sessions">
+				<SidebarGroupContent>
+					<SessionList onNewSession={handleNewSession} />
 				</SidebarGroupContent>
 			</SidebarGroup>
 
@@ -155,9 +170,16 @@
 	<SidebarInset>
 		<header class="flex h-12 items-center gap-2 border-b px-4">
 			<SidebarTrigger />
+			{#if $sessionStore.activeSession}
+				<span class="text-sm text-muted-foreground">
+					Session: {$sessionStore.activeSession.getName() || 'Untitled'}
+				</span>
+			{/if}
 		</header>
 		<main class="flex-1 p-4">
 			{@render children()}
 		</main>
 	</SidebarInset>
 </SidebarProvider>
+
+<SessionDialog bind:open={showNewSessionDialog} mode="create" />
