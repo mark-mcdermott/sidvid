@@ -10,7 +10,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1, // Run tests sequentially to avoid state conflicts
   reporter: 'html',
-  globalSetup: './tests/e2e/global-setup.ts',
+  globalSetup: './tests/e2e/shared/global-setup.ts',
 
   use: {
     baseURL: 'http://localhost:5173',
