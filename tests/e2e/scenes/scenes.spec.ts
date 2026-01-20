@@ -1,186 +1,213 @@
-import { test, expect } from '../shared/fixtures';
-import { navigateAndWait, clearAllData } from '../shared/test-helpers';
+import { test, expect } from '@playwright/test';
 
-test.describe('Scenes Feature', () => {
+test.describe('Scenes @scenes', () => {
 	test.beforeEach(async ({ page }) => {
-		await clearAllData(page);
-		await navigateAndWait(page, '/scenes');
+		await page.goto('/scenes');
+		await page.evaluate(() => {
+			localStorage.clear();
+			sessionStorage.clear();
+		});
+		await page.reload();
 	});
 
-	test.describe('Scene Generation', () => {
-		test('generates scenes from story and characters', async ({ page, mockStory, mockCharacter }) => {
-			// TODO: Implement
-			// 1. Mock story and character data
-			// 2. Click "Generate Scenes"
-			// 3. Wait for API response
-			// 4. Verify scenes are displayed with descriptions
-			// 5. Verify scene images are generated
-		});
+	test.skip('generates scenes when coming from characters page', async ({ page }) => {
+		// Full flow: Story → Characters → Scenes
+		// Generate story
+		await page.goto('/story');
+		await page.getByPlaceholder(/Enter your story prompt/).fill('A space adventure');
+		await page.getByRole('button', { name: 'Generate Story' }).click();
+		await expect(page.getByText(/Scene 1/)).toBeVisible({ timeout: 30000 });
 
-		test('allows specifying number of scenes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select scene count (3-20)
-			// 2. Generate scenes
-			// 3. Verify correct number generated
-		});
+		// Navigate to characters and generate
+		await page.getByRole('button', { name: 'Send to Character Generation' }).click();
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img')).toBeVisible({ timeout: 45000 });
 
-		test('assigns characters to scenes appropriately', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Verify characters appear in relevant scenes
-			// 3. Verify character images shown in scene cards
-		});
+		// Navigate to scenes
+		await page.getByRole('button', { name: /Send to Scene Generation/i }).click();
+		await expect(page).toHaveURL(/\/scenes/);
+		await expect(page.getByText(/Scene Generation/i)).toBeVisible();
 	});
 
-	test.describe('Scene Editing', () => {
-		test('allows editing scene description', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Click edit on a scene
-			// 3. Modify description
-			// 4. Save changes
-			// 5. Verify description updated
-		});
-
-		test('allows regenerating scene image', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Click "Regenerate Image"
-			// 3. Verify new image generated
-			// 4. Verify old image replaced
-		});
-
-		test('allows changing characters in a scene', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Edit scene
-			// 3. Add/remove characters
-			// 4. Save changes
-			// 5. Verify scene updated
-		});
+	test.skip('displays Generate Scenes button', async ({ page }) => {
+		// Should show button to generate scenes from story+characters
+		await expect(page.getByRole('button', { name: /Generate Scenes/i })).toBeVisible();
 	});
 
-	test.describe('Scene Management', () => {
-		test('allows adding new scenes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate initial scenes
-			// 2. Click "Add Scene"
-			// 3. Enter scene details
-			// 4. Select characters
-			// 5. Generate scene
-			// 6. Verify added to list
-		});
+	test.skip('generates scene images using DALL-E', async ({ page }) => {
+		// Click Generate Scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
 
-		test('allows removing scenes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Click remove on a scene
-			// 3. Confirm deletion
-			// 4. Verify scene removed
-		});
+		// Wait for scenes to generate (GPT-4 + DALL-E)
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
 
-		test('allows reordering scenes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate multiple scenes
-			// 2. Drag and drop to reorder
-			// 3. Verify new order persists
-		});
-
-		test('allows splitting a scene into multiple', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Click "Split Scene"
-			// 3. Define split point
-			// 4. Verify two scenes created
-		});
-
-		test('allows merging scenes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select two adjacent scenes
-			// 2. Click "Merge Scenes"
-			// 3. Verify single scene created
-		});
+		// Verify multiple scenes created
+		const sceneCount = await page.locator('img[alt*="Scene"]').count();
+		expect(sceneCount).toBeGreaterThan(2);
 	});
 
-	test.describe('Scene Timeline', () => {
-		test('displays scenes in chronological order', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Verify timeline view shows order
-			// 3. Verify scene numbers are sequential
-		});
+	test.skip('shows scene descriptions with images', async ({ page }) => {
+		// Generate scenes first
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
 
-		test('allows setting scene duration', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Set duration (1-60 seconds)
-			// 3. Verify duration saved
-			// 4. Verify total duration updated
-		});
+		// Verify each scene has description
+		await expect(page.getByText(/Scene 1:/i)).toBeVisible();
+		await expect(page.getByText(/Scene 2:/i)).toBeVisible();
 
-		test('shows total video duration', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes with durations
-			// 2. Verify total duration calculated
-			// 3. Update a scene duration
-			// 4. Verify total updates
-		});
+		// Verify images are present
+		const scene1Img = page.locator('img[alt*="Scene 1"]');
+		await expect(scene1Img).toBeVisible();
 	});
 
-	test.describe('Image Handling', () => {
-		test('downloads and stores scene images locally', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scene with image
-			// 2. Verify image from DALL-E
-			// 3. Wait for download
-			// 4. Verify local path stored
-		});
+	test.skip('displays scenes in chronological order', async ({ page }) => {
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
 
-		test('handles image generation errors', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock API error
-			// 2. Verify error message
-			// 3. Verify retry option
-		});
+		// Check scene numbers are sequential
+		await expect(page.getByText(/Scene 1:/i)).toBeVisible();
+		await expect(page.getByText(/Scene 2:/i)).toBeVisible();
+		await expect(page.getByText(/Scene 3:/i)).toBeVisible();
 	});
 
-	test.describe('Navigation', () => {
-		test('allows proceeding to storyboard when scenes ready', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Click "Send to Storyboard"
-			// 3. Verify navigated to /storyboard
-			// 4. Verify scenes passed to storyboard
-		});
+	test.skip('allows editing scene description', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
 
-		test('can return to characters to make changes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Go back to characters
-			// 2. Modify characters
-			// 3. Return to scenes
-			// 4. Verify regenerate prompt shown
-		});
+		// Click edit on first scene
+		await page.locator('[data-scene="1"]').getByRole('button', { name: /Edit/i }).click();
+
+		// Edit description
+		const descInput = page.getByLabel(/Scene Description/i).first();
+		await descInput.fill('The spaceship launches into the starry night');
+
+		// Save
+		await page.getByRole('button', { name: /Save/i }).first().click();
+
+		// Verify description updated
+		await expect(page.getByText(/spaceship launches into the starry night/i)).toBeVisible();
 	});
 
-	test.describe('Conversation Integration', () => {
-		test('saves scenes to conversation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate scenes
-			// 2. Verify conversation updated
-			// 3. Check sidebar shows scene generation
-		});
+	test.skip('allows regenerating scene image', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Get original image src
+		const originalSrc = await page.locator('img[alt*="Scene 1"]').getAttribute('src');
+
+		// Regenerate image for scene 1
+		await page.locator('[data-scene="1"]').getByRole('button', { name: /Regenerate Image/i }).click();
+		await page.waitForTimeout(5000);
+
+		// Verify new image
+		const newSrc = await page.locator('img[alt*="Scene 1"]').getAttribute('src');
+		expect(newSrc).not.toBe(originalSrc);
 	});
 
-	test.describe('Error Handling', () => {
-		test('handles API errors gracefully', async ({ page }) => {
-			// TODO: Implement
-		});
+	test.skip('allows reordering scenes with drag and drop', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
 
-		test('handles missing character data', async ({ page }) => {
-			// TODO: Implement
-			// 1. Navigate to /scenes without characters
-			// 2. Verify error message
-			// 3. Verify redirect to /characters
-		});
+		// Get first scene description
+		const firstSceneDesc = await page.locator('[data-scene="1"]').textContent();
+
+		// Drag scene 1 to position 2 (swap with scene 2)
+		const scene1 = page.locator('[data-scene="1"]');
+		const scene2 = page.locator('[data-scene="2"]');
+		await scene1.dragTo(scene2);
+
+		// Verify order changed
+		await page.waitForTimeout(1000);
+		const newFirstSceneDesc = await page.locator('[data-scene="1"]').textContent();
+		expect(newFirstSceneDesc).not.toBe(firstSceneDesc);
+	});
+
+	test.skip('allows adding new scene', async ({ page }) => {
+		// Generate initial scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		const initialCount = await page.locator('[data-scene]').count();
+
+		// Add new scene
+		await page.getByRole('button', { name: /Add Scene/i }).click();
+
+		// Fill scene details
+		await page.getByLabel(/Scene Description/i).last().fill('A dramatic space battle');
+
+		// Generate image for new scene
+		await page.getByRole('button', { name: /Generate Image/i }).last().click();
+		await expect(page.locator('img[alt*="Scene"]').last()).toBeVisible({ timeout: 45000 });
+
+		// Verify scene count increased
+		const newCount = await page.locator('[data-scene]').count();
+		expect(newCount).toBe(initialCount + 1);
+	});
+
+	test.skip('allows removing scene', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		const initialCount = await page.locator('[data-scene]').count();
+
+		// Remove scene 2
+		await page.locator('[data-scene="2"]').getByRole('button', { name: /Delete|Remove/i }).click();
+
+		// Confirm deletion if prompted
+		const confirmButton = page.getByRole('button', { name: /Confirm|Yes/i });
+		if (await confirmButton.isVisible()) {
+			await confirmButton.click();
+		}
+
+		// Verify scene count decreased
+		await page.waitForTimeout(500);
+		const newCount = await page.locator('[data-scene]').count();
+		expect(newCount).toBe(initialCount - 1);
+	});
+
+	test.skip('Send to Storyboard button enabled when scenes ready', async ({ page }) => {
+		// Generate scenes with images
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Verify button enabled
+		const sendButton = page.getByRole('button', { name: /Send to Storyboard/i });
+		await expect(sendButton).toBeEnabled();
+	});
+
+	test.skip('navigates to storyboard with scene data', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Navigate to storyboard
+		await page.getByRole('button', { name: /Send to Storyboard/i }).click();
+		await expect(page).toHaveURL(/\/storyboard/);
+
+		// Verify scenes loaded in storyboard
+		await expect(page.getByText(/Storyboard/i)).toBeVisible();
+	});
+
+	test.skip('scenes persist when navigating away and back', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		const sceneCount = await page.locator('[data-scene]').count();
+
+		// Navigate away
+		await page.goto('/characters');
+
+		// Navigate back
+		await page.goto('/scenes');
+
+		// Verify scenes still there
+		const newSceneCount = await page.locator('[data-scene]').count();
+		expect(newSceneCount).toBe(sceneCount);
 	});
 });

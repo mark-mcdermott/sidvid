@@ -1,197 +1,189 @@
-import { test, expect } from '../shared/fixtures';
-import { navigateAndWait, clearAllData } from '../shared/test-helpers';
+import { test, expect } from '@playwright/test';
 
-test.describe('Storyboard Feature', () => {
+test.describe('Storyboard @storyboard', () => {
 	test.beforeEach(async ({ page }) => {
-		await clearAllData(page);
-		await navigateAndWait(page, '/storyboard');
+		await page.goto('/storyboard');
+		await page.evaluate(() => {
+			localStorage.clear();
+			sessionStorage.clear();
+		});
+		await page.reload();
 	});
 
-	test.describe('Storyboard Display', () => {
-		test('displays scenes in timeline view', async ({ page, mockScene }) => {
-			// TODO: Implement
-			// 1. Mock scene data
-			// 2. Verify scenes displayed in order
-			// 3. Verify thumbnails shown
-			// 4. Verify durations shown
-		});
-
-		test('shows total storyboard duration', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load scenes with durations
-			// 2. Verify total duration calculated
-			// 3. Verify displayed in header
-		});
-
-		test('displays scene transitions', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load multiple scenes
-			// 2. Verify transition indicators between scenes
-			// 3. Verify transition types shown
-		});
+	test.skip('displays scenes in timeline view when loaded', async ({ page }) => {
+		// Assume scenes were generated in previous step
+		// Verify timeline displays scenes in order
+		await expect(page.getByText(/Timeline/i)).toBeVisible();
+		await expect(page.locator('[data-scene-timeline]')).toBeVisible();
 	});
 
-	test.describe('Storyboard Editing', () => {
-		test('allows adjusting scene order', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load storyboard
-			// 2. Drag scene to new position
-			// 3. Verify order updated
-			// 4. Verify timeline reflects change
-		});
+	test.skip('shows scene thumbnails in timeline', async ({ page }) => {
+		// Verify each scene has a thumbnail in timeline
+		const thumbnails = page.locator('[data-scene-thumbnail]');
+		const count = await thumbnails.count();
+		expect(count).toBeGreaterThan(0);
 
-		test('allows adjusting scene durations', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Adjust duration slider
-			// 3. Verify duration updated
-			// 4. Verify total duration recalculated
-		});
-
-		test('allows setting transition effects', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select transition between scenes
-			// 2. Choose transition type (fade, cut, wipe, etc.)
-			// 3. Set transition duration
-			// 4. Verify transition saved
-		});
-
-		test('allows adding text overlays', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Click "Add Text"
-			// 3. Enter text content
-			// 4. Set position and style
-			// 5. Verify text overlay added
-		});
-
-		test('allows adding audio notes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Click "Add Audio Note"
-			// 3. Record or select audio
-			// 4. Verify audio attached to scene
-		});
+		// Verify first thumbnail is visible
+		await expect(thumbnails.first()).toBeVisible();
 	});
 
-	test.describe('Timeline Playback Preview', () => {
-		test('allows playing through storyboard', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load storyboard
-			// 2. Click play button
-			// 3. Verify scenes transition at correct timing
-			// 4. Verify playback controls work (pause, stop)
-		});
-
-		test('allows scrubbing through timeline', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load storyboard
-			// 2. Drag timeline scrubber
-			// 3. Verify preview updates
-			// 4. Verify current scene highlighted
-		});
-
-		test('shows current playback time', async ({ page }) => {
-			// TODO: Implement
-			// 1. Start playback
-			// 2. Verify time counter updates
-			// 3. Verify format is MM:SS
-		});
+	test.skip('displays total storyboard duration', async ({ page }) => {
+		// Should show total duration (sum of all scenes)
+		await expect(page.getByText(/Total Duration:/i)).toBeVisible();
+		await expect(page.getByText(/\d+s/)).toBeVisible(); // e.g., "45s"
 	});
 
-	test.describe('Storyboard Export', () => {
-		test('allows exporting storyboard as PDF', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load storyboard
-			// 2. Click "Export PDF"
-			// 3. Verify download initiated
-			// 4. Verify PDF contains all scenes
-		});
+	test.skip('allows adjusting scene order by dragging', async ({ page }) => {
+		// Get initial order
+		const firstScene = page.locator('[data-scene-timeline-item]').first();
+		const firstSceneId = await firstScene.getAttribute('data-scene-id');
 
-		test('allows exporting storyboard data as JSON', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load storyboard
-			// 2. Click "Export JSON"
-			// 3. Verify JSON structure
-			// 4. Verify all scene data included
-		});
+		// Drag first scene to second position
+		const secondScene = page.locator('[data-scene-timeline-item]').nth(1);
+		await firstScene.dragTo(secondScene);
+
+		// Verify order changed
+		await page.waitForTimeout(500);
+		const newFirstScene = page.locator('[data-scene-timeline-item]').first();
+		const newFirstSceneId = await newFirstScene.getAttribute('data-scene-id');
+		expect(newFirstSceneId).not.toBe(firstSceneId);
 	});
 
-	test.describe('Collaboration Features', () => {
-		test('allows adding comments to scenes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Click "Add Comment"
-			// 3. Enter comment text
-			// 4. Verify comment saved
-			// 5. Verify comment displayed on scene
-		});
+	test.skip('allows setting scene duration with slider', async ({ page }) => {
+		// Click on first scene to select it
+		await page.locator('[data-scene-timeline-item]').first().click();
 
-		test('allows marking scenes for review', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a scene
-			// 2. Click "Flag for Review"
-			// 3. Verify scene marked
-			// 4. Verify appears in review list
-		});
+		// Find duration slider
+		const slider = page.getByLabel(/Duration/i);
+		await expect(slider).toBeVisible();
+
+		// Adjust duration
+		await slider.fill('10'); // 10 seconds
+
+		// Verify total duration updated
+		await expect(page.getByText(/Total Duration:/i)).toBeVisible();
 	});
 
-	test.describe('Navigation', () => {
-		test('allows proceeding to video generation when ready', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load complete storyboard
-			// 2. Click "Send to Video Generation"
-			// 3. Verify navigated to /video
-			// 4. Verify storyboard passed to video
-		});
+	test.skip('allows setting transition effects between scenes', async ({ page }) => {
+		// Select transition between scene 1 and 2
+		await page.locator('[data-transition="1-2"]').click();
 
-		test('can return to scenes to make changes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Go back to scenes
-			// 2. Modify a scene
-			// 3. Return to storyboard
-			// 4. Verify changes reflected
-		});
+		// Open transition menu
+		await page.getByRole('button', { name: /Transition Effect/i }).click();
 
-		test('disables video navigation when storyboard incomplete', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load incomplete storyboard (missing data)
-			// 2. Verify "Send to Video" button disabled
-			// 3. Verify tooltip explains why
-		});
+		// Select fade transition
+		await page.getByRole('option', { name: /Fade/i }).click();
+
+		// Verify transition set
+		await expect(page.locator('[data-transition="1-2"]')).toContainText(/Fade/i);
 	});
 
-	test.describe('Conversation Integration', () => {
-		test('saves storyboard to conversation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Create storyboard
-			// 2. Verify conversation updated
-			// 3. Check sidebar shows storyboard creation
-		});
+	test.skip('allows adding text overlay to scene', async ({ page }) => {
+		// Select first scene
+		await page.locator('[data-scene-timeline-item]').first().click();
 
-		test('loads storyboard from conversation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Create and save storyboard
-			// 2. Navigate away
-			// 3. Return to storyboard
-			// 4. Verify loaded from conversation
-		});
+		// Click Add Text
+		await page.getByRole('button', { name: /Add Text/i }).click();
+
+		// Enter text
+		await page.getByLabel(/Text Content/i).fill('Once upon a time...');
+
+		// Set position
+		await page.getByLabel(/Position X/i).fill('50');
+		await page.getByLabel(/Position Y/i).fill('50');
+
+		// Save
+		await page.getByRole('button', { name: /Save|Add/i }).click();
+
+		// Verify text overlay added
+		await expect(page.getByText(/Once upon a time.../i)).toBeVisible();
 	});
 
-	test.describe('Error Handling', () => {
-		test('handles missing scene data', async ({ page }) => {
-			// TODO: Implement
-			// 1. Navigate to /storyboard without scenes
-			// 2. Verify error message
-			// 3. Verify redirect to /scenes
-		});
+	test.skip('timeline playback plays through scenes', async ({ page }) => {
+		// Click play button
+		await page.getByRole('button', { name: /Play/i }).click();
 
-		test('handles save failures', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock save error
-			// 2. Make changes to storyboard
-			// 3. Verify error message
-			// 4. Verify retry option
-		});
+		// Verify playback started
+		await expect(page.getByRole('button', { name: /Pause/i })).toBeVisible();
+
+		// Wait a bit for playback
+		await page.waitForTimeout(2000);
+
+		// Pause
+		await page.getByRole('button', { name: /Pause/i }).click();
+
+		// Verify can resume
+		await expect(page.getByRole('button', { name: /Play/i })).toBeVisible();
+	});
+
+	test.skip('scrubber allows jumping to specific time', async ({ page }) => {
+		// Find timeline scrubber
+		const scrubber = page.locator('[data-timeline-scrubber]');
+
+		// Drag scrubber to 50% position
+		await scrubber.hover();
+		await page.mouse.down();
+		await page.mouse.move(100, 0); // Move right
+		await page.mouse.up();
+
+		// Verify current time updated
+		const currentTime = await page.getByText(/Current Time:/i).textContent();
+		expect(currentTime).toMatch(/\d+s/);
+	});
+
+	test.skip('shows current playback time during playback', async ({ page }) => {
+		await page.getByRole('button', { name: /Play/i }).click();
+
+		// Verify time updates
+		const initialTime = await page.locator('[data-current-time]').textContent();
+		await page.waitForTimeout(2000);
+		const updatedTime = await page.locator('[data-current-time]').textContent();
+
+		expect(updatedTime).not.toBe(initialTime);
+	});
+
+	test.skip('allows exporting storyboard as PDF', async ({ page }) => {
+		// Click Export
+		await page.getByRole('button', { name: /Export/i }).click();
+
+		// Select PDF
+		await page.getByRole('option', { name: /PDF/i }).click();
+
+		// Verify download initiated (check for download event)
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByRole('button', { name: /Download/i }).click();
+		const download = await downloadPromise;
+
+		// Verify filename
+		expect(download.suggestedFilename()).toContain('.pdf');
+	});
+
+	test.skip('Send to Video button enabled when storyboard complete', async ({ page }) => {
+		// Verify button is enabled (storyboard has scenes)
+		const sendButton = page.getByRole('button', { name: /Send to Video|Generate Video/i });
+		await expect(sendButton).toBeEnabled();
+	});
+
+	test.skip('navigates to video generation page', async ({ page }) => {
+		await page.getByRole('button', { name: /Send to Video|Generate Video/i }).click();
+
+		// Verify navigation
+		await expect(page).toHaveURL(/\/video/);
+		await expect(page.getByText(/Video Generation/i)).toBeVisible();
+	});
+
+	test.skip('storyboard persists when navigating away and back', async ({ page }) => {
+		// Get scene count
+		const sceneCount = await page.locator('[data-scene-timeline-item]').count();
+
+		// Navigate away
+		await page.goto('/scenes');
+
+		// Navigate back
+		await page.goto('/storyboard');
+
+		// Verify scenes still there
+		const newSceneCount = await page.locator('[data-scene-timeline-item]').count();
+		expect(newSceneCount).toBe(sceneCount);
 	});
 });

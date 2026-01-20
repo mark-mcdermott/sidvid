@@ -1,252 +1,264 @@
-import { test, expect } from '../shared/fixtures';
-import { navigateAndWait, clearAllData } from '../shared/test-helpers';
+import { test, expect } from '@playwright/test';
 
-test.describe('Video Feature', () => {
+test.describe('Video @video', () => {
 	test.beforeEach(async ({ page }) => {
-		await clearAllData(page);
-		await navigateAndWait(page, '/video');
+		await page.goto('/video');
+		await page.evaluate(() => {
+			localStorage.clear();
+			sessionStorage.clear();
+		});
+		await page.reload();
 	});
 
-	test.describe('Video Generation', () => {
-		test('generates video from storyboard using Sora', async ({ page, mockStoryboard }) => {
-			// TODO: Implement
-			// 1. Mock storyboard data
-			// 2. Click "Generate Video"
-			// 3. Wait for Sora API processing
-			// 4. Verify progress indicator shown
-			// 5. Verify video URL returned
-		});
-
-		test('shows generation progress', async ({ page }) => {
-			// TODO: Implement
-			// 1. Start video generation
-			// 2. Verify progress bar appears
-			// 3. Verify progress updates (0-100%)
-			// 4. Verify estimated time remaining shown
-		});
-
-		test('handles long generation times', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock slow Sora response
-			// 2. Start generation
-			// 3. Verify page doesn't timeout
-			// 4. Verify user can navigate away
-			// 5. Verify notification when complete
-		});
-
-		test('allows canceling video generation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Start generation
-			// 2. Click "Cancel"
-			// 3. Verify generation stopped
-			// 4. Verify API request canceled
-		});
+	test.skip('displays Generate Video button when storyboard ready', async ({ page }) => {
+		// Verify page loaded with storyboard data
+		await expect(page.getByRole('button', { name: /Generate Video/i })).toBeVisible();
 	});
 
-	test.describe('Video Settings', () => {
-		test('allows selecting video resolution', async ({ page }) => {
-			// TODO: Implement
-			// 1. Open settings
-			// 2. Select resolution (720p, 1080p, 4K)
-			// 3. Verify setting saved
-			// 4. Verify affects generation
-		});
+	test.skip('shows video settings before generation', async ({ page }) => {
+		// Verify resolution dropdown
+		await expect(page.getByLabel(/Resolution/i)).toBeVisible();
 
-		test('allows selecting video format', async ({ page }) => {
-			// TODO: Implement
-			// 1. Open settings
-			// 2. Select format (MP4, WebM, MOV)
-			// 3. Verify setting saved
-		});
+		// Verify format dropdown
+		await expect(page.getByLabel(/Format/i)).toBeVisible();
 
-		test('allows selecting frame rate', async ({ page }) => {
-			// TODO: Implement
-			// 1. Open settings
-			// 2. Select FPS (24, 30, 60)
-			// 3. Verify setting saved
-		});
-
-		test('allows setting audio options', async ({ page }) => {
-			// TODO: Implement
-			// 1. Open audio settings
-			// 2. Upload background music
-			// 3. Adjust volume levels
-			// 4. Set audio effects
-			// 5. Verify settings saved
-		});
+		// Verify FPS dropdown
+		await expect(page.getByLabel(/Frame Rate|FPS/i)).toBeVisible();
 	});
 
-	test.describe('Video Preview', () => {
-		test('displays generated video in player', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate video
-			// 2. Wait for completion
-			// 3. Verify video player shown
-			// 4. Verify video loads and plays
-		});
+	test.skip('generates video using Sora when Generate clicked', async ({ page }) => {
+		// Click Generate Video
+		await page.getByRole('button', { name: /Generate Video/i }).click();
 
-		test('allows playing/pausing video', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load generated video
-			// 2. Click play
-			// 3. Verify video plays
-			// 4. Click pause
-			// 5. Verify video pauses
-		});
+		// Verify progress indicator appears
+		await expect(page.getByText(/Generating|Processing/i)).toBeVisible({ timeout: 5000 });
 
-		test('allows scrubbing through video', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load video
-			// 2. Drag timeline scrubber
-			// 3. Verify video position updates
-		});
+		// Wait for Sora to complete (can take several minutes)
+		// Use very long timeout for video generation
+		await expect(page.locator('video')).toBeVisible({ timeout: 300000 }); // 5 minutes
 
-		test('allows fullscreen playback', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load video
-			// 2. Click fullscreen button
-			// 3. Verify enters fullscreen
-			// 4. Press Escape
-			// 5. Verify exits fullscreen
-		});
-
-		test('shows video metadata', async ({ page }) => {
-			// TODO: Implement
-			// 1. Load video
-			// 2. Verify duration shown
-			// 3. Verify resolution shown
-			// 4. Verify file size shown
-		});
+		// Verify video player loaded
+		await expect(page.locator('video')).toHaveAttribute('src', /.+/);
 	});
 
-	test.describe('Video Download', () => {
-		test('allows downloading video file', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate video
-			// 2. Click "Download"
-			// 3. Verify download initiated
-			// 4. Verify file format correct
-		});
+	test.skip('shows generation progress with percentage', async ({ page }) => {
+		await page.getByRole('button', { name: /Generate Video/i }).click();
 
-		test('downloads video to local storage', async ({ page }) => {
-			// TODO: Implement
-			// 1. Download video
-			// 2. Verify saved to data/videos/
-			// 3. Verify remote URL replaced with local path
-		});
+		// Verify progress bar appears
+		await expect(page.locator('[role="progressbar"]')).toBeVisible({ timeout: 5000 });
 
-		test('allows downloading in different formats', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select format (MP4/WebM)
-			// 2. Click download
-			// 3. Verify correct format downloaded
-		});
+		// Verify percentage text (e.g., "35%")
+		await expect(page.getByText(/\d+%/)).toBeVisible({ timeout: 10000 });
 	});
 
-	test.describe('Video Regeneration', () => {
-		test('allows regenerating with different settings', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate initial video
-			// 2. Change settings (resolution, etc.)
-			// 3. Click "Regenerate"
-			// 4. Verify new video generated
-			// 5. Verify old version preserved
-		});
+	test.skip('shows estimated time remaining during generation', async ({ page }) => {
+		await page.getByRole('button', { name: /Generate Video/i }).click();
 
-		test('maintains version history', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate multiple versions
-			// 2. Verify all versions listed
-			// 3. Verify can switch between versions
-			// 4. Verify can delete old versions
-		});
+		// Verify ETA displayed
+		await expect(page.getByText(/Estimated time|Time remaining/i)).toBeVisible({ timeout: 10000 });
 	});
 
-	test.describe('Video Sharing', () => {
-		test('generates shareable link', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate video
-			// 2. Click "Share"
-			// 3. Verify link generated
-			// 4. Verify link copied to clipboard
-		});
+	test.skip('shows generation stages during processing', async ({ page }) => {
+		await page.getByRole('button', { name: /Generate Video/i }).click();
 
-		test('allows setting share permissions', async ({ page }) => {
-			// TODO: Implement
-			// 1. Click share
-			// 2. Set permissions (public/private)
-			// 3. Set expiration date
-			// 4. Verify settings saved
-		});
+		// Verify stages appear
+		// Example: "Preparing...", "Rendering...", "Encoding...", "Finalizing..."
+		await expect(page.getByText(/Preparing|Rendering|Encoding/i)).toBeVisible({ timeout: 10000 });
 	});
 
-	test.describe('Navigation', () => {
-		test('can return to storyboard to make changes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate video
-			// 2. Click "Back to Storyboard"
-			// 3. Modify storyboard
-			// 4. Return to video
-			// 5. Verify regenerate prompt shown
-		});
+	test.skip('allows canceling video generation', async ({ page }) => {
+		await page.getByRole('button', { name: /Generate Video/i }).click();
 
-		test('can start new project', async ({ page }) => {
-			// TODO: Implement
-			// 1. Complete video
-			// 2. Click "New Project"
-			// 3. Verify navigated to /story
-			// 4. Verify fresh state
-		});
+		// Wait for generation to start
+		await expect(page.getByText(/Generating/i)).toBeVisible({ timeout: 5000 });
+
+		// Click cancel
+		await page.getByRole('button', { name: /Cancel/i }).click();
+
+		// Verify generation stopped
+		await expect(page.getByText(/Cancelled|Stopped/i)).toBeVisible({ timeout: 5000 });
+		await expect(page.getByRole('button', { name: /Generate Video/i })).toBeVisible();
 	});
 
-	test.describe('Conversation Integration', () => {
-		test('saves video to conversation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate video
-			// 2. Verify conversation updated
-			// 3. Check sidebar shows video generation
-		});
+	test.skip('video player has play/pause controls', async ({ page }) => {
+		// Assume video is generated
+		const video = page.locator('video');
+		await expect(video).toBeVisible();
 
-		test('loads video from conversation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate video
-			// 2. Navigate away
-			// 3. Return to video
-			// 4. Verify video loaded from conversation
-		});
+		// Verify play button exists
+		const playButton = page.getByRole('button', { name: /Play/i });
+		await expect(playButton).toBeVisible();
+
+		// Click play
+		await playButton.click();
+
+		// Verify pause button appears
+		await expect(page.getByRole('button', { name: /Pause/i })).toBeVisible();
 	});
 
-	test.describe('Error Handling', () => {
-		test('handles Sora API errors', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock API error
-			// 2. Attempt generation
-			// 3. Verify error message
-			// 4. Verify retry option
-		});
+	test.skip('video player allows scrubbing through video', async ({ page }) => {
+		const video = page.locator('video');
+		await expect(video).toBeVisible();
 
-		test('handles missing storyboard data', async ({ page }) => {
-			// TODO: Implement
-			// 1. Navigate to /video without storyboard
-			// 2. Verify error message
-			// 3. Verify redirect to /storyboard
-		});
+		// Find timeline/scrubber
+		const timeline = page.locator('[data-video-timeline]');
 
-		test('handles network failures during generation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Start generation
-			// 2. Simulate network failure
-			// 3. Verify error message
-			// 4. Restore connection
-			// 5. Verify can retry
-		});
+		// Click at 50% position
+		const box = await timeline.boundingBox();
+		if (box) {
+			await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+		}
 
-		test('handles quota/rate limit errors', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock quota exceeded error
-			// 2. Attempt generation
-			// 3. Verify clear error message
-			// 4. Verify suggested actions
-		});
+		// Verify video position changed
+		const currentTime = await video.evaluate((el: HTMLVideoElement) => el.currentTime);
+		expect(currentTime).toBeGreaterThan(0);
+	});
+
+	test.skip('video player supports fullscreen', async ({ page }) => {
+		const video = page.locator('video');
+		await expect(video).toBeVisible();
+
+		// Click fullscreen button
+		await page.getByRole('button', { name: /Fullscreen|Full Screen/i }).click();
+
+		// Note: Actual fullscreen testing in Playwright is limited
+		// Just verify the button exists and can be clicked
+	});
+
+	test.skip('displays video metadata after generation', async ({ page }) => {
+		// Assume video generated
+		await expect(page.locator('video')).toBeVisible();
+
+		// Verify duration shown
+		await expect(page.getByText(/Duration:/i)).toBeVisible();
+
+		// Verify resolution shown
+		await expect(page.getByText(/Resolution:|1080p|720p/i)).toBeVisible();
+
+		// Verify file size shown
+		await expect(page.getByText(/File Size:|MB/i)).toBeVisible();
+	});
+
+	test.skip('allows downloading video file', async ({ page }) => {
+		// Assume video generated
+		await expect(page.locator('video')).toBeVisible();
+
+		// Set up download listener
+		const downloadPromise = page.waitForEvent('download');
+
+		// Click download button
+		await page.getByRole('button', { name: /Download/i }).click();
+
+		// Verify download initiated
+		const download = await downloadPromise;
+		expect(download.suggestedFilename()).toMatch(/\.(mp4|webm|mov)$/);
+	});
+
+	test.skip('video downloads to local storage', async ({ page }) => {
+		// Generate video
+		await page.getByRole('button', { name: /Generate Video/i }).click();
+		await expect(page.locator('video')).toBeVisible({ timeout: 300000 });
+
+		// Wait for automatic download
+		await page.waitForTimeout(3000);
+
+		// Verify video src changed from remote to local
+		const videoSrc = await page.locator('video').getAttribute('src');
+		expect(videoSrc).toContain('/data/videos/');
+	});
+
+	test.skip('allows regenerating video with different settings', async ({ page }) => {
+		// Assume video already generated
+		await expect(page.locator('video')).toBeVisible();
+
+		// Get original video src
+		const originalSrc = await page.locator('video').getAttribute('src');
+
+		// Change settings (e.g., resolution)
+		await page.getByLabel(/Resolution/i).selectOption('720p');
+
+		// Regenerate
+		await page.getByRole('button', { name: /Regenerate Video/i }).click();
+
+		// Wait for new video
+		await expect(page.locator('video')).toBeVisible({ timeout: 300000 });
+
+		// Verify video changed
+		const newSrc = await page.locator('video').getAttribute('src');
+		expect(newSrc).not.toBe(originalSrc);
+	});
+
+	test.skip('maintains version history of generated videos', async ({ page }) => {
+		// Assume multiple video versions exist
+		// Verify version list
+		await expect(page.getByText(/Version History|Previous Versions/i)).toBeVisible();
+
+		// Verify can select different versions
+		const versions = page.locator('[data-video-version]');
+		const count = await versions.count();
+		expect(count).toBeGreaterThan(1);
+	});
+
+	test.skip('allows switching between video versions', async ({ page }) => {
+		// Select version 1
+		await page.locator('[data-video-version="1"]').click();
+		const version1Src = await page.locator('video').getAttribute('src');
+
+		// Select version 2
+		await page.locator('[data-video-version="2"]').click();
+		const version2Src = await page.locator('video').getAttribute('src');
+
+		// Verify different videos
+		expect(version2Src).not.toBe(version1Src);
+	});
+
+	test.skip('generates shareable link for video', async ({ page }) => {
+		// Assume video generated
+		await expect(page.locator('video')).toBeVisible();
+
+		// Click Share button
+		await page.getByRole('button', { name: /Share/i }).click();
+
+		// Verify share dialog appears
+		await expect(page.getByText(/Share Video/i)).toBeVisible();
+
+		// Verify shareable link generated
+		await expect(page.getByLabel(/Share Link/i)).toHaveValue(/.+/);
+	});
+
+	test.skip('allows copying share link to clipboard', async ({ page }) => {
+		await expect(page.locator('video')).toBeVisible();
+		await page.getByRole('button', { name: /Share/i }).click();
+
+		// Click copy button
+		await page.getByRole('button', { name: /Copy Link/i }).click();
+
+		// Verify copied feedback
+		await expect(page.getByText(/Copied|Link copied/i)).toBeVisible();
+	});
+
+	test.skip('can return to storyboard to make changes', async ({ page }) => {
+		// Click Back to Storyboard
+		await page.getByRole('button', { name: /Back to Storyboard|Edit Storyboard/i }).click();
+
+		// Verify navigation
+		await expect(page).toHaveURL(/\/storyboard/);
+	});
+
+	test.skip('video persists when navigating away and back', async ({ page }) => {
+		// Assume video generated
+		await expect(page.locator('video')).toBeVisible();
+		const videoSrc = await page.locator('video').getAttribute('src');
+
+		// Navigate away
+		await page.goto('/storyboard');
+
+		// Navigate back
+		await page.goto('/video');
+
+		// Verify video still there
+		await expect(page.locator('video')).toBeVisible();
+		const newVideoSrc = await page.locator('video').getAttribute('src');
+		expect(newVideoSrc).toBe(videoSrc);
 	});
 });

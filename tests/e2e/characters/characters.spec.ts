@@ -1,175 +1,195 @@
-import { test, expect } from '../shared/fixtures';
-import { navigateAndWait, waitForNetworkIdle, clearAllData } from '../shared/test-helpers';
+import { test, expect } from '@playwright/test';
 
-test.describe('Characters Feature', () => {
+test.describe('Characters @characters', () => {
 	test.beforeEach(async ({ page }) => {
-		await clearAllData(page);
-		await navigateAndWait(page, '/characters');
+		await page.goto('/characters');
+		await page.evaluate(() => {
+			localStorage.clear();
+			sessionStorage.clear();
+		});
+		await page.reload();
 	});
 
-	test.describe('Character Generation', () => {
-		test('generates characters from story content', async ({ page, mockStory }) => {
-			// TODO: Implement
-			// 1. Mock story data from previous step
-			// 2. Click "Generate Characters" button
-			// 3. Wait for API response
-			// 4. Verify characters are displayed
-			// 5. Verify character images are generated
-		});
+	test.skip('generates characters when coming from story page', async ({ page }) => {
+		// First generate a story
+		await page.goto('/story');
+		await page.getByPlaceholder(/Enter your story prompt/).fill('A space adventure with Captain Nova and Robo');
+		await page.getByRole('button', { name: 'Generate Story' }).click();
+		await expect(page.getByText(/Scene 1/)).toBeVisible({ timeout: 30000 });
 
-		test('allows specifying number of characters', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select character count (1-10)
-			// 2. Generate characters
-			// 3. Verify correct number generated
-		});
+		// Navigate to characters
+		await page.getByRole('button', { name: 'Send to Character Generation' }).click();
+		await expect(page).toHaveURL(/\/characters/);
 
-		test('displays loading state during generation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Click generate
-			// 2. Verify spinner is visible
-			// 3. Verify button is disabled
-			// 4. Wait for completion
-			// 5. Verify UI returns to normal
-		});
+		// Verify characters page shows story data
+		await expect(page.getByText(/Character Generation/i)).toBeVisible();
 	});
 
-	test.describe('Character Editing', () => {
-		test('allows editing character name', async ({ page, mockCharacter }) => {
-			// TODO: Implement
-			// 1. Generate or mock character
-			// 2. Click edit name button
-			// 3. Enter new name
-			// 4. Save changes
-			// 5. Verify name updated
-		});
-
-		test('allows editing character description', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate or mock character
-			// 2. Edit description field
-			// 3. Save changes
-			// 4. Verify description updated
-		});
-
-		test('allows regenerating character image', async ({ page }) => {
-			// TODO: Implement
-			// 1. Select a character
-			// 2. Click "Regenerate Image"
-			// 3. Verify new image is generated
-			// 4. Verify old image is replaced
-		});
+	test.skip('displays list of characters extracted from story', async ({ page }) => {
+		// Setup: Navigate from story
+		// Verify character names from story are displayed
+		// Example: "Captain Nova", "Robo" should be visible as buttons/cards
+		await expect(page.getByText(/Captain Nova/i)).toBeVisible();
+		await expect(page.getByText(/Robo/i)).toBeVisible();
 	});
 
-	test.describe('Character Management', () => {
-		test('allows adding additional characters', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate initial characters
-			// 2. Click "Add Character"
-			// 3. Fill character details
-			// 4. Generate character
-			// 5. Verify added to list
-		});
+	test.skip('generates character image when Generate Image clicked', async ({ page }) => {
+		// Select a character
+		await page.getByText(/Captain Nova/i).click();
 
-		test('allows removing characters', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate characters
-			// 2. Click remove on a character
-			// 3. Confirm deletion
-			// 4. Verify character removed
-		});
+		// Click Generate Image
+		await page.getByRole('button', { name: /Generate Image/i }).click();
 
-		test('allows reordering characters', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate multiple characters
-			// 2. Drag and drop to reorder
-			// 3. Verify new order is saved
-		});
+		// Wait for DALL-E response (can be slow)
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Verify image is from OpenAI initially
+		const imgSrc = await page.locator('img[alt*="Captain Nova"]').getAttribute('src');
+		expect(imgSrc).toContain('oaidalleapiprodscus');
 	});
 
-	test.describe('Image Handling', () => {
-		test('downloads and stores images locally', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate character with image
-			// 2. Verify image URL is from OpenAI
-			// 3. Wait for download
-			// 4. Verify local path is stored
-			// 5. Verify image is accessible locally
-		});
+	test.skip('shows loading spinner during image generation', async ({ page }) => {
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
 
-		test('displays placeholder while image loads', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock slow image load
-			// 2. Verify placeholder shown
-			// 3. Verify image replaces placeholder
-		});
+		// Verify loading state
+		await expect(page.getByText(/Generating/i)).toBeVisible();
+		await expect(page.getByRole('button', { name: /Generating/i })).toBeDisabled();
 
-		test('handles image generation errors', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock API error
-			// 2. Verify error message shown
-			// 3. Verify retry option available
-		});
+		// Wait for completion
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Verify loading state cleared
+		await expect(page.getByText(/Generating/i)).not.toBeVisible();
 	});
 
-	test.describe('Navigation', () => {
-		test('allows proceeding to scenes when characters are ready', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate characters
-			// 2. Click "Send to Scene Generation"
-			// 3. Verify navigated to /scenes
-			// 4. Verify characters passed to scenes
-		});
+	test.skip('downloads image and stores locally', async ({ page }) => {
+		// Generate image first
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
 
-		test('disables scene navigation when no characters', async ({ page }) => {
-			// TODO: Implement
-			// 1. Visit characters page with no data
-			// 2. Verify "Send to Scenes" button disabled
-		});
+		// Wait for download to complete (automatic)
+		await page.waitForTimeout(2000);
 
-		test('can return to story to make changes', async ({ page }) => {
-			// TODO: Implement
-			// 1. Click back to story
-			// 2. Verify story content is preserved
-			// 3. Edit story
-			// 4. Return to characters
-			// 5. Verify characters regenerate prompt appears
-		});
+		// Verify image URL changed to local path
+		const imgSrc = await page.locator('img[alt*="Captain Nova"]').getAttribute('src');
+		expect(imgSrc).toContain('/data/images/');
+
+		// Verify image still displays
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible();
 	});
 
-	test.describe('Conversation Integration', () => {
-		test('saves characters to conversation', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate characters
-			// 2. Verify conversation updated
-			// 3. Check sidebar shows character generation
-		});
+	test.skip('allows editing character name', async ({ page }) => {
+		await page.getByText(/Captain Nova/i).click();
 
-		test('loads characters from conversation history', async ({ page }) => {
-			// TODO: Implement
-			// 1. Generate characters
-			// 2. Navigate away
-			// 3. Return to characters
-			// 4. Verify characters loaded from conversation
-		});
+		// Click edit button
+		await page.getByRole('button', { name: /Edit Name/i }).click();
+
+		// Change name
+		const nameInput = page.getByLabel(/Character Name/i);
+		await nameInput.fill('Commander Nova');
+
+		// Save
+		await page.getByRole('button', { name: /Save/i }).click();
+
+		// Verify name updated
+		await expect(page.getByText(/Commander Nova/i)).toBeVisible();
+		await expect(page.getByText(/Captain Nova/i)).not.toBeVisible();
 	});
 
-	test.describe('Error Handling', () => {
-		test('handles API errors gracefully', async ({ page }) => {
-			// TODO: Implement
-			// 1. Mock API error
-			// 2. Attempt generation
-			// 3. Verify error message
-			// 4. Verify retry option
-		});
+	test.skip('allows editing character description', async ({ page }) => {
+		await page.getByText(/Captain Nova/i).click();
 
-		test('handles network failures', async ({ page }) => {
-			// TODO: Implement
-			// 1. Simulate offline
-			// 2. Attempt generation
-			// 3. Verify offline message
-			// 4. Restore connection
-			// 5. Verify retry works
-		});
+		// Edit description
+		const descInput = page.getByLabel(/Description/i);
+		await descInput.fill('A brave and skilled pilot with years of experience');
+
+		// Save
+		await page.getByRole('button', { name: /Save/i }).click();
+
+		// Verify description saved
+		await expect(page.getByText(/brave and skilled pilot/i)).toBeVisible();
+	});
+
+	test.skip('allows regenerating character image', async ({ page }) => {
+		// Setup: Have character with image
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Get original image src
+		const originalSrc = await page.locator('img[alt*="Captain Nova"]').getAttribute('src');
+
+		// Regenerate
+		await page.getByRole('button', { name: /Regenerate Image/i }).click();
+		await expect(page.getByText(/Generating/i)).toBeVisible();
+		await page.waitForTimeout(5000); // Wait for new image
+
+		// Verify new image is different
+		const newSrc = await page.locator('img[alt*="Captain Nova"]').getAttribute('src');
+		expect(newSrc).not.toBe(originalSrc);
+	});
+
+	test.skip('Send to Scenes button enabled when characters have images', async ({ page }) => {
+		// Generate images for characters
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Verify Send to Scenes is enabled
+		const sendButton = page.getByRole('button', { name: /Send to Scene Generation/i });
+		await expect(sendButton).toBeEnabled();
+	});
+
+	test.skip('Send to Scenes button disabled when no images', async ({ page }) => {
+		// Don't generate any images
+		const sendButton = page.getByRole('button', { name: /Send to Scene Generation/i });
+		await expect(sendButton).toBeDisabled();
+	});
+
+	test.skip('navigates to scenes page with character data', async ({ page }) => {
+		// Setup: Generate character images
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Navigate to scenes
+		await page.getByRole('button', { name: /Send to Scene Generation/i }).click();
+		await expect(page).toHaveURL(/\/scenes/);
+
+		// Verify characters are available in scenes
+		await expect(page.getByText(/Scene Generation/i)).toBeVisible();
+	});
+
+	test.skip('characters persist when navigating away and back', async ({ page }) => {
+		// Generate character
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Navigate away
+		await page.goto('/story');
+
+		// Navigate back
+		await page.goto('/characters');
+
+		// Verify character still visible with image
+		await expect(page.getByText(/Captain Nova/i)).toBeVisible();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible();
+	});
+
+	test.skip('conversation shows character generation in sidebar', async ({ page }) => {
+		// Generate character
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		// Wait for conversation to save
+		await page.waitForTimeout(2000);
+
+		// Check sidebar
+		const sidebarEntry = page.getByRole('link', { name: /Character/i });
+		await expect(sidebarEntry).toBeVisible({ timeout: 10000 });
 	});
 });
