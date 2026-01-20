@@ -1,0 +1,138 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e25]:
+          - generic [ref=e26]: Conversations
+          - list [ref=e28]:
+            - listitem [ref=e29]:
+              - link "A space adventure" [ref=e30] [cursor=pointer]:
+                - /url: /conversation/4e989921-da15-4cac-a014-57b3413fa0ad
+            - listitem [ref=e31]:
+              - link "A robot story" [ref=e32] [cursor=pointer]:
+                - /url: /conversation/5d9cedf2-f2cb-4be5-baa1-445afef5404a
+            - listitem [ref=e33]:
+              - link "Unique test story prompt" [ref=e34] [cursor=pointer]:
+                - /url: /conversation/b4e86021-1d90-42a1-92d6-59cb5baed58f
+            - listitem [ref=e35]:
+              - link "A quick story" [ref=e36] [cursor=pointer]:
+                - /url: /conversation/5b310486-bc2b-4620-9370-d074c3511753
+            - listitem [ref=e37]:
+              - link "A detective solving a mystery" [ref=e38] [cursor=pointer]:
+                - /url: /conversation/c49ec664-6c2b-4a62-9b37-8fa5e6ec736d
+      - img "Sid" [ref=e41]
+    - main [ref=e42]:
+      - button "Toggle Sidebar" [ref=e44] [cursor=pointer]:
+        - img
+        - generic [ref=e45]: Toggle Sidebar
+      - main [ref=e46]:
+        - generic [ref=e48]:
+          - heading "Story Generation" [level=1] [ref=e49]
+          - paragraph [ref=e50]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e51]:
+            - paragraph [ref=e52]: "Prompt (5s):"
+            - paragraph [ref=e53]: A space adventure
+          - generic [ref=e54]:
+            - heading "Journey to the Cosmic Rift" [level=2] [ref=e56]
+            - generic [ref=e57]:
+              - generic [ref=e58]:
+                - heading "Scene 1" [level=3] [ref=e59]
+                - generic [ref=e60]:
+                  - paragraph [ref=e61]: "Description:"
+                  - paragraph [ref=e62]: A lone spaceship zooming through the colorful depths of a nebula.
+                - generic [ref=e63]:
+                  - paragraph [ref=e64]: "Dialogue:"
+                  - paragraph [ref=e65]: "\"Captain Zara: 'Hold steady, we're approaching the rift!'\""
+                - generic [ref=e66]:
+                  - paragraph [ref=e67]: "Action:"
+                  - paragraph [ref=e68]: The spaceship navigates through shimmering gases and stardust.
+              - generic [ref=e69]:
+                - heading "Scene 2" [level=3] [ref=e70]
+                - generic [ref=e71]:
+                  - paragraph [ref=e72]: "Description:"
+                  - paragraph [ref=e73]: The spaceship approaches an ominous swirling cosmic rift.
+                - generic [ref=e74]:
+                  - paragraph [ref=e75]: "Dialogue:"
+                  - paragraph [ref=e76]: "\"Navigator Zeke: 'It's larger than the simulations!'\""
+                - generic [ref=e77]:
+                  - paragraph [ref=e78]: "Action:"
+                  - paragraph [ref=e79]: The ship's shields flare as they encounter gravitational fluctuations.
+              - generic [ref=e80]:
+                - heading "Scene 3" [level=3] [ref=e81]
+                - generic [ref=e82]:
+                  - paragraph [ref=e83]: "Description:"
+                  - paragraph [ref=e84]: Inside the ship, alarms blare and screens flash warning messages.
+                - generic [ref=e85]:
+                  - paragraph [ref=e86]: "Dialogue:"
+                  - paragraph [ref=e87]: "\"Engineer Kai: 'We've got a breach in Sector 4!'\""
+                - generic [ref=e88]:
+                  - paragraph [ref=e89]: "Action:"
+                  - paragraph [ref=e90]: Crew rush to their stations, securing the ship's integrity.
+              - generic [ref=e91]:
+                - heading "Scene 4" [level=3] [ref=e92]
+                - generic [ref=e93]:
+                  - paragraph [ref=e94]: "Description:"
+                  - paragraph [ref=e95]: The ship stabilizes and proceeds boldly towards the rift.
+                - generic [ref=e96]:
+                  - paragraph [ref=e97]: "Dialogue:"
+                  - paragraph [ref=e98]: "\"Captain Zara: 'Engage warp drive. Let's make history.'\""
+                - generic [ref=e99]:
+                  - paragraph [ref=e100]: "Action:"
+                  - paragraph [ref=e101]: The ship's engines roar to life, propelling it through the rift.
+              - generic [ref=e102]:
+                - heading "Scene 5" [level=3] [ref=e103]
+                - generic [ref=e104]:
+                  - paragraph [ref=e105]: "Description:"
+                  - paragraph [ref=e106]: The ship bursts into a stunning, uncharted galaxy full of unknown wonders.
+                - generic [ref=e107]:
+                  - paragraph [ref=e108]: "Dialogue:"
+                  - paragraph [ref=e109]: "\"Navigator Zeke: 'We've arrived. It's beautiful.'\""
+                - generic [ref=e110]:
+                  - paragraph [ref=e111]: "Action:"
+                  - paragraph [ref=e112]: The crew gazes out in awe at the new star systems unfolding before them.
+            - group [ref=e113]:
+              - generic "View raw content" [ref=e114] [cursor=pointer]
+          - generic [ref=e115]:
+            - button "Try Again" [ref=e116] [cursor=pointer]
+            - button "Edit Story Manually" [ref=e117] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e118] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e119] [cursor=pointer]:
+              - /url: /characters
+          - generic [ref=e121]:
+            - heading "Try Again" [level=3] [ref=e122]
+            - paragraph [ref=e123]: Generate a new version of the story
+            - generic [ref=e124]:
+              - generic [ref=e125]: Video Length
+              - button "5s" [ref=e126]:
+                - text: 5s
+                - img
+            - textbox "Enter your story prompt. Press Enter to submit, Shift+Enter for new line." [ref=e127]: A space adventure
+            - generic [ref=e128]:
+              - button "Cancel" [ref=e129] [cursor=pointer]
+              - button "Regenerating..." [disabled]:
+                - img
+                - text: Regenerating...
+  - generic [ref=e130]: untitled page
+```

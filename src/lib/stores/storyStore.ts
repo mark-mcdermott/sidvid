@@ -22,7 +22,7 @@ export interface StoryState {
 }
 
 const initialState: StoryState = {
-	prompt: 'sci-fi anime',
+	prompt: '',
 	selectedLength: { value: '5s', label: '5s' },
 	stories: [],
 	isGenerating: false,

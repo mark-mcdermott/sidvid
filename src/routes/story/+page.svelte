@@ -13,7 +13,6 @@
 
 	// DOM element references (not persisted in store)
 	let storyCardElement: HTMLDivElement | undefined = $state();
-	let tryAgainElement: HTMLDivElement | undefined = $state();
 	let editPromptElement: HTMLDivElement | undefined = $state();
 	let latestStoryCardElement: HTMLDivElement | undefined = $state();
 	let lastStoryRawContent = $state<string>('');
@@ -162,27 +161,30 @@
 	}
 
 	function startTryAgain() {
-		if ($storyStore.stories.length > 0) {
-			storyStore.update(state => ({
-				...state,
-				tryAgainPrompt: state.prompt,
-				tryAgainLength: state.selectedLength,
-				isTryingAgain: true
-			}));
-			// Scroll to the try again section
-			setTimeout(() => {
-				tryAgainElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			}, 0);
+		console.log('startTryAgain called', {
+			hasStories: $storyStore.stories.length > 0,
+			hasFormElement: !!tryAgainFormElement,
+			prompt: $storyStore.prompt,
+			length: $storyStore.selectedLength.value
+		});
+
+		if ($storyStore.stories.length > 0 && tryAgainFormElement) {
+			// Update form values right before submission to ensure they're current
+			const promptInput = tryAgainFormElement.querySelector('input[name="prompt"]') as HTMLInputElement;
+			const lengthInput = tryAgainFormElement.querySelector('input[name="length"]') as HTMLInputElement;
+
+			console.log('Found inputs:', { promptInput, lengthInput });
+
+			if (promptInput) promptInput.value = $storyStore.prompt;
+			if (lengthInput) lengthInput.value = $storyStore.selectedLength.value;
+
+			console.log('Submitting form...');
+			tryAgainFormElement.requestSubmit();
+		} else {
+			console.log('Not submitting - missing stories or form element');
 		}
 	}
 
-	function cancelTryAgain() {
-		storyStore.update(state => ({
-			...state,
-			isTryingAgain: false,
-			tryAgainPrompt: ''
-		}));
-	}
 
 	const lengthOptions = [
 		{ value: '2s', label: '2s' },
@@ -197,6 +199,25 @@
 		{ value: '15m', label: '15m' },
 		{ value: '30m', label: '30m' }
 	];
+
+	// Create reactive state variable for the Select component
+	let selectedLengthValue = $state($storyStore.selectedLength.value);
+
+	// Sync changes from Select back to store
+	$effect(() => {
+		const selectedOption = lengthOptions.find(opt => opt.value === selectedLengthValue);
+		if (selectedOption && selectedOption.value !== $storyStore.selectedLength.value) {
+			storyStore.update(state => ({
+				...state,
+				selectedLength: selectedOption
+			}));
+		}
+	});
+
+	// Sync changes from store back to local state
+	$effect(() => {
+		selectedLengthValue = $storyStore.selectedLength.value;
+	});
 </script>
 
 <form
@@ -232,9 +253,9 @@
 			<div class="w-full xl:max-w-[32rem]">
 				<div class="mb-2">
 					<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
-					<Select.Root bind:selected={$storyStore.selectedLength}>
+					<Select.Root type="single" bind:value={selectedLengthValue}>
 						<Select.Trigger class="w-32">
-							{$storyStore.selectedLength?.label || 'Select length'}
+							{$storyStore.selectedLength.label}
 						</Select.Trigger>
 						<Select.Content>
 							{#each lengthOptions as option}
@@ -366,7 +387,19 @@
 
 			{#if !$storyStore.isEditingManually && index === $storyStore.stories.length - 1}
 				<div class="flex gap-2">
-					<Button type="button" onclick={startTryAgain} variant="outline">Try Again</Button>
+					<Button
+						type="button"
+						onclick={startTryAgain}
+						variant="outline"
+						disabled={$storyStore.isGenerating}
+					>
+						{#if $storyStore.isGenerating}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Regenerating...
+						{:else}
+							Try Again
+						{/if}
+					</Button>
 					<Button onclick={startManualEdit} variant="outline">Edit Story Manually</Button>
 					<Button onclick={startPromptEdit} variant="outline">Edit Story with Prompt</Button>
 					<Button href="/characters">Send to Character Generation</Button>
@@ -421,76 +454,30 @@
 					</form>
 				{/if}
 
-				{#if $storyStore.isTryingAgain}
-					<form
-						bind:this={tryAgainFormElement}
-						method="POST"
-						action="?/generateStory"
-					use:enhance={() => {
-						// Capture the try again prompt before form submission
-						const currentTryAgainPrompt = $storyStore.tryAgainPrompt;
-						storyStore.update(state => ({ ...state, isGenerating: true }));
-						return async ({ update }) => {
-							await update({ reset: false }); // Don't reset the form
-							storyStore.update(state => ({
-								...state,
-								isGenerating: false,
-								isTryingAgain: false,
-								// Restore prompt if it was cleared
-								tryAgainPrompt: currentTryAgainPrompt
-							}));
-						};
-					}}
-					>
-						<div bind:this={tryAgainElement} class="flex flex-col gap-4 rounded-md border p-4">
-							<h3 class="text-lg font-semibold">Try Again</h3>
-							<p class="text-sm text-muted-foreground">
-								Generate a new version of the story
-							</p>
-
-							<div>
-								<label for="tryAgainLength" class="mb-1 block text-sm font-medium"
-									>Video Length</label
-								>
-								<Select.Root bind:selected={$storyStore.tryAgainLength}>
-									<Select.Trigger class="w-32">
-										{$storyStore.tryAgainLength?.label || 'Select length'}
-									</Select.Trigger>
-									<Select.Content>
-										{#each lengthOptions as option}
-											<Select.Item value={option.value} label={option.label}>
-												{option.label}
-											</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" name="length" value={$storyStore.tryAgainLength?.value || '5s'} />
-							</div>
-
-							<Textarea
-								bind:value={$storyStore.tryAgainPrompt}
-								name="prompt"
-								placeholder="Enter your story prompt. Press Enter to submit, Shift+Enter for new line."
-								class="min-h-32"
-								required
-								onkeydown={(e) => handleKeydown(e, tryAgainFormElement)}
-							/>
-
-							<div class="flex gap-2">
-								<Button type="button" onclick={cancelTryAgain} variant="outline">Cancel</Button>
-								<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.tryAgainPrompt.trim()}>
-									{#if $storyStore.isGenerating}
-										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-										Regenerating...
-									{:else}
-										Regenerate Story
-									{/if}
-								</Button>
-							</div>
-						</div>
-					</form>
-				{/if}
 			{/if}
 		{/each}
 	</div>
+</form>
+
+<!-- Hidden form for Try Again functionality -->
+<form
+	bind:this={tryAgainFormElement}
+	method="POST"
+	action="?/generateStory"
+	class="hidden"
+	use:enhance={() => {
+		const currentPrompt = $storyStore.prompt;
+		storyStore.update(state => ({ ...state, isGenerating: true }));
+		return async ({ update }) => {
+			await update({ reset: false });
+			storyStore.update(state => ({
+				...state,
+				isGenerating: false,
+				prompt: currentPrompt
+			}));
+		};
+	}}
+>
+	<input type="hidden" name="prompt" value={$storyStore.prompt} />
+	<input type="hidden" name="length" value={$storyStore.selectedLength.value} />
 </form>

@@ -86,7 +86,7 @@
 			</SidebarGroup>
 		</SidebarContent>
 		<SidebarFooter>
-			<div class="p-4">
+			<div class="py-4 pr-4">
 				<img src="/sid.png" alt="Sid" class="w-full rounded-lg" />
 			</div>
 		</SidebarFooter>

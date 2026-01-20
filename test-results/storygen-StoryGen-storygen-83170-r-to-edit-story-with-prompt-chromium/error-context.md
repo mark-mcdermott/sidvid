@@ -1,0 +1,113 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e25]:
+          - generic [ref=e26]: Conversations
+          - list [ref=e28]:
+            - listitem [ref=e29]:
+              - link "A robot story" [ref=e30] [cursor=pointer]:
+                - /url: /conversation/5d9cedf2-f2cb-4be5-baa1-445afef5404a
+            - listitem [ref=e31]:
+              - link "Unique test story prompt" [ref=e32] [cursor=pointer]:
+                - /url: /conversation/b4e86021-1d90-42a1-92d6-59cb5baed58f
+            - listitem [ref=e33]:
+              - link "A quick story" [ref=e34] [cursor=pointer]:
+                - /url: /conversation/5b310486-bc2b-4620-9370-d074c3511753
+            - listitem [ref=e35]:
+              - link "A detective solving a mystery" [ref=e36] [cursor=pointer]:
+                - /url: /conversation/c49ec664-6c2b-4a62-9b37-8fa5e6ec736d
+      - img "Sid" [ref=e39]
+    - main [ref=e40]:
+      - button "Toggle Sidebar" [ref=e42] [cursor=pointer]:
+        - img
+        - generic [ref=e43]: Toggle Sidebar
+      - main [ref=e44]:
+        - generic [ref=e46]:
+          - heading "Story Generation" [level=1] [ref=e47]
+          - paragraph [ref=e48]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e49]: No content returned from ChatGPT
+          - generic [ref=e50]:
+            - paragraph [ref=e51]: "Prompt (5s):"
+            - paragraph [ref=e52]: A robot story
+          - generic [ref=e53]:
+            - heading "A Robot's New Friend" [level=2] [ref=e55]
+            - generic [ref=e56]:
+              - generic [ref=e57]:
+                - heading "Scene 1" [level=3] [ref=e58]
+                - generic [ref=e59]:
+                  - paragraph [ref=e60]: "Description:"
+                  - paragraph [ref=e61]: A lonely robot sits by itself on a park bench, its eyes glowing softly.
+                - generic [ref=e62]:
+                  - paragraph [ref=e63]: "Action:"
+                  - paragraph [ref=e64]: The robot looks around, noticing the vibrant environment filled with people and nature.
+              - generic [ref=e65]:
+                - heading "Scene 2" [level=3] [ref=e66]
+                - generic [ref=e67]:
+                  - paragraph [ref=e68]: "Description:"
+                  - paragraph [ref=e69]: A small puppy bounds into view, sniffing curiously at the robot's feet.
+                - generic [ref=e70]:
+                  - paragraph [ref=e71]: "Dialogue:"
+                  - paragraph [ref=e72]: "\"Robot: 'Hello, little one.'\""
+                - generic [ref=e73]:
+                  - paragraph [ref=e74]: "Action:"
+                  - paragraph [ref=e75]: The robot slowly extends a hand towards the puppy, who sniffs it with interest.
+              - generic [ref=e76]:
+                - heading "Scene 3" [level=3] [ref=e77]
+                - generic [ref=e78]:
+                  - paragraph [ref=e79]: "Description:"
+                  - paragraph [ref=e80]: The puppy playfully rubs against the robot, a wagging tail showing its excitement.
+                - generic [ref=e81]:
+                  - paragraph [ref=e82]: "Action:"
+                  - paragraph [ref=e83]: The robot gently pets the puppy, its eyes glowing brighter with joy.
+              - generic [ref=e84]:
+                - heading "Scene 4" [level=3] [ref=e85]
+                - generic [ref=e86]:
+                  - paragraph [ref=e87]: "Description:"
+                  - paragraph [ref=e88]: A child rushes over, looking relieved to find their puppy with the robot.
+                - generic [ref=e89]:
+                  - paragraph [ref=e90]: "Dialogue:"
+                  - paragraph [ref=e91]: "\"Child: 'There you are! Thank you for keeping him company.'\""
+                - generic [ref=e92]:
+                  - paragraph [ref=e93]: "Action:"
+                  - paragraph [ref=e94]: The robot nods at the child, showing understanding and camaraderie.
+              - generic [ref=e95]:
+                - heading "Scene 5" [level=3] [ref=e96]
+                - generic [ref=e97]:
+                  - paragraph [ref=e98]: "Description:"
+                  - paragraph [ref=e99]: The robot watches as the puppy and child play together, a small smile forming on its face.
+                - generic [ref=e100]:
+                  - paragraph [ref=e101]: "Action:"
+                  - paragraph [ref=e102]: Content with its brief encounter, the robot sits back, basking in the warmth of the moment.
+            - group [ref=e103]:
+              - generic "View raw content" [ref=e104] [cursor=pointer]
+          - generic [ref=e105]:
+            - button "Try Again" [ref=e106] [cursor=pointer]
+            - button "Edit Story Manually" [ref=e107] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e108] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e109] [cursor=pointer]:
+              - /url: /characters
+  - generic [ref=e110]: untitled page
+```
