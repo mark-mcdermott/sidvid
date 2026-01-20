@@ -6,16 +6,26 @@
 	import { storyStore } from '$lib/stores/storyStore';
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
 
 	let isGenerating = $state(false);
+	let isImproving = $state(false);
+	let improvingType = $state<'smart' | 'regenerate' | null>(null);
 	let activeCharacterIndex = $state(0);
 	let lastProcessedEnhancedText = $state<string>('');
 	let lastProcessedImageUrl = $state<string>('');
 	let characterRefs: { [key: number]: HTMLDivElement } = {};
+
+	// Track which characters have had descriptions enhanced (to show improve buttons)
+	let enhancedCharacters = $state<Set<number>>(new Set());
+	// Track which characters have the prompt textarea open
+	let showPromptTextarea = $state<Set<number>>(new Set());
+	// Store user prompts for each character
+	let userPrompts = $state<{ [key: number]: string }>({});
 
 	// Load story characters if available
 	onMount(() => {
@@ -40,6 +50,11 @@
 				}
 				return { ...state, characters: updatedCharacters };
 			});
+
+			// Mark character as enhanced to show improve buttons
+			enhancedCharacters = new Set([...enhancedCharacters, activeCharacterIndex]);
+			// Close prompt textarea if open
+			showPromptTextarea = new Set([...showPromptTextarea].filter(i => i !== activeCharacterIndex));
 
 			// Save to conversation
 			(async () => {
@@ -159,6 +174,21 @@
 			addCustomCharacter();
 		}
 	}
+
+	function openPromptTextarea(index: number) {
+		showPromptTextarea = new Set([...showPromptTextarea, index]);
+	}
+
+	function closePromptTextarea(index: number) {
+		showPromptTextarea = new Set([...showPromptTextarea].filter(i => i !== index));
+		userPrompts[index] = '';
+	}
+
+	async function beginSceneGeneration() {
+		// Navigate to scenes page with character and story data
+		// Data will be available through stores
+		await goto('/scenes');
+	}
 </script>
 
 <div class="flex flex-col gap-4">
@@ -215,6 +245,15 @@
 		</div>
 	</div>
 
+	<!-- Begin Scene Generation Button -->
+	{#if $characterStore.characters.length > 0}
+		<div class="flex justify-center">
+			<Button onclick={beginSceneGeneration} size="lg">
+				Begin Scene Generation
+			</Button>
+		</div>
+	{/if}
+
 	<!-- Expanded Characters -->
 	{#each $characterStore.characters as char, index}
 		{#if $characterStore.expandedCharacterIndices.has(index)}
@@ -250,33 +289,74 @@
 					</details>
 				{/if}
 
-				<div class="flex gap-2">
-					<form
-						method="POST"
-						action="?/enhanceDescription"
-						use:enhance={() => {
-							isGenerating = true;
-							activeCharacterIndex = index;
-							return async ({ update }) => {
-								await update();
-								isGenerating = false;
-							};
-						}}
-					>
-						<input type="hidden" name="description" value={getCurrentDescription(index)} />
-						<Button
-							type="submit"
-							variant="outline"
-							disabled={isGenerating || !char.description}
+					<div class="flex flex-col gap-3">
+					<div class="flex flex-wrap gap-2">
+					{#if !enhancedCharacters.has(index)}
+						<!-- Initial Enhance Description button -->
+						<form
+							method="POST"
+							action="?/enhanceDescription"
+							use:enhance={() => {
+								isGenerating = true;
+								activeCharacterIndex = index;
+								return async ({ update }) => {
+									await update();
+									isGenerating = false;
+								};
+							}}
 						>
-							{#if isGenerating && activeCharacterIndex === index && form?.action === 'enhance'}
-								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-								Enhancing...
-							{:else}
-								Enhance Description
-							{/if}
+							<input type="hidden" name="description" value={getCurrentDescription(index)} />
+							<Button
+								type="submit"
+								variant="outline"
+								disabled={isGenerating || !char.description}
+							>
+								{#if isGenerating && activeCharacterIndex === index && form?.action === 'enhance'}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+									Enhancing...
+								{:else}
+									Enhance Description
+								{/if}
+							</Button>
+						</form>
+					{:else if !showPromptTextarea.has(index)}
+						<!-- Smart Improve and Improve With Prompt buttons -->
+						<form
+							method="POST"
+							action="?/improveDescription"
+							use:enhance={() => {
+								isImproving = true;
+								improvingType = 'smart';
+								activeCharacterIndex = index;
+								return async ({ update }) => {
+									await update();
+									isImproving = false;
+									improvingType = null;
+								};
+							}}
+						>
+							<input type="hidden" name="description" value={getCurrentDescription(index)} />
+							<Button
+								type="submit"
+								variant="outline"
+								disabled={isImproving || isGenerating}
+							>
+								{#if isImproving && activeCharacterIndex === index && improvingType === 'smart'}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+									Improving...
+								{:else}
+									Smart Improve Description
+								{/if}
+							</Button>
+						</form>
+						<Button
+							variant="outline"
+							onclick={() => openPromptTextarea(index)}
+							disabled={isImproving || isGenerating}
+						>
+							Improve Description With Prompt
 						</Button>
-					</form>
+					{/if}
 
 					<form
 						method="POST"
@@ -301,6 +381,51 @@
 						</Button>
 					</form>
 				</div>
+
+				{#if showPromptTextarea.has(index)}
+					<!-- Prompt textarea for improving description -->
+					<div class="flex flex-col gap-2 rounded-md border p-3">
+						<Textarea
+							bind:value={userPrompts[index]}
+							placeholder="Describe how you'd like to change the description..."
+							class="min-h-20"
+						/>
+						<div class="flex gap-2">
+							<form
+								method="POST"
+								action="?/improveDescription"
+								use:enhance={() => {
+									isImproving = true;
+									improvingType = 'regenerate';
+									activeCharacterIndex = index;
+									return async ({ update }) => {
+										await update();
+										isImproving = false;
+										improvingType = null;
+									};
+								}}
+							>
+								<input type="hidden" name="description" value={getCurrentDescription(index)} />
+								<input type="hidden" name="userPrompt" value={userPrompts[index] || ''} />
+								<Button
+									type="submit"
+									disabled={isImproving || !userPrompts[index]?.trim()}
+								>
+									{#if isImproving && activeCharacterIndex === index && improvingType === 'regenerate'}
+										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										Regenerating...
+									{:else}
+										Regenerate Description
+									{/if}
+								</Button>
+							</form>
+							<Button variant="outline" onclick={() => closePromptTextarea(index)}>
+								Cancel
+							</Button>
+						</div>
+					</div>
+				{/if}
+			</div>
 			</div>
 		{/if}
 	{/each}

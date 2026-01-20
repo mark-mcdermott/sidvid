@@ -19,6 +19,8 @@
 		SidebarTrigger
 	} from '$lib/components/ui/sidebar';
 	import { conversationStore, loadConversations } from '$lib/stores/conversationStore';
+	import { characterStore } from '$lib/stores/characterStore';
+	import { storyStore } from '$lib/stores/storyStore';
 
 	let { children } = $props();
 
@@ -65,6 +67,65 @@
 					</SidebarMenu>
 				</SidebarGroupContent>
 			</SidebarGroup>
+
+			{#if $page.url.pathname === '/scenes'}
+				<!-- Story section for scenes page -->
+				{#if $storyStore.stories.length > 0}
+					<SidebarGroup data-sidebar-section="story">
+						<SidebarGroupLabel>Story</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<div class="px-2">
+								{#each $storyStore.stories as story}
+									<div data-story-draggable class="p-2 cursor-move hover:bg-muted rounded">
+										<div class="text-sm font-medium">{story.story.title || 'Untitled Story'}</div>
+										<div class="text-xs text-muted-foreground">{story.story.scenes.length} scenes</div>
+									</div>
+								{/each}
+							</div>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				{/if}
+
+				<!-- Characters section for scenes page -->
+				{#if $characterStore.characters.length > 0}
+					<SidebarGroup data-sidebar-section="characters">
+						<SidebarGroupLabel>Characters</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<div class="px-2 flex flex-col gap-2">
+								{#each $characterStore.characters as char, index}
+									<div
+										data-character-thumbnail
+										class="flex items-center gap-2 p-2 cursor-move hover:bg-muted rounded"
+										draggable="true"
+									>
+										{#if char.imageUrl}
+											<img src={char.imageUrl} alt={char.name} class="w-12 h-12 rounded object-cover" />
+										{:else}
+											<div class="w-12 h-12 rounded bg-muted flex items-center justify-center text-xs">
+												{char.name.charAt(0)}
+											</div>
+										{/if}
+										<div class="flex-1 min-w-0">
+											<div class="text-sm font-medium truncate">{char.name}</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				{/if}
+			{/if}
+
+			{#if $page.url.pathname === '/video'}
+				<SidebarGroup data-sidebar-section="video">
+					<SidebarGroupLabel>Video</SidebarGroupLabel>
+					<SidebarGroupContent>
+						<div class="px-2">
+							<!-- Video thumbnails will be added here -->
+						</div>
+					</SidebarGroupContent>
+				</SidebarGroup>
+			{/if}
 
 			<SidebarGroup>
 				<SidebarGroupLabel>Conversations</SidebarGroupLabel>
