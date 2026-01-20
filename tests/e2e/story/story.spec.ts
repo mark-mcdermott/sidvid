@@ -112,14 +112,19 @@ test.describe('StoryGen @storygen', () => {
     // Wait for the story to be generated
     await expect(page.getByText(/Scene 1/)).toBeVisible({ timeout: 30000 });
 
+    // Get the story title from the page
+    const storyTitle = await page.locator('h2').first().textContent();
+
     // Wait for the conversation to be saved and appear in the sidebar
-    // The title will be the first 5 words of the prompt
-    const expectedTitle = testPrompt.split(/\s+/).slice(0, 5).join(' ');
+    // The title will be the story title truncated to 3-5 words
+    // We'll check for the first 3 words of the story title since that's the minimum
+    const titleWords = storyTitle?.trim().split(/\s+/) || [];
+    const expectedTitleStart = titleWords.slice(0, 3).join(' ');
 
     // Look for the conversation in the sidebar under the Story section (not global Conversations)
     // It should appear directly below the Story nav item
     const storySidebar = page.locator('[data-sidebar-section="story"]');
-    const sidebarConversation = storySidebar.getByRole('link', { name: new RegExp(expectedTitle, 'i') });
+    const sidebarConversation = storySidebar.getByRole('link', { name: new RegExp(expectedTitleStart, 'i') });
     await expect(sidebarConversation).toBeVisible({ timeout: 10000 });
   });
 
