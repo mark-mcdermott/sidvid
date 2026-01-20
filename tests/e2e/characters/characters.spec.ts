@@ -179,17 +179,84 @@ test.describe('Characters @characters', () => {
 		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible();
 	});
 
-	test.skip('conversation shows character generation in sidebar', async ({ page }) => {
+	test.skip('character thumbnail appears in sidebar under Characters tab', async ({ page }) => {
 		// Generate character
 		await page.getByText(/Captain Nova/i).click();
 		await page.getByRole('button', { name: /Generate Image/i }).click();
 		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
 
-		// Wait for conversation to save
+		// Wait for thumbnail to save
 		await page.waitForTimeout(2000);
 
-		// Check sidebar
-		const sidebarEntry = page.getByRole('link', { name: /Character/i });
-		await expect(sidebarEntry).toBeVisible({ timeout: 10000 });
+		// Check sidebar for thumbnail under Characters section
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const thumbnail = charactersSidebar.locator('[data-character-thumbnail]').first();
+		await expect(thumbnail).toBeVisible({ timeout: 10000 });
+
+		// Verify thumbnail is a small square image
+		const thumbnailImg = thumbnail.locator('img');
+		await expect(thumbnailImg).toBeVisible();
+	});
+
+	test.skip('multiple character thumbnails display in grid below Characters tab', async ({ page }) => {
+		// Generate multiple characters
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		await page.getByText(/Robo/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Robo"]')).toBeVisible({ timeout: 45000 });
+
+		// Wait for thumbnails to save
+		await page.waitForTimeout(2000);
+
+		// Verify multiple thumbnails in sidebar
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const thumbnails = charactersSidebar.locator('[data-character-thumbnail]');
+		const count = await thumbnails.count();
+		expect(count).toBe(2);
+
+		// Verify they're displayed in a grid/line
+		await expect(thumbnails.first()).toBeVisible();
+		await expect(thumbnails.nth(1)).toBeVisible();
+	});
+
+	test.skip('character thumbnail can be dragged from sidebar to main area', async ({ page }) => {
+		// Setup: Have character with thumbnail in sidebar
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+		await page.waitForTimeout(2000);
+
+		// Get thumbnail from sidebar
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const thumbnail = charactersSidebar.locator('[data-character-thumbnail]').first();
+
+		// Drag to main area (e.g., to enlarge or edit)
+		const mainArea = page.locator('[data-character-detail-area]');
+		await thumbnail.dragTo(mainArea);
+
+		// Verify character details appear in main area
+		await expect(mainArea.getByText(/Captain Nova/i)).toBeVisible();
+	});
+
+	test.skip('conversations for Characters appear below thumbnails in sidebar', async ({ page }) => {
+		// Generate character (creates conversation)
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+		await page.waitForTimeout(2000);
+
+		// Check sidebar structure: Characters tab > thumbnails > conversations
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+
+		// Thumbnails should be first
+		const thumbnails = charactersSidebar.locator('[data-character-thumbnail]');
+		await expect(thumbnails.first()).toBeVisible();
+
+		// Conversations should be below thumbnails
+		const conversations = charactersSidebar.locator('[data-conversation-item]');
+		await expect(conversations.first()).toBeVisible({ timeout: 10000 });
 	});
 });

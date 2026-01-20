@@ -1,6 +1,7 @@
 import type OpenAI from 'openai';
 import type { StoryOptions, EditStoryOptions, Story, StoryScene, StoryCharacter, StorySceneVisual } from '../types';
 import { storyOptionsSchema } from '../schemas';
+import { getComplexityGuidance } from '../utils/story-helpers';
 
 const STORY_SYSTEM_PROMPT = `You are a creative story writer for video production.
 Generate structured stories that can be turned into videos.
@@ -35,12 +36,19 @@ For characters and sceneVisuals, extract information directly from the story tex
 
 export async function generateStory(
   client: OpenAI,
-  options: StoryOptions
+  options: StoryOptions & { videoLength?: string }
 ): Promise<Story> {
   const validated = storyOptionsSchema.parse(options);
+  const videoLength = (options as any).videoLength || '5s';
+  const complexityGuidance = getComplexityGuidance(videoLength);
 
-  const userPrompt = `Create a ${validated.scenes}-scene story about: ${validated.prompt}
+  const userPrompt = `Create a ${validated.scenes}-scene story for a ${videoLength} video about: ${validated.prompt}
+
+${complexityGuidance}
+
 ${validated.style ? `Style: ${validated.style}` : ''}
+
+IMPORTANT: The entire story must fit within a ${videoLength} video. Adjust scene complexity accordingly.
 Return only valid JSON.`;
 
   const completion = await client.chat.completions.create({
@@ -80,12 +88,15 @@ export async function editStory(
   options: EditStoryOptions
 ): Promise<Story> {
   const { currentStory, editPrompt, length = '5s', maxTokens = 2000 } = options;
+  const complexityGuidance = getComplexityGuidance(length);
 
   const fullPrompt = `You are editing a story for a ${length} video. Here is the current story in JSON format:
 
 ${currentStory.rawContent}
 
 Please modify the story based on this instruction: ${editPrompt}
+
+${complexityGuidance}
 
 CRITICAL EDITING RULES:
 1. PRESERVE THE EXACT SAME NUMBER OF SCENES - Do not reduce or increase the scene count unless explicitly requested
@@ -94,6 +105,7 @@ CRITICAL EDITING RULES:
 4. DO NOT start over from scratch - build upon the current story
 5. Only reduce scenes if explicitly asked (e.g., "make it shorter", "combine scenes", "remove scene X")
 6. Only increase scenes if explicitly asked (e.g., "make it longer", "add more scenes")
+7. IMPORTANT: The entire story must fit within a ${length} video - adjust scene complexity accordingly
 
 Return the updated story in the same JSON format with the following structure:
 {

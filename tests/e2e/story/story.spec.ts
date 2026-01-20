@@ -102,7 +102,7 @@ test.describe('StoryGen @storygen', () => {
     await expect(page.getByText(/Prompt \(/)).toBeVisible();
   });
 
-  test('conversation shows in sidebar shortly after response loads', async ({ page }) => {
+  test('conversation shows in sidebar under Story tab', async ({ page }) => {
     const testPrompt = 'Unique test story prompt';
 
     // Fill in the prompt and submit
@@ -116,8 +116,10 @@ test.describe('StoryGen @storygen', () => {
     // The title will be the first 5 words of the prompt
     const expectedTitle = testPrompt.split(/\s+/).slice(0, 5).join(' ');
 
-    // Look for the conversation in the sidebar under "Conversations" section
-    const sidebarConversation = page.getByRole('link', { name: new RegExp(expectedTitle, 'i') });
+    // Look for the conversation in the sidebar under the Story section (not global Conversations)
+    // It should appear directly below the Story nav item
+    const storySidebar = page.locator('[data-sidebar-section="story"]');
+    const sidebarConversation = storySidebar.getByRole('link', { name: new RegExp(expectedTitle, 'i') });
     await expect(sidebarConversation).toBeVisible({ timeout: 10000 });
   });
 

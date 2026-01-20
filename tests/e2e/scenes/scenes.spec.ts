@@ -210,4 +210,180 @@ test.describe('Scenes @scenes', () => {
 		const newSceneCount = await page.locator('[data-scene]').count();
 		expect(newSceneCount).toBe(sceneCount);
 	});
+
+	test.skip('scene thumbnail appears in sidebar under Scenes tab', async ({ page }) => {
+		// Generate scene
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Wait for thumbnail to save
+		await page.waitForTimeout(2000);
+
+		// Check sidebar for thumbnail under Scenes section
+		const scenesSidebar = page.locator('[data-sidebar-section="scenes"]');
+		const thumbnail = scenesSidebar.locator('[data-scene-thumbnail]').first();
+		await expect(thumbnail).toBeVisible({ timeout: 10000 });
+
+		// Verify thumbnail is a small square image
+		const thumbnailImg = thumbnail.locator('img');
+		await expect(thumbnailImg).toBeVisible();
+	});
+
+	test.skip('multiple scene thumbnails display in grid below Scenes tab', async ({ page }) => {
+		// Generate multiple scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Wait for thumbnails to save
+		await page.waitForTimeout(2000);
+
+		// Verify multiple thumbnails in sidebar
+		const scenesSidebar = page.locator('[data-sidebar-section="scenes"]');
+		const thumbnails = scenesSidebar.locator('[data-scene-thumbnail]');
+		const count = await thumbnails.count();
+		expect(count).toBeGreaterThan(2);
+
+		// Verify they're displayed in a grid/line
+		await expect(thumbnails.first()).toBeVisible();
+		await expect(thumbnails.nth(1)).toBeVisible();
+		await expect(thumbnails.nth(2)).toBeVisible();
+	});
+
+	test.skip('supports generating both text scenes and image scenes', async ({ page }) => {
+		// Generate scenes
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Verify some scenes have images
+		const imageScenes = page.locator('[data-scene-type="image"]');
+		await expect(imageScenes.first()).toBeVisible();
+
+		// Verify some scenes are text-only
+		const textScenes = page.locator('[data-scene-type="text"]');
+		await expect(textScenes.first()).toBeVisible();
+	});
+
+	test.skip('character thumbnail can be dragged from Characters sidebar into a scene', async ({ page }) => {
+		// First generate a character with image
+		await page.goto('/characters');
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+		await page.waitForTimeout(2000);
+
+		// Navigate to scenes and generate a scene
+		await page.goto('/scenes');
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Get character thumbnail from Characters section
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const characterThumbnail = charactersSidebar.locator('[data-character-thumbnail]').first();
+
+		// Drag to first scene
+		const firstScene = page.locator('[data-scene="1"]');
+		await characterThumbnail.dragTo(firstScene);
+
+		// Verify character added to scene
+		await expect(firstScene.getByText(/Captain Nova/i)).toBeVisible();
+	});
+
+	test.skip('character can be dragged into text scene', async ({ page }) => {
+		// Generate character
+		await page.goto('/characters');
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+		await page.waitForTimeout(2000);
+
+		// Navigate to scenes and generate scenes
+		await page.goto('/scenes');
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('[data-scene-type="text"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Get character thumbnail
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const characterThumbnail = charactersSidebar.locator('[data-character-thumbnail]').first();
+
+		// Drag to text scene
+		const textScene = page.locator('[data-scene-type="text"]').first();
+		await characterThumbnail.dragTo(textScene);
+
+		// Verify character added to text scene
+		await expect(textScene.getByText(/Captain Nova/i)).toBeVisible();
+	});
+
+	test.skip('character can be dragged into image scene', async ({ page }) => {
+		// Generate character
+		await page.goto('/characters');
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+		await page.waitForTimeout(2000);
+
+		// Navigate to scenes and generate scenes
+		await page.goto('/scenes');
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('[data-scene-type="image"]').first()).toBeVisible({ timeout: 60000 });
+
+		// Get character thumbnail
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const characterThumbnail = charactersSidebar.locator('[data-character-thumbnail]').first();
+
+		// Drag to image scene
+		const imageScene = page.locator('[data-scene-type="image"]').first();
+		await characterThumbnail.dragTo(imageScene);
+
+		// Verify character added to image scene
+		await expect(imageScene.getByText(/Captain Nova/i)).toBeVisible();
+	});
+
+	test.skip('multiple characters can be added to a single scene', async ({ page }) => {
+		// Generate two characters
+		await page.goto('/characters');
+		await page.getByText(/Captain Nova/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Captain Nova"]')).toBeVisible({ timeout: 45000 });
+
+		await page.getByText(/Robo/i).click();
+		await page.getByRole('button', { name: /Generate Image/i }).click();
+		await expect(page.locator('img[alt*="Robo"]')).toBeVisible({ timeout: 45000 });
+		await page.waitForTimeout(2000);
+
+		// Navigate to scenes
+		await page.goto('/scenes');
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('[data-scene]').first()).toBeVisible({ timeout: 60000 });
+
+		// Get character thumbnails
+		const charactersSidebar = page.locator('[data-sidebar-section="characters"]');
+		const thumbnails = charactersSidebar.locator('[data-character-thumbnail]');
+
+		// Drag both characters to first scene
+		const firstScene = page.locator('[data-scene="1"]');
+		await thumbnails.first().dragTo(firstScene);
+		await thumbnails.nth(1).dragTo(firstScene);
+
+		// Verify both characters in scene
+		await expect(firstScene.getByText(/Captain Nova/i)).toBeVisible();
+		await expect(firstScene.getByText(/Robo/i)).toBeVisible();
+	});
+
+	test.skip('conversations for Scenes appear below thumbnails in sidebar', async ({ page }) => {
+		// Generate scene (creates conversation)
+		await page.getByRole('button', { name: /Generate Scenes/i }).click();
+		await expect(page.locator('img[alt*="Scene"]').first()).toBeVisible({ timeout: 60000 });
+		await page.waitForTimeout(2000);
+
+		// Check sidebar structure: Scenes tab > thumbnails > conversations
+		const scenesSidebar = page.locator('[data-sidebar-section="scenes"]');
+
+		// Thumbnails should be first
+		const thumbnails = scenesSidebar.locator('[data-scene-thumbnail]');
+		await expect(thumbnails.first()).toBeVisible();
+
+		// Conversations should be below thumbnails
+		const conversations = scenesSidebar.locator('[data-conversation-item]');
+		await expect(conversations.first()).toBeVisible({ timeout: 10000 });
+	});
 });

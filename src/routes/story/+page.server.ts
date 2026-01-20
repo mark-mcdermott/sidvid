@@ -1,6 +1,7 @@
 import { SidVid } from '$lib/sidvid';
 import { OPENAI_API_KEY } from '$env/static/private';
 import type { Actions } from './$types';
+import { calculateSceneCount } from '$lib/sidvid/utils/story-helpers';
 
 export const actions = {
 	generateStory: async ({ request }) => {
@@ -14,11 +15,13 @@ export const actions = {
 
 		try {
 			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
-			const fullPrompt = `Give me the storyline for a ${length || '5s'} video: ${userPrompt}`;
+			const videoLength = typeof length === 'string' ? length : '5s';
+			const sceneCount = calculateSceneCount(videoLength);
 
 			const story = await sidvid.generateStory({
-				prompt: fullPrompt,
-				scenes: 5
+				prompt: userPrompt,
+				scenes: sceneCount,
+				videoLength
 			});
 
 			return { success: true, story };
