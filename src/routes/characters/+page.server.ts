@@ -62,5 +62,40 @@ export const actions = {
 				error: error instanceof Error ? error.message : 'Failed to generate character image'
 			};
 		}
+	},
+
+	improveDescription: async ({ request }) => {
+		const data = await request.formData();
+		const description = data.get('description');
+		const userPrompt = data.get('userPrompt');
+
+		if (!description || typeof description !== 'string') {
+			return { success: false, error: 'Character description is required' };
+		}
+
+		try {
+			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
+
+			// If user prompt provided, include it in the enhancement request
+			const promptSuffix = userPrompt && typeof userPrompt === 'string'
+				? `. Additionally: ${userPrompt}`
+				: '';
+
+			const enhancedText = await sidvid.enhanceCharacterDescription({
+				description: description + promptSuffix
+			});
+
+			return {
+				success: true,
+				enhancedText,
+				action: userPrompt ? 'regenerate' : 'improve'
+			};
+		} catch (error) {
+			console.error('Error improving character description:', error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Failed to improve character description'
+			};
+		}
 	}
 } satisfies Actions;

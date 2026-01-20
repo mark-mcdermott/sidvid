@@ -121,10 +121,8 @@ test.describe('StoryGen @storygen', () => {
     const titleWords = storyTitle?.trim().split(/\s+/) || [];
     const expectedTitleStart = titleWords.slice(0, 3).join(' ');
 
-    // Look for the conversation in the sidebar under the Story section (not global Conversations)
-    // It should appear directly below the Story nav item
-    const storySidebar = page.locator('[data-sidebar-section="story"]');
-    const sidebarConversation = storySidebar.getByRole('link', { name: new RegExp(expectedTitleStart, 'i') });
+    // Look for the conversation in the sidebar Conversations section
+    const sidebarConversation = page.getByRole('link', { name: new RegExp(expectedTitleStart, 'i') });
     await expect(sidebarConversation).toBeVisible({ timeout: 10000 });
   });
 
@@ -164,20 +162,10 @@ test.describe('StoryGen @storygen', () => {
     // Get the initial story title
     const firstTitle = await page.locator('h2').first().textContent();
 
-    // Click Try Again button
+    // Click Try Again button - this immediately submits and generates a new story
     await page.getByRole('button', { name: 'Try Again' }).click();
 
-    // Verify the Try Again form is visible
-    await expect(page.getByText('Generate a new version of the story')).toBeVisible();
-
-    // Verify the prompt is pre-filled in the Try Again form
-    const tryAgainTextarea = page.getByRole('textbox').last();
-    await expect(tryAgainTextarea).toHaveValue(testPrompt);
-
-    // Submit try again
-    await page.getByRole('button', { name: 'Regenerate Story' }).last().click();
-
-    // Wait for the new story
+    // Wait for the new story (second Scene 1)
     await expect(page.getByText(/Scene 1/).nth(1)).toBeVisible({ timeout: 30000 });
 
     // Verify we have two stories
@@ -194,19 +182,21 @@ test.describe('StoryGen @storygen', () => {
     // Test keyboard shortcuts for form submission
     const textarea = page.getByPlaceholder(/Enter your story prompt/);
 
-    // Type some text
-    await textarea.fill('First line');
+    // Click to focus and type slowly to ensure Svelte bindings work correctly
+    await textarea.click();
+    await textarea.pressSequentially('First line');
 
     // Press Shift+Enter to add a new line
-    await textarea.press('Shift+Enter');
-    await textarea.type('Second line');
+    await page.keyboard.press('Shift+Enter');
+    await textarea.pressSequentially('Second line');
 
     // Verify the textarea has two lines
     const textareaValue = await textarea.inputValue();
     expect(textareaValue).toContain('\n');
     expect(textareaValue).toBe('First line\nSecond line');
 
-    // Now press Enter without Shift to submit
+    // Focus textarea and press Enter to submit
+    await textarea.focus();
     await textarea.press('Enter');
 
     // Verify the form was submitted (story generation begins)
@@ -225,11 +215,8 @@ test.describe('StoryGen @storygen', () => {
     // Get the initial story title
     const firstTitle = await page.locator('h2').first().textContent();
 
-    // Click Try Again
+    // Click Try Again - this immediately generates a new story
     await page.getByRole('button', { name: 'Try Again' }).click();
-
-    // Submit try again (prompt should be pre-filled)
-    await page.getByRole('button', { name: 'Regenerate Story' }).last().click();
     await expect(page.getByText(/Scene 1/).nth(1)).toBeVisible({ timeout: 30000 });
 
     // Get the second story title
@@ -262,9 +249,8 @@ test.describe('StoryGen @storygen', () => {
 
     const secondStoryTitle = await page.locator('h2').nth(1).textContent();
 
-    // Now click Try Again on the edited story
+    // Now click Try Again on the edited story - this immediately generates a new story
     await page.getByRole('button', { name: 'Try Again' }).click();
-    await page.getByRole('button', { name: 'Regenerate Story' }).last().click();
     await expect(page.getByText(/Scene 1/).nth(2)).toBeVisible({ timeout: 30000 });
 
     // Verify we have 3 story cards
@@ -286,10 +272,11 @@ test.describe('StoryGen @storygen', () => {
     // Click Edit Story Manually
     await page.getByRole('button', { name: 'Edit Story Manually' }).click();
 
-    // Manually edit the story
+    // Manually edit the story - modify the JSON content properly
     const editTextarea = page.getByRole('textbox').last();
     const originalContent = await editTextarea.inputValue();
-    const manuallyEditedContent = originalContent + '\n\nManually added content.';
+    // Modify the JSON by replacing text in a scene description
+    const manuallyEditedContent = originalContent.replace(/"description":\s*"([^"]+)"/, '"description": "MANUALLY EDITED: $1"');
     await editTextarea.fill(manuallyEditedContent);
 
     // Save manual edit

@@ -1,20 +1,36 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+// Helper function to add a character and wait for it to appear
+async function addCharacter(page: Page, description: string, expectedIndex: number = 0) {
+	const textarea = page.getByPlaceholder(/Enter character description/);
+	await textarea.fill(description);
+	await expect(textarea).toHaveValue(description);
+	await page.getByRole('button', { name: 'Add' }).click();
+	// Wait for content area to appear
+	await expect(page.locator(`[data-character-content="${expectedIndex}"]`)).toBeVisible({ timeout: 15000 });
+}
 
 test.describe('Character Improvement @characters', () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/characters');
+		// Navigate fresh each time
+		await page.goto('/characters', { waitUntil: 'networkidle' });
 		await page.evaluate(() => {
 			localStorage.clear();
 			sessionStorage.clear();
 		});
-		await page.reload();
+		// Full page reload with network idle
+		await page.reload({ waitUntil: 'networkidle' });
+		// Wait for the page to be fully loaded and ready
+		await expect(page.getByPlaceholder(/Enter character description/)).toBeVisible({ timeout: 10000 });
+		// Ensure textarea is empty and ready
+		const textarea = page.getByPlaceholder(/Enter character description/);
+		await expect(textarea).toHaveValue('');
 	});
 
 	test.describe('Description Improvement', () => {
 		test('shows Smart Improve Description and Improve Description With Prompt buttons after enhance', async ({ page }) => {
 			// Add a custom character
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 
 			// Click Enhance Description
 			await page.getByRole('button', { name: /Enhance Description/i }).click();
@@ -36,9 +52,11 @@ test.describe('Character Improvement @characters', () => {
 		});
 
 		test('Smart Improve Description regenerates description without user input', async ({ page }) => {
+			// This test makes 2 API calls (Enhance + Improve), so needs extra time
+			test.setTimeout(150000);
+
 			// Setup: Add character and enhance description
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 			await page.getByRole('button', { name: /Enhance Description/i }).click();
 			await expect(page.getByText(/Enhanced Description/i)).toBeVisible({ timeout: 60000 });
 
@@ -61,8 +79,7 @@ test.describe('Character Improvement @characters', () => {
 
 		test('Improve Description With Prompt shows textarea when clicked', async ({ page }) => {
 			// Setup: Add character and enhance description
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 			await page.getByRole('button', { name: /Enhance Description/i }).click();
 			await expect(page.getByText(/Enhanced Description/i)).toBeVisible({ timeout: 60000 });
 
@@ -79,9 +96,11 @@ test.describe('Character Improvement @characters', () => {
 		});
 
 		test('Regenerate Description applies user prompt changes', async ({ page }) => {
+			// This test makes 2 API calls (Enhance + Regenerate), so needs extra time
+			test.setTimeout(150000);
+
 			// Setup: Add character and enhance description
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 			await page.getByRole('button', { name: /Enhance Description/i }).click();
 			await expect(page.getByText(/Enhanced Description/i)).toBeVisible({ timeout: 60000 });
 
@@ -107,8 +126,7 @@ test.describe('Character Improvement @characters', () => {
 
 		test('Cancel button hides prompt textarea', async ({ page }) => {
 			// Setup: Add character and enhance description
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 			await page.getByRole('button', { name: /Enhance Description/i }).click();
 			await expect(page.getByText(/Enhanced Description/i)).toBeVisible({ timeout: 60000 });
 
@@ -263,8 +281,7 @@ test.describe('Character Improvement @characters', () => {
 	test.describe('Button State Management', () => {
 		test('initial state shows only Enhance Description and Generate Image buttons', async ({ page }) => {
 			// Add a custom character
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 
 			// Verify initial buttons
 			await expect(page.getByRole('button', { name: /^Enhance Description$/i })).toBeVisible();
@@ -277,8 +294,7 @@ test.describe('Character Improvement @characters', () => {
 
 		test('description improvement buttons persist across image generation', async ({ page }) => {
 			// Add character and enhance description
-			await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'A brave space captain');
 			await page.getByRole('button', { name: /Enhance Description/i }).click();
 			await expect(page.getByText(/Enhanced Description/i)).toBeVisible({ timeout: 60000 });
 
@@ -294,12 +310,8 @@ test.describe('Character Improvement @characters', () => {
 
 		test('multiple characters have independent improvement states', async ({ page }) => {
 			// Add two characters
-			await page.getByPlaceholder(/Enter character description/).fill('First character');
-			await page.getByRole('button', { name: 'Add' }).click();
-			await page.waitForTimeout(500);
-
-			await page.getByPlaceholder(/Enter character description/).fill('Second character');
-			await page.getByRole('button', { name: 'Add' }).click();
+			await addCharacter(page, 'First character', 0);
+			await addCharacter(page, 'Second character', 1);
 
 			// Enhance first character's description
 			const firstCharContent = page.locator('[data-character-content="0"]');

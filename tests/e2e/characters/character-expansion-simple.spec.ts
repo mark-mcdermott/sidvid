@@ -1,30 +1,44 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+// Helper function to add a character and wait for it to appear
+async function addCharacter(page: Page, description: string, expectedIndex: number) {
+	const textarea = page.getByPlaceholder(/Enter character description/);
+	await textarea.fill(description);
+	await expect(textarea).toHaveValue(description);
+	await page.getByRole('button', { name: 'Add' }).click();
+	// Wait for content area to appear (more reliable than button)
+	await expect(page.locator(`[data-character-content="${expectedIndex}"]`)).toBeVisible({ timeout: 15000 });
+}
 
 test.describe('Character Expansion Simple @characters', () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/characters');
+		// Navigate fresh each time
+		await page.goto('/characters', { waitUntil: 'networkidle' });
 		await page.evaluate(() => {
 			localStorage.clear();
 			sessionStorage.clear();
 		});
-		await page.reload();
+		// Full page reload with network idle
+		await page.reload({ waitUntil: 'networkidle' });
+		// Wait for the page to be fully loaded and ready
+		await expect(page.getByPlaceholder(/Enter character description/)).toBeVisible({ timeout: 10000 });
+		// Ensure textarea is empty and ready
+		const textarea = page.getByPlaceholder(/Enter character description/);
+		await expect(textarea).toHaveValue('');
 	});
 
 	test('custom character button expands character content', async ({ page }) => {
 		// Add a custom character
-		await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-		await page.getByRole('button', { name: 'Add' }).click();
+		await addCharacter(page, 'A brave space captain', 0);
 
-		// Verify character button appears under "Characters from Story" section
-		// Actually it should appear in the story characters section or custom section
-		// Let me check what actually appears
+		// Verify character button appears
 		const customCharButton = page.getByRole('button', { name: /Custom Character/i }).first();
 		await expect(customCharButton).toBeVisible();
 
-		// Click the button
+		// Click the button (already expanded, should scroll)
 		await customCharButton.click();
 
-		// Verify character content area appears
+		// Verify character content area is still visible
 		const characterContent = page.locator('[data-character-content="0"]');
 		await expect(characterContent).toBeVisible();
 		await expect(characterContent.getByRole('heading', { name: /Custom Character/i, level: 2 })).toBeVisible();
@@ -32,13 +46,10 @@ test.describe('Character Expansion Simple @characters', () => {
 
 	test('adding second custom character expands second content', async ({ page }) => {
 		// Add first custom character
-		await page.getByPlaceholder(/Enter character description/).fill('A brave space captain');
-		await page.getByRole('button', { name: 'Add' }).click();
-		await page.waitForTimeout(500);
+		await addCharacter(page, 'A brave space captain', 0);
 
 		// Add second custom character
-		await page.getByPlaceholder(/Enter character description/).fill('A wise robot assistant');
-		await page.getByRole('button', { name: 'Add' }).click();
+		await addCharacter(page, 'A wise robot assistant', 1);
 
 		// Both characters should be expanded
 		await expect(page.locator('[data-character-content="0"]')).toBeVisible();
@@ -47,16 +58,8 @@ test.describe('Character Expansion Simple @characters', () => {
 
 	test('clicking already-expanded character scrolls to it', async ({ page }) => {
 		// Add two custom characters
-		await page.getByPlaceholder(/Enter character description/).fill('First character');
-		await page.getByRole('button', { name: 'Add' }).click();
-		await page.waitForTimeout(500);
-
-		await page.getByPlaceholder(/Enter character description/).fill('Second character');
-		await page.getByRole('button', { name: 'Add' }).click();
-
-		// Both should be visible
-		await expect(page.locator('[data-character-content="0"]')).toBeVisible();
-		await expect(page.locator('[data-character-content="1"]')).toBeVisible();
+		await addCharacter(page, 'First character', 0);
+		await addCharacter(page, 'Second character', 1);
 
 		// Click first character button again (should scroll, not collapse)
 		const buttons = page.getByRole('button', { name: /Custom Character/i });
@@ -68,13 +71,11 @@ test.describe('Character Expansion Simple @characters', () => {
 
 	test('content does not duplicate when clicking same button twice', async ({ page }) => {
 		// Add custom character
-		await page.getByPlaceholder(/Enter character description/).fill('A test character');
-		await page.getByRole('button', { name: 'Add' }).click();
+		await addCharacter(page, 'A test character', 0);
 
 		// Click the button twice
 		const charButton = page.getByRole('button', { name: /Custom Character/i }).first();
 		await charButton.click();
-		await page.waitForTimeout(500);
 		await charButton.click();
 
 		// Verify only one instance of content exists
@@ -84,8 +85,7 @@ test.describe('Character Expansion Simple @characters', () => {
 
 	test('button state reflects expanded state', async ({ page }) => {
 		// Add custom character
-		await page.getByPlaceholder(/Enter character description/).fill('Test character');
-		await page.getByRole('button', { name: 'Add' }).click();
+		await addCharacter(page, 'Test character', 0);
 
 		// The button should be highlighted (default variant) after add since it auto-expands
 		const charButton = page.getByRole('button', { name: /Custom Character/i }).first();
@@ -100,12 +100,8 @@ test.describe('Character Expansion Simple @characters', () => {
 
 	test('multiple characters have independent action buttons', async ({ page }) => {
 		// Add two custom characters
-		await page.getByPlaceholder(/Enter character description/).fill('First character');
-		await page.getByRole('button', { name: 'Add' }).click();
-		await page.waitForTimeout(500);
-
-		await page.getByPlaceholder(/Enter character description/).fill('Second character');
-		await page.getByRole('button', { name: 'Add' }).click();
+		await addCharacter(page, 'First character', 0);
+		await addCharacter(page, 'Second character', 1);
 
 		// Verify both have independent Enhance Description and Generate Image buttons
 		const firstCharContent = page.locator('[data-character-content="0"]');
