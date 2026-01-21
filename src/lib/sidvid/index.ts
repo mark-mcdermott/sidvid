@@ -26,6 +26,8 @@ export type {
   StoryboardFrame,
   VideoOptions,
   Video,
+  ScenePipeline,
+  SceneSlot,
 } from './types';
 
 export {

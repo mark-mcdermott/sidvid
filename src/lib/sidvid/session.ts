@@ -8,7 +8,9 @@ import type {
   StoryCharacter,
   StoryScene,
   CharacterOptions,
-  SceneOptions
+  SceneOptions,
+  ScenePipeline,
+  SceneSlot
 } from './types';
 import { generateStory, editStory } from './api/story';
 import { generateCharacter, enhanceCharacterDescription } from './api/character';
@@ -57,6 +59,9 @@ export class Session {
 
   // Storyboard state
   private storyboard?: Storyboard;
+
+  // Scene pipeline state
+  private scenePipeline?: ScenePipeline;
 
   // Metadata
   private createdAt: number;
@@ -378,6 +383,295 @@ export class Session {
     return enhanced;
   }
 
+  // ===== Scene Pipeline Workflow =====
+
+  /**
+   * Initialize a scene pipeline from the current story.
+   * Creates a slot for each scene in the story.
+   */
+  initializeScenePipeline(): ScenePipeline {
+    const story = this.getCurrentStory();
+    if (!story) {
+      throw new Error('No story available. Generate a story first.');
+    }
+
+    const slots: SceneSlot[] = story.scenes.map((scene, index) => ({
+      id: `slot-${Date.now()}-${index}`,
+      storySceneIndex: index,
+      storyScene: scene,
+      characterIds: [],
+      status: 'pending' as const
+    }));
+
+    this.scenePipeline = {
+      sourceStoryIndex: this.currentStoryIndex,
+      slots,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    this.touch();
+    return this.scenePipeline;
+  }
+
+  /**
+   * Get the current scene pipeline state.
+   */
+  getScenePipeline(): ScenePipeline | undefined {
+    return this.scenePipeline;
+  }
+
+  /**
+   * Assign characters to a scene slot.
+   */
+  assignCharactersToSlot(slotId: string, characterIds: string[]): SceneSlot {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const slotIndex = this.scenePipeline.slots.findIndex(s => s.id === slotId);
+    if (slotIndex === -1) {
+      throw new Error('Scene slot not found');
+    }
+
+    // Validate character IDs exist
+    for (const charId of characterIds) {
+      const exists = this.characters.some(c => c.id === charId);
+      if (!exists) {
+        throw new Error(`Character ${charId} not found`);
+      }
+    }
+
+    this.scenePipeline.slots[slotIndex] = {
+      ...this.scenePipeline.slots[slotIndex],
+      characterIds
+    };
+    this.scenePipeline.updatedAt = Date.now();
+
+    this.touch();
+    return this.scenePipeline.slots[slotIndex];
+  }
+
+  /**
+   * Set a custom description for a scene slot (overrides story scene description).
+   */
+  setSlotCustomDescription(slotId: string, description: string): SceneSlot {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const slotIndex = this.scenePipeline.slots.findIndex(s => s.id === slotId);
+    if (slotIndex === -1) {
+      throw new Error('Scene slot not found');
+    }
+
+    this.scenePipeline.slots[slotIndex] = {
+      ...this.scenePipeline.slots[slotIndex],
+      customDescription: description
+    };
+    this.scenePipeline.updatedAt = Date.now();
+
+    this.touch();
+    return this.scenePipeline.slots[slotIndex];
+  }
+
+  /**
+   * Add a new empty slot to the pipeline.
+   */
+  addSlot(afterSlotId?: string): SceneSlot {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const newSlot: SceneSlot = {
+      id: `slot-${Date.now()}-custom`,
+      storySceneIndex: -1, // Custom slot, not from story
+      storyScene: {
+        number: this.scenePipeline.slots.length + 1,
+        description: ''
+      },
+      characterIds: [],
+      status: 'pending'
+    };
+
+    if (afterSlotId) {
+      const afterIndex = this.scenePipeline.slots.findIndex(s => s.id === afterSlotId);
+      if (afterIndex === -1) {
+        throw new Error('Slot not found');
+      }
+      this.scenePipeline.slots.splice(afterIndex + 1, 0, newSlot);
+    } else {
+      this.scenePipeline.slots.push(newSlot);
+    }
+
+    this.scenePipeline.updatedAt = Date.now();
+    this.touch();
+    return newSlot;
+  }
+
+  /**
+   * Remove a slot from the pipeline.
+   */
+  removeSlot(slotId: string): void {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const index = this.scenePipeline.slots.findIndex(s => s.id === slotId);
+    if (index === -1) {
+      throw new Error('Scene slot not found');
+    }
+
+    this.scenePipeline.slots.splice(index, 1);
+    this.scenePipeline.updatedAt = Date.now();
+    this.touch();
+  }
+
+  /**
+   * Reorder slots in the pipeline.
+   */
+  reorderSlots(newOrder: string[]): void {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const reordered = newOrder.map(id => {
+      const slot = this.scenePipeline!.slots.find(s => s.id === id);
+      if (!slot) {
+        throw new Error(`Slot ${id} not found`);
+      }
+      return slot;
+    });
+
+    this.scenePipeline.slots = reordered;
+    this.scenePipeline.updatedAt = Date.now();
+    this.touch();
+  }
+
+  /**
+   * Generate image for a single scene slot.
+   */
+  async generateSlotImage(slotId: string, options?: Partial<SceneOptions>): Promise<SceneSlot> {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const slotIndex = this.scenePipeline.slots.findIndex(s => s.id === slotId);
+    if (slotIndex === -1) {
+      throw new Error('Scene slot not found');
+    }
+
+    const slot = this.scenePipeline.slots[slotIndex];
+
+    // Build description from story scene + characters
+    let description = slot.customDescription || slot.storyScene.description;
+
+    // Add character descriptions if assigned
+    if (slot.characterIds.length > 0) {
+      const charDescriptions = slot.characterIds
+        .map(id => this.characters.find(c => c.id === id))
+        .filter(Boolean)
+        .map(c => c!.enhancedDescription || c!.description)
+        .join('. ');
+
+      if (charDescriptions) {
+        description = `${description}. Characters in scene: ${charDescriptions}`;
+      }
+    }
+
+    // Update status to generating
+    this.scenePipeline.slots[slotIndex] = {
+      ...slot,
+      status: 'generating'
+    };
+    this.scenePipeline.updatedAt = Date.now();
+
+    try {
+      const result = await generateScene(this.client, {
+        description,
+        style: options?.style || 'cinematic',
+        aspectRatio: options?.aspectRatio || '16:9',
+        size: options?.size || '1792x1024',
+        quality: options?.quality || 'standard'
+      });
+
+      this.scenePipeline.slots[slotIndex] = {
+        ...this.scenePipeline.slots[slotIndex],
+        status: 'completed',
+        generatedScene: {
+          description,
+          imageUrl: result.imageUrl,
+          revisedPrompt: result.revisedPrompt
+        },
+        error: undefined
+      };
+    } catch (error) {
+      this.scenePipeline.slots[slotIndex] = {
+        ...this.scenePipeline.slots[slotIndex],
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Generation failed'
+      };
+    }
+
+    this.scenePipeline.updatedAt = Date.now();
+    this.touch();
+    await this.autoSaveIfEnabled();
+
+    return this.scenePipeline.slots[slotIndex];
+  }
+
+  /**
+   * Generate images for all pending slots in the pipeline.
+   */
+  async generateAllPendingSlots(options?: Partial<SceneOptions>): Promise<SceneSlot[]> {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const pendingSlots = this.scenePipeline.slots.filter(s => s.status === 'pending');
+    const results: SceneSlot[] = [];
+
+    for (const slot of pendingSlots) {
+      const result = await this.generateSlotImage(slot.id, options);
+      results.push(result);
+    }
+
+    return results;
+  }
+
+  /**
+   * Regenerate a specific slot (reset to pending and generate again).
+   */
+  async regenerateSlot(slotId: string, options?: Partial<SceneOptions>): Promise<SceneSlot> {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize it first.');
+    }
+
+    const slotIndex = this.scenePipeline.slots.findIndex(s => s.id === slotId);
+    if (slotIndex === -1) {
+      throw new Error('Scene slot not found');
+    }
+
+    // Reset to pending first
+    this.scenePipeline.slots[slotIndex] = {
+      ...this.scenePipeline.slots[slotIndex],
+      status: 'pending',
+      generatedScene: undefined,
+      error: undefined
+    };
+
+    // Generate new image
+    return this.generateSlotImage(slotId, options);
+  }
+
+  /**
+   * Clear the scene pipeline (start fresh).
+   */
+  clearScenePipeline(): void {
+    this.scenePipeline = undefined;
+    this.touch();
+  }
+
   // ===== Storyboard Workflow =====
 
   createStoryboard(): Storyboard {
@@ -456,6 +750,7 @@ export class Session {
       scenes: this.scenes,
       sceneMap: Array.from(this.sceneMap.entries()),
       storyboard: this.storyboard,
+      scenePipeline: this.scenePipeline,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     };
@@ -474,6 +769,7 @@ export class Session {
     this.scenes = data.scenes || [];
     this.sceneMap = new Map(data.sceneMap || []);
     this.storyboard = data.storyboard;
+    this.scenePipeline = data.scenePipeline;
     this.createdAt = data.createdAt || Date.now();
     this.updatedAt = data.updatedAt || Date.now();
   }

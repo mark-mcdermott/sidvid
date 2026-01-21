@@ -107,3 +107,42 @@ export interface Video {
   progress: number;
   url?: string;
 }
+
+// ===== Scene Pipeline Types =====
+
+/**
+ * Represents a scene slot in the generation pipeline.
+ * Maps a story scene to characters and tracks generation state.
+ */
+export interface SceneSlot {
+  id: string;
+  /** Index of the source story scene (from Story.scenes) */
+  storySceneIndex: number;
+  /** The story scene data */
+  storyScene: StoryScene;
+  /** Character IDs assigned to this scene */
+  characterIds: string[];
+  /** Optional user-provided description override */
+  customDescription?: string;
+  /** Generation state */
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  /** Generated scene result (if completed) */
+  generatedScene?: Scene;
+  /** Error message if generation failed */
+  error?: string;
+}
+
+/**
+ * The scene generation pipeline state.
+ * Tracks the mapping from story scenes to generated scene images.
+ */
+export interface ScenePipeline {
+  /** ID of the source story (for tracking which story version this came from) */
+  sourceStoryIndex: number;
+  /** The scene slots in order */
+  slots: SceneSlot[];
+  /** When the pipeline was created */
+  createdAt: number;
+  /** When the pipeline was last modified */
+  updatedAt: number;
+}

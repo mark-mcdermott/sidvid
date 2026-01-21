@@ -90,26 +90,29 @@ export async function editStory(
   const { currentStory, editPrompt, length = '5s', maxTokens = 2000 } = options;
   const complexityGuidance = getComplexityGuidance(length);
 
-  const fullPrompt = `You are editing a story for a ${length} video. Here is the current story in JSON format:
+  const systemPrompt = `You are a story EDITOR, not a story writer. Your job is to make targeted modifications to existing stories while preserving their core identity.
 
+CRITICAL: You must EDIT the given story, not replace it. The output should be recognizable as a modified version of the input.`;
+
+  const userPrompt = `CURRENT STORY (Title: "${currentStory.title}"):
 ${currentStory.rawContent}
 
-Please modify the story based on this instruction: ${editPrompt}
+EDIT INSTRUCTION: ${editPrompt}
+
+EDITING RULES - FOLLOW STRICTLY:
+1. KEEP THE SAME TITLE unless the edit explicitly asks to change it. Current title is: "${currentStory.title}"
+2. KEEP THE SAME NUMBER OF SCENES (${currentStory.scenes.length} scenes) unless explicitly asked to add/remove scenes
+3. KEEP THE SAME CHARACTERS and setting - modify their actions/descriptions as needed, don't replace them entirely
+4. Apply the edit instruction as a MODIFICATION to the existing story, not as inspiration for a new story
+5. The edited story should be recognizable as a version of the original, not a completely different story
 
 ${complexityGuidance}
 
-CRITICAL EDITING RULES:
-1. PRESERVE THE EXACT SAME NUMBER OF SCENES - Do not reduce or increase the scene count unless explicitly requested
-2. Keep the existing story structure intact - only modify the parts requested in the edit instruction
-3. If the edit asks to add something (like "needs exploding stars"), incorporate it INTO the existing scenes
-4. DO NOT start over from scratch - build upon the current story
-5. Only reduce scenes if explicitly asked (e.g., "make it shorter", "combine scenes", "remove scene X")
-6. Only increase scenes if explicitly asked (e.g., "make it longer", "add more scenes")
-7. IMPORTANT: The entire story must fit within a ${length} video - adjust scene complexity accordingly
+The entire story must fit within a ${length} video.
 
-Return the updated story in the same JSON format with the following structure:
+Return the EDITED story in this JSON format:
 {
-  "title": "Story Title",
+  "title": "${currentStory.title}",
   "scenes": [
     {
       "number": 1,
@@ -121,7 +124,7 @@ Return the updated story in the same JSON format with the following structure:
   "characters": [
     {
       "name": "Character Name",
-      "description": "Physical description of the character as mentioned in the story, no embellishment"
+      "description": "Physical description of the character"
     }
   ],
   "sceneVisuals": [
@@ -129,20 +132,21 @@ Return the updated story in the same JSON format with the following structure:
       "sceneNumber": 1,
       "setting": "Description of the background/setting",
       "charactersPresent": ["Character Name 1", "Character Name 2"],
-      "visualDescription": "How the scene looks as a static image, including setting and character positions/appearance"
+      "visualDescription": "How the scene looks as a static image"
     }
   ]
 }
 
-Update the characters and sceneVisuals arrays to reflect any changes from the edit.
-Extract information directly from the story text without adding creative embellishments.
 Return only valid JSON.`;
 
   const completion = await client.chat.completions.create({
     model: 'gpt-4o',
-    messages: [{ role: 'user', content: fullPrompt }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
     max_tokens: maxTokens,
-    temperature: 0.8,
+    temperature: 0.5,
     response_format: { type: 'json_object' }
   });
 
