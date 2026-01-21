@@ -1,20 +1,74 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 
+	interface DroppedItem {
+		type: 'story' | 'character';
+		index: number;
+		title?: string;
+		scenes?: any[];
+		name?: string;
+		imageUrl?: string;
+	}
+
 	interface Wireframe {
 		id: number;
 		textDescription: string;
 		showTextArea: boolean;
 		hasImage: boolean;
+		droppedItems: DroppedItem[];
 	}
 
 	let wireframes = $state<Wireframe[]>([
-		{ id: 0, textDescription: '', showTextArea: false, hasImage: false }
+		{ id: 0, textDescription: '', showTextArea: false, hasImage: false, droppedItems: [] }
 	]);
+
+	let dragOverIndex = $state<number | null>(null);
 
 	function addWireframe() {
 		const newId = wireframes.length;
-		wireframes = [...wireframes, { id: newId, textDescription: '', showTextArea: false, hasImage: false }];
+		wireframes = [...wireframes, { id: newId, textDescription: '', showTextArea: false, hasImage: false, droppedItems: [] }];
+	}
+
+	function handleDragOver(e: DragEvent, index: number) {
+		e.preventDefault();
+		dragOverIndex = index;
+	}
+
+	function handleDragLeave() {
+		dragOverIndex = null;
+	}
+
+	function handleDrop(e: DragEvent, index: number) {
+		e.preventDefault();
+		dragOverIndex = null;
+
+		const data = e.dataTransfer?.getData('application/json');
+		if (!data) return;
+
+		try {
+			const item: DroppedItem = JSON.parse(data);
+			wireframes = wireframes.map((w, i) => {
+				if (i !== index) return w;
+				// Avoid duplicates
+				const exists = w.droppedItems.some(
+					(d) => d.type === item.type && d.index === item.index
+				);
+				if (exists) return w;
+				return { ...w, droppedItems: [...w.droppedItems, item] };
+			});
+		} catch (err) {
+			console.error('Failed to parse dropped data:', err);
+		}
+	}
+
+	function removeDroppedItem(wireframeIndex: number, itemIndex: number) {
+		wireframes = wireframes.map((w, i) => {
+			if (i !== wireframeIndex) return w;
+			return {
+				...w,
+				droppedItems: w.droppedItems.filter((_, idx) => idx !== itemIndex)
+			};
+		});
 	}
 
 	function toggleTextDescription(index: number) {
@@ -29,9 +83,9 @@
 		);
 	}
 
-	// Count wireframes with content (text description filled)
+	// Count wireframes with content (text description filled or items dropped)
 	let wireframesWithContent = $derived(
-		wireframes.filter(w => w.textDescription.trim() !== '')
+		wireframes.filter(w => w.textDescription.trim() !== '' || w.droppedItems.length > 0)
 	);
 
 	let showGenerateButton = $derived(wireframesWithContent.length > 0);
@@ -52,13 +106,39 @@
 			<div>
 				<div
 					data-scene-wireframe={index}
-					class="wireframe relative flex flex-col items-center justify-center w-64 border border-dashed border-black rounded-lg p-2"
+					class="wireframe relative flex flex-col items-center justify-center w-64 border border-dashed rounded-lg p-2 transition-colors {dragOverIndex === index ? 'border-primary bg-primary/10 border-solid' : 'border-black'}"
 					style="aspect-ratio: 16/9;"
+					ondragover={(e) => handleDragOver(e, index)}
+					ondragleave={handleDragLeave}
+					ondrop={(e) => handleDrop(e, index)}
 				>
+					<!-- Dropped items display -->
+					{#if wireframe.droppedItems.length > 0}
+						<div class="absolute top-1 left-1 right-1 flex flex-wrap gap-1">
+							{#each wireframe.droppedItems as item, itemIndex}
+								<div
+									class="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded {item.type === 'story' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}"
+								>
+									{#if item.type === 'character' && item.imageUrl}
+										<img src={item.imageUrl} alt={item.name} class="w-4 h-4 rounded-full object-cover" />
+									{/if}
+									<span class="truncate max-w-16">{item.type === 'story' ? item.title : item.name}</span>
+									<button
+										type="button"
+										class="ml-0.5 hover:text-red-600"
+										onclick={() => removeDroppedItem(index, itemIndex)}
+									>
+										×
+									</button>
+								</div>
+							{/each}
+						</div>
+					{/if}
+
 					{#if wireframe.showTextArea}
 						<textarea
 							placeholder="Enter scene description..."
-							class="w-full h-16 p-2 text-sm border rounded resize-none mb-2"
+							class="w-full h-16 p-2 text-sm border rounded resize-none mb-2 mt-6"
 							bind:value={wireframe.textDescription}
 						></textarea>
 					{/if}

@@ -90,8 +90,20 @@
 						<SidebarGroupLabel>Story</SidebarGroupLabel>
 						<SidebarGroupContent>
 							<div class="px-2">
-								{#each $storyStore.stories as story}
-									<div data-story-draggable class="p-2 cursor-move hover:bg-muted rounded">
+								{#each $storyStore.stories as story, index}
+									<div
+										data-story-draggable
+										class="p-2 cursor-move hover:bg-muted rounded"
+										draggable="true"
+										ondragstart={(e) => {
+											e.dataTransfer?.setData('application/json', JSON.stringify({
+												type: 'story',
+												index,
+												title: story.story.title,
+												scenes: story.story.scenes
+											}));
+										}}
+									>
 										<div class="text-sm font-medium">{story.story.title || 'Untitled Story'}</div>
 										<div class="text-xs text-muted-foreground">{story.story.scenes.length} scenes</div>
 									</div>
@@ -112,6 +124,14 @@
 										data-character-thumbnail
 										class="flex items-center gap-2 p-2 cursor-move hover:bg-muted rounded"
 										draggable="true"
+										ondragstart={(e) => {
+											e.dataTransfer?.setData('application/json', JSON.stringify({
+												type: 'character',
+												index,
+												name: char.name,
+												imageUrl: char.imageUrl
+											}));
+										}}
 									>
 										{#if char.imageUrl}
 											<img src={char.imageUrl} alt={char.name} class="w-12 h-12 rounded object-cover" />

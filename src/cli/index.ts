@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import { SessionManager, FileStorageAdapter, type Session } from '../lib/sidvid';
+import { SessionManager, type Session } from '../lib/sidvid';
+import { FileStorageAdapter } from '../lib/sidvid/storage/file-adapter';
 import { join } from 'path';
 
 const commands = {

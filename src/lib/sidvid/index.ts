@@ -2,7 +2,9 @@ export { SidVid } from './client';
 export { Session, type SessionMetadata } from './session';
 export { SessionManager } from './session-manager';
 export { MemoryStorageAdapter } from './storage/memory-adapter';
-export { FileStorageAdapter } from './storage/file-adapter';
+// FileStorageAdapter is NOT exported here because it uses fs/promises which
+// can't be bundled for browser code. Import directly from './storage/file-adapter'
+// in server/CLI contexts only.
 export { BrowserStorageAdapter } from './storage/browser-adapter';
 export type { StorageAdapter } from './storage/adapter';
 
