@@ -55,7 +55,7 @@
 		<SidebarHeader>
 			<div class="flex items-center gap-2 px-4 py-2">
 				<a href="/" class="hover:opacity-80 transition-opacity">
-					<img src="/logo.png" alt="SidVid" class="h-12" />
+					<img src="/logo.png" alt="SidVid" class="h-[10.125rem]" />
 				</a>
 			</div>
 		</SidebarHeader>
