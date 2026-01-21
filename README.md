@@ -7,24 +7,28 @@ AI-powered video generation platform using OpenAI's ChatGPT, DALL-E 3, and Sora.
 SidVid follows a **headless library** architecture with two thin client wrappers:
 
 ```
-┌─────────────────────────────────────┐
-│  Headless Library (src/lib/sidvid)  │
-│  --------------------------------   │
-│  Pure TypeScript API methods:       │
-│  - generateStory()                  │
-│  - editStory()                      │
-│  - enhanceCharacterDescription()    │
-│  - generateCharacter()              │
-│  - generateScene()                  │
-│  - generateVideo()                  │
-└─────────────────────────────────────┘
-            ↑              ↑
-            │              │
-     ┌──────┴──────┐  ┌─── ┴───────┐
-     │   Web UI    │  │  CLI       │
-     │  (routes/)  │  │  (cli/)    │
-     │  SvelteKit  │  │  Node.js   │
-     └─────────────┘  └────────────┘
+┌─────────────────────────────────────────────────┐
+│       Headless Library (src/lib/sidvid)         │
+│  ─────────────────────────────────────────────  │
+│  Session & SessionManager (stateful workflows)  │
+│  - Story history with undo/redo                 │
+│  - Character history with undo/redo             │
+│  - Scene pipeline (slots, generation, status)   │
+│  - State persistence (save/load sessions)       │
+│  ─────────────────────────────────────────────  │
+│  SidVid class (stateless API methods)           │
+│  - generateStory() / editStory()                │
+│  - enhanceCharacterDescription()                │
+│  - generateCharacter() / generateScene()        │
+│  - generateVideo()                              │
+└─────────────────────────────────────────────────┘
+                ↑              ↑
+                │              │
+         ┌──────┴──────┐  ┌───┴──────┐
+         │   Web UI    │  │   CLI    │
+         │  (routes/)  │  │  (cli/)  │
+         │  SvelteKit  │  │  Node.js │
+         └─────────────┘  └──────────┘
 ```
 
 ### Project Structure
@@ -38,15 +42,23 @@ core/
 │   │   │   ├── character.ts # Character generation & enhancement
 │   │   │   ├── scene.ts     # Scene generation
 │   │   │   └── video.ts     # Video generation
+│   │   ├── storage/         # Storage adapters for session persistence
+│   │   │   ├── adapter.ts   # StorageAdapter interface
+│   │   │   ├── memory-adapter.ts   # In-memory storage
+│   │   │   ├── browser-adapter.ts  # localStorage/IndexedDB
+│   │   │   └── file-adapter.ts     # File system (Node.js only)
 │   │   ├── types/           # TypeScript interfaces
 │   │   ├── schemas/         # Zod validation schemas
-│   │   ├── client.ts        # Main SidVid class
+│   │   ├── client.ts        # Main SidVid class (stateless)
+│   │   ├── session.ts       # Session class (stateful workflows)
+│   │   ├── session-manager.ts # SessionManager (session CRUD)
 │   │   └── index.ts         # Public exports
 │   │
 │   ├── routes/              # Web UI (SvelteKit)
 │   │   ├── story/           # Story generation page
 │   │   ├── characters/      # Character generation page
-│   │   └── +layout.svelte   # App layout
+│   │   ├── scenes/          # Scene pipeline page
+│   │   └── +layout.svelte   # App layout with sidebar
 │   │
 │   └── cli/                 # CLI wrapper
 │       └── index.ts         # Command-line interface
@@ -130,11 +142,119 @@ const completed = await sidvid.waitForVideo(video.id);
 console.log(completed.url);
 ```
 
+### Stateful Sessions (Recommended)
+
+For iterative, exploratory workflows, use the `Session` and `SessionManager` classes. These provide:
+- **State persistence**: Save and load complete project state
+- **History tracking**: Full undo/redo support for stories and characters
+- **Scene pipeline**: Manage the flow from story → scenes → images → video
+
+```typescript
+import { SessionManager, MemoryStorageAdapter } from 'sidvid';
+// For Node.js/CLI, import FileStorageAdapter directly:
+// import { FileStorageAdapter } from 'sidvid/storage/file-adapter';
+
+// Create a session manager with storage
+const manager = new SessionManager(new MemoryStorageAdapter());
+
+// Create a new session
+const session = await manager.createSession('My Video Project', {
+  openaiApiKey: process.env.OPENAI_API_KEY!
+});
+
+// Generate a story (automatically tracked in history)
+await session.generateStory({
+  prompt: 'A detective solving a mystery',
+  scenes: 3
+});
+
+// Edit the story (creates new history entry, preserves original)
+await session.editStory({
+  editPrompt: 'Make it more dramatic'
+});
+
+// Undo/redo story changes
+session.undoStory();
+session.redoStory();
+
+// Extract characters from the story
+const characters = session.extractCharacters();
+for (const char of characters) {
+  // Enhance and generate images (tracked in character history)
+  await session.enhanceCharacter(char.id);
+  await session.generateCharacterImage(char.id);
+}
+
+// Initialize scene pipeline from story
+session.initializeScenePipeline();
+const pipeline = session.getScenePipeline();
+
+// Assign characters to scene slots
+const charIds = session.extractCharacters().map(c => c.id);
+session.assignCharactersToSlot(pipeline.slots[0].id, charIds);
+
+// Generate scene images
+await session.generateAllPendingSlots();
+
+// Save session for later
+await manager.saveSession(session);
+
+// Load session later
+const loadedSession = await manager.loadSession(session.id, {
+  openaiApiKey: process.env.OPENAI_API_KEY!
+});
+```
+
+#### Session Methods
+
+**Story Management:**
+- `generateStory(options)` - Generate a new story (adds to history)
+- `editStory(options)` - Edit current story (adds to history)
+- `getCurrentStory()` - Get the current story
+- `getStoryHistory()` - Get all story versions
+- `undoStory()` / `redoStory()` - Navigate story history
+
+**Character Management:**
+- `extractCharacters()` - Extract characters from current story
+- `enhanceCharacter(characterId, userPrompt?)` - Enhance character description
+- `generateCharacterImage(characterId)` - Generate character image
+- `getCharacterHistory(characterId)` - Get character version history
+- `undoCharacter(characterId)` / `redoCharacter(characterId)` - Navigate character history
+
+**Scene Pipeline:**
+- `initializeScenePipeline()` - Create scene slots from current story
+- `getScenePipeline()` - Get current pipeline state
+- `assignCharactersToSlot(slotId, characterIds)` - Assign characters to a scene
+- `setSlotCustomDescription(slotId, description)` - Override scene description
+- `addSlot()` / `removeSlot(slotId)` - Manage scene slots
+- `reorderSlots(slotIds)` - Reorder scene slots
+- `generateSlotImage(slotId)` - Generate image for one slot
+- `generateAllPendingSlots()` - Generate images for all pending slots
+- `regenerateSlot(slotId)` - Regenerate a completed slot
+
+### Direct API (Stateless)
+
+For simple, one-off operations without state management, use the `SidVid` class directly:
+
+```typescript
+import { SidVid } from 'sidvid';
+
+const sidvid = new SidVid({
+  openaiApiKey: process.env.OPENAI_API_KEY,
+});
+
+// One-off story generation
+const story = await sidvid.generateStory({
+  prompt: 'A detective solving a mystery',
+  scenes: 5,
+});
+```
+
 ### API Reference
 
 #### `new SidVid(config)`
 
-Creates a new SidVid client.
+Creates a new SidVid client for stateless operations.
 
 **Parameters:**
 - `config.openaiApiKey` (string, required) - Your OpenAI API key
@@ -199,19 +319,37 @@ Creates a new SidVid client.
 
 ```typescript
 import type {
+  // Story types
   Story,
   StoryOptions,
   EditStoryOptions,
+  StoryScene,
   StoryCharacter,
   StorySceneVisual,
+  // Character types
   Character,
   CharacterOptions,
   EnhanceCharacterOptions,
+  // Scene types
   Scene,
   SceneOptions,
+  // Video types
   Video,
   VideoOptions,
+  // Scene pipeline types
+  ScenePipeline,
+  SceneSlot,
+  // Session types
+  SessionMetadata,
 } from 'sidvid';
+
+// Session and SessionManager classes
+import { Session, SessionManager } from 'sidvid';
+
+// Storage adapters
+import { MemoryStorageAdapter, BrowserStorageAdapter } from 'sidvid';
+// For Node.js/CLI only (uses fs/promises):
+import { FileStorageAdapter } from 'sidvid/storage/file-adapter';
 ```
 
 ## Running the Web UI Locally
