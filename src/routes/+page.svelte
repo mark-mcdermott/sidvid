@@ -36,6 +36,9 @@
 
 	let { form }: { form: ActionData } = $props();
 
+	// ========== Testing Mode ==========
+	let testingMode = $state(false);
+
 	// ========== Active Section State ==========
 	type Section = 'story' | 'characters' | 'scenes' | 'storyboard' | 'video';
 	let activeSection = $state<Section>('story');
@@ -1182,6 +1185,15 @@
 	});
 </script>
 
+<!-- Testing Mode Toggle -->
+<button
+	onclick={() => testingMode = !testingMode}
+	class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
+	title="Toggle testing mode"
+>
+	<FlaskConical class="h-4 w-4" />
+</button>
+
 <div class="flex flex-col gap-8">
 	<!-- ========== STORY SECTION ========== -->
 	<section
@@ -1212,14 +1224,16 @@
 						<h1 class="text-3xl font-bold">Story Generation</h1>
 						<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
 					</div>
-					<div class="flex gap-1">
-						<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe' }))} title="Insert test prompt">
-							<FlaskConical class="h-4 w-4 opacity-50" />
-						</Button>
-						<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
-							<FlaskConical class="h-4 w-4" />
-						</Button>
-					</div>
+					{#if testingMode}
+						<div class="flex gap-1">
+							<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe' }))} title="Insert test prompt">
+								<FlaskConical class="h-4 w-4 opacity-50" />
+							</Button>
+							<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
+								<FlaskConical class="h-4 w-4" />
+							</Button>
+						</div>
+					{/if}
 				</div>
 
 				{#if form?.action === 'generateStory' && form?.error}
@@ -1455,9 +1469,11 @@
 						{/if}
 					</p>
 				</div>
-				<Button variant="outline" size="sm" onclick={loadTestCharacters} title="Load test data">
-					<FlaskConical class="h-4 w-4" />
-				</Button>
+				{#if testingMode}
+					<Button variant="outline" size="sm" onclick={loadTestCharacters} title="Load test data">
+						<FlaskConical class="h-4 w-4" />
+					</Button>
+				{/if}
 			</div>
 
 			{#if form?.action?.includes('Description') && form?.error}
@@ -1698,9 +1714,11 @@
 							{/if}
 						</div>
 					{/if}
-					<Button variant="outline" size="sm" onclick={loadTestScenes} title="Load test data">
-						<FlaskConical class="h-4 w-4" />
-					</Button>
+					{#if testingMode}
+						<Button variant="outline" size="sm" onclick={loadTestScenes} title="Load test data">
+							<FlaskConical class="h-4 w-4" />
+						</Button>
+					{/if}
 				</div>
 			</div>
 
@@ -1858,9 +1876,11 @@
 						<p class="text-muted-foreground">Arrange your scenes and edit with prompts</p>
 					</div>
 					<div class="flex gap-2">
-						<Button variant="outline" size="sm" onclick={loadTestStoryboard} title="Load test data">
-							<FlaskConical class="h-4 w-4" />
-						</Button>
+						{#if testingMode}
+							<Button variant="outline" size="sm" onclick={loadTestStoryboard} title="Load test data">
+								<FlaskConical class="h-4 w-4" />
+							</Button>
+						{/if}
 						<Button variant="outline" onclick={handleNewStoryboard}>New Storyboard</Button>
 						<Button
 							disabled={!hasStoryboardContent}
@@ -2079,9 +2099,11 @@
 					</p>
 				</div>
 				<div class="flex gap-2">
-					<Button variant="outline" size="sm" onclick={loadTestVideo} title="Load test data">
-						<FlaskConical class="h-4 w-4" />
-					</Button>
+					{#if testingMode}
+						<Button variant="outline" size="sm" onclick={loadTestVideo} title="Load test data">
+							<FlaskConical class="h-4 w-4" />
+						</Button>
+					{/if}
 					{#if allCompleted}
 						<Button variant="outline" onclick={handleRegenerate}>
 							<RotateCcw class="mr-2 h-4 w-4" />
