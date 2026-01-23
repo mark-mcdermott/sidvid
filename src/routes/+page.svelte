@@ -5,7 +5,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical } from '@lucide/svelte';
 
 	// Stores
 	import { storyStore } from '$lib/stores/storyStore';
@@ -498,6 +498,237 @@
 		stopPolling();
 	}
 
+	// ========== Test Data ==========
+	const TEST_DATA = {
+		story: {
+			title: 'Neon Capybara Heist',
+			rawContent: JSON.stringify({
+				title: 'Neon Capybara Heist',
+				scenes: [
+					{
+						number: 1,
+						description: 'A neon-lit server room in a dystopian megacity. Rows of humming mainframes cast an eerie blue glow. Two cybernetic capybaras crouch behind a terminal.',
+						dialogue: 'Chip, disable the firewall. We have 30 seconds.',
+						action: 'Byte types furiously on a holographic keyboard while Chip plugs into the mainframe.'
+					},
+					{
+						number: 2,
+						description: 'Alarms blare as red lights flood the room. Security drones descend from the ceiling. The capybaras exchange a knowing glance.',
+						dialogue: 'Time to go swimming.',
+						action: 'They dive into a cooling vent, escaping into the city sewers below.'
+					}
+				],
+				characters: [
+					{ name: 'Byte', description: 'A sleek cybernetic capybara with glowing blue circuit patterns across their fur, expert hacker' },
+					{ name: 'Chip', description: 'A muscular capybara with a chrome-plated arm and infrared eye implant, the muscle of the operation' }
+				]
+			}),
+			scenes: [
+				{
+					number: 1,
+					description: 'A neon-lit server room in a dystopian megacity. Rows of humming mainframes cast an eerie blue glow. Two cybernetic capybaras crouch behind a terminal.',
+					dialogue: 'Chip, disable the firewall. We have 30 seconds.',
+					action: 'Byte types furiously on a holographic keyboard while Chip plugs into the mainframe.'
+				},
+				{
+					number: 2,
+					description: 'Alarms blare as red lights flood the room. Security drones descend from the ceiling. The capybaras exchange a knowing glance.',
+					dialogue: 'Time to go swimming.',
+					action: 'They dive into a cooling vent, escaping into the city sewers below.'
+				}
+			],
+			characters: [
+				{ name: 'Byte', description: 'A sleek cybernetic capybara with glowing blue circuit patterns across their fur, expert hacker' },
+				{ name: 'Chip', description: 'A muscular capybara with a chrome-plated arm and infrared eye implant, the muscle of the operation' }
+			]
+		},
+		characters: [
+			{
+				name: 'Byte',
+				description: 'A sleek cybernetic capybara with glowing blue circuit patterns across their fur, expert hacker',
+				enhancedDescription: 'Byte is a sleek, medium-sized capybara with dark brown fur interlaced with bioluminescent blue circuit patterns that pulse gently when processing data. Their eyes have been replaced with advanced optical implants that glow cyan. A neural interface port sits behind their left ear.',
+				imageUrl: 'https://picsum.photos/seed/byte-capybara/512/512'
+			},
+			{
+				name: 'Chip',
+				description: 'A muscular capybara with a chrome-plated arm and infrared eye implant, the muscle of the operation',
+				enhancedDescription: 'Chip is a large, imposing capybara with sandy brown fur and a fully chrome-plated cybernetic right arm capable of interfacing with any system. Their left eye has been replaced with a red infrared sensor that can see through walls. Battle scars cross their snout.',
+				imageUrl: 'https://picsum.photos/seed/chip-capybara/512/512'
+			}
+		],
+		scenes: [
+			{
+				id: 'test-scene-1',
+				storySceneIndex: 0,
+				storyScene: {
+					number: 1,
+					description: 'A neon-lit server room in a dystopian megacity. Rows of humming mainframes cast an eerie blue glow. Two cybernetic capybaras crouch behind a terminal.',
+					dialogue: 'Chip, disable the firewall. We have 30 seconds.',
+					action: 'Byte types furiously on a holographic keyboard while Chip plugs into the mainframe.'
+				},
+				characterIds: [],
+				status: 'completed' as const,
+				generatedScene: {
+					description: 'A neon-lit server room in a dystopian megacity',
+					imageUrl: 'https://picsum.photos/seed/neon-server-room/1280/720'
+				}
+			},
+			{
+				id: 'test-scene-2',
+				storySceneIndex: 1,
+				storyScene: {
+					number: 2,
+					description: 'Alarms blare as red lights flood the room. Security drones descend from the ceiling. The capybaras exchange a knowing glance.',
+					dialogue: 'Time to go swimming.',
+					action: 'They dive into a cooling vent, escaping into the city sewers below.'
+				},
+				characterIds: [],
+				status: 'completed' as const,
+				generatedScene: {
+					description: 'Alarms blare as red lights flood the room',
+					imageUrl: 'https://picsum.photos/seed/alarm-room/1280/720'
+				}
+			}
+		],
+		storyboard: [
+			{
+				id: 'test-wf-1',
+				scene: {
+					id: 'test-scene-1',
+					sceneNumber: 1,
+					name: 'A neon-lit server room in a dystopian megacity',
+					imageUrl: 'https://picsum.photos/seed/neon-server-room/1280/720',
+					characterIds: []
+				},
+				characters: [],
+				duration: 5
+			},
+			{
+				id: 'test-wf-2',
+				scene: {
+					id: 'test-scene-2',
+					sceneNumber: 2,
+					name: 'Alarms blare as red lights flood the room',
+					imageUrl: 'https://picsum.photos/seed/alarm-room/1280/720',
+					characterIds: []
+				},
+				characters: [],
+				duration: 5
+			}
+		],
+		videos: [
+			{
+				sceneIndex: 0,
+				sceneId: 'test-scene-1',
+				sceneName: 'A neon-lit server room in a dystopian megacity',
+				sceneImageUrl: 'https://picsum.photos/seed/neon-server-room/1280/720',
+				videoUrl: 'https://tempfile.aiquickdraw.com/h/7606ab4948924b782c10b86a797717ee_1769128334.mp4'
+			},
+			{
+				sceneIndex: 1,
+				sceneId: 'test-scene-2',
+				sceneName: 'Alarms blare as red lights flood the room',
+				sceneImageUrl: 'https://picsum.photos/seed/alarm-room/1280/720',
+				videoUrl: 'https://tempfile.aiquickdraw.com/h/0debb33d4be73af035dc263ebe58b06f_1769129630.mp4'
+			}
+		]
+	};
+
+	function loadTestStory() {
+		storyStore.update(state => ({
+			...state,
+			prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe',
+			stories: [{
+				story: TEST_DATA.story as Story,
+				prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe',
+				length: '10s'
+			}]
+		}));
+	}
+
+	function loadTestCharacters() {
+		// First load story if not present
+		if ($storyStore.stories.length === 0) {
+			loadTestStory();
+		}
+
+		characterStore.update(state => ({
+			...state,
+			storyCharacters: TEST_DATA.characters,
+			characters: TEST_DATA.characters.map(c => ({
+				...c,
+				isExpanded: false
+			})),
+			expandedCharacterIndices: new Set([0, 1])
+		}));
+		enhancedCharacters = new Set([0, 1]);
+	}
+
+	function loadTestScenes() {
+		// First load story and characters if not present
+		if ($storyStore.stories.length === 0) {
+			loadTestStory();
+		}
+		if ($characterStore.characters.length === 0) {
+			loadTestCharacters();
+		}
+
+		localSlots = TEST_DATA.scenes.map(s => ({
+			...s,
+			status: s.status as 'pending' | 'generating' | 'completed' | 'failed'
+		}));
+	}
+
+	function loadTestStoryboard() {
+		// First load all previous steps if not present
+		if ($storyStore.stories.length === 0) {
+			loadTestStory();
+		}
+		if ($characterStore.characters.length === 0) {
+			loadTestCharacters();
+		}
+		if (slots.length === 0 || !slots.some(s => s.status === 'completed')) {
+			loadTestScenes();
+		}
+
+		storyboardStore.update(state => ({
+			...state,
+			wireframes: TEST_DATA.storyboard.map(wf => ({
+				...wf,
+				scene: wf.scene as WireframeScene | null,
+				characters: wf.characters as WireframeCharacter[]
+			})),
+			selectedWireframeId: TEST_DATA.storyboard[0].id
+		}));
+	}
+
+	function loadTestVideo() {
+		// First load all previous steps if not present
+		if ($storyStore.stories.length === 0) {
+			loadTestStory();
+		}
+		if ($characterStore.characters.length === 0) {
+			loadTestCharacters();
+		}
+		if (slots.length === 0 || !slots.some(s => s.status === 'completed')) {
+			loadTestScenes();
+		}
+		if ($storyboardStore.wireframes.length === 0 || !$storyboardStore.wireframes.some(wf => wf.scene !== null)) {
+			loadTestStoryboard();
+		}
+
+		sceneVideos = TEST_DATA.videos.map(v => ({
+			...v,
+			videoId: `test-video-${v.sceneIndex}`,
+			status: 'completed' as const,
+			progress: 100,
+			error: null,
+			retryCount: 0
+		}));
+		isVideoGenerating = false;
+		stopPolling();
+	}
+
 	// ========== Effects ==========
 
 	// Story effects
@@ -976,9 +1207,14 @@
 			}}
 		>
 			<div class="flex flex-col gap-4">
-				<div>
-					<h1 class="text-3xl font-bold">Story Generation</h1>
-					<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
+				<div class="flex items-start justify-between">
+					<div>
+						<h1 class="text-3xl font-bold">Story Generation</h1>
+						<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
+					</div>
+					<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
+						<FlaskConical class="h-4 w-4" />
+					</Button>
 				</div>
 
 				{#if form?.action === 'generateStory' && form?.error}
@@ -1203,14 +1439,21 @@
 		class="scroll-mt-16 border-b pb-8"
 	>
 		<div class="flex flex-col gap-4">
-			<h1 class="text-3xl font-bold">Character Generation</h1>
-			<p class="text-muted-foreground">
-				{#if $characterStore.storyCharacters.length > 0}
-					Generate character images from your story, or add custom characters
-				{:else}
-					Create and generate character images
-				{/if}
-			</p>
+			<div class="flex items-start justify-between">
+				<div>
+					<h1 class="text-3xl font-bold">Character Generation</h1>
+					<p class="text-muted-foreground">
+						{#if $characterStore.storyCharacters.length > 0}
+							Generate character images from your story, or add custom characters
+						{:else}
+							Create and generate character images
+						{/if}
+					</p>
+				</div>
+				<Button variant="outline" size="sm" onclick={loadTestCharacters} title="Load test data">
+					<FlaskConical class="h-4 w-4" />
+				</Button>
+			</div>
 
 			{#if form?.action?.includes('Description') && form?.error}
 				<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -1441,14 +1684,19 @@
 					<h1 class="text-3xl font-bold">Scene Generation</h1>
 					<p class="text-muted-foreground">Generate scene images using DALL-E</p>
 				</div>
-				{#if slots.length > 0}
-					<div class="text-sm text-muted-foreground">
-						{completedCount}/{slots.length} generated
-						{#if generatingCount > 0}
-							<span class="text-blue-600">({generatingCount} in progress)</span>
-						{/if}
-					</div>
-				{/if}
+				<div class="flex items-center gap-2">
+					{#if slots.length > 0}
+						<div class="text-sm text-muted-foreground">
+							{completedCount}/{slots.length} generated
+							{#if generatingCount > 0}
+								<span class="text-blue-600">({generatingCount} in progress)</span>
+							{/if}
+						</div>
+					{/if}
+					<Button variant="outline" size="sm" onclick={loadTestScenes} title="Load test data">
+						<FlaskConical class="h-4 w-4" />
+					</Button>
+				</div>
 			</div>
 
 			<div class="flex flex-wrap gap-4 items-start" data-wireframes-container>
@@ -1605,6 +1853,9 @@
 						<p class="text-muted-foreground">Arrange your scenes and edit with prompts</p>
 					</div>
 					<div class="flex gap-2">
+						<Button variant="outline" size="sm" onclick={loadTestStoryboard} title="Load test data">
+							<FlaskConical class="h-4 w-4" />
+						</Button>
 						<Button variant="outline" onclick={handleNewStoryboard}>New Storyboard</Button>
 						<Button
 							disabled={!hasStoryboardContent}
@@ -1822,12 +2073,17 @@
 						Generate {sceneVideos.length} video clip{sceneVideos.length !== 1 ? 's' : ''} ({totalVideoDuration}s total) using {selectedProvider === 'kling' ? 'Kling AI (with audio)' : 'Mock (for testing)'}
 					</p>
 				</div>
-				{#if allCompleted}
-					<Button variant="outline" onclick={handleRegenerate}>
-						<RotateCcw class="mr-2 h-4 w-4" />
-						Regenerate All
+				<div class="flex gap-2">
+					<Button variant="outline" size="sm" onclick={loadTestVideo} title="Load test data">
+						<FlaskConical class="h-4 w-4" />
 					</Button>
-				{/if}
+					{#if allCompleted}
+						<Button variant="outline" onclick={handleRegenerate}>
+							<RotateCcw class="mr-2 h-4 w-4" />
+							Regenerate All
+						</Button>
+					{/if}
+				</div>
 			</div>
 
 			{#if !allCompleted && !isVideoGenerating}
@@ -1858,10 +2114,6 @@
 							{/if}
 						</button>
 					{/if}
-
-					<Button variant="outline" size="sm" onclick={loadTestVideos}>
-						Load Test Videos
-					</Button>
 				</div>
 			{/if}
 
