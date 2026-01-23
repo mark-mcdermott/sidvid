@@ -1212,9 +1212,14 @@
 						<h1 class="text-3xl font-bold">Story Generation</h1>
 						<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
 					</div>
-					<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
-						<FlaskConical class="h-4 w-4" />
-					</Button>
+					<div class="flex gap-1">
+						<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe' }))} title="Insert test prompt">
+							<FlaskConical class="h-4 w-4 opacity-50" />
+						</Button>
+						<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
+							<FlaskConical class="h-4 w-4" />
+						</Button>
+					</div>
 				</div>
 
 				{#if form?.action === 'generateStory' && form?.error}
