@@ -2293,7 +2293,7 @@
 			{/each}
 
 			{#if selectedProvider === 'kling' && !allCompleted && !isVideoGenerating}
-				<div class="text-xs text-muted-foreground border rounded p-2 bg-muted/50">
+				<div class="text-xs rounded p-2" style="background-color: #f5f5f5; color: #666; border: 1px solid #ddd;">
 					<strong>Kling AI 2.6:</strong> Generates 5-second video clips with native audio from each scene image.
 					Cost: ~$0.35-0.70 per clip ({enableSound ? 'with' : 'without'} audio).
 					<strong>Total estimate: ~${(sceneVideos.length * 0.5).toFixed(2)}</strong>

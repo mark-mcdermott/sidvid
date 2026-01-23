@@ -24,12 +24,20 @@
 	import { storyStore } from '$lib/stores/storyStore';
 	import { sessionStore, refreshSessions, createNewSession } from '$lib/stores/sessionStore';
 	import { SessionList, SessionDialog } from '$lib/components/sessions';
-	import { ChevronDown, ChevronUp } from '@lucide/svelte';
+	import { ChevronDown, ChevronUp, Sun, Moon } from '@lucide/svelte';
 
 	let { children } = $props();
 
 	let showNewSessionDialog = $state(false);
 	let showAllConversations = $state(false);
+	let darkMode = $state(false);
+
+	function toggleDarkMode() {
+		darkMode = !darkMode;
+		if (browser) {
+			document.documentElement.classList.toggle('dark', darkMode);
+		}
+	}
 
 	// Active section for homepage single-page nav
 	let activeSection = $state<string>('story');
@@ -125,7 +133,7 @@
 		<SidebarHeader>
 			<div class="flex items-center gap-2 px-4 py-2">
 				<a href="/" class="hover:opacity-80 transition-opacity">
-					<img src="/logo-no-ice.png" alt="SidVid" class="h-[10.125rem]" />
+					<img src={darkMode ? "/logo-no-ice-white.png" : "/logo-no-ice.png"} alt="SidVid" class="h-[10.125rem]" />
 				</a>
 			</div>
 		</SidebarHeader>
@@ -289,13 +297,26 @@
 		</SidebarFooter>
 	</Sidebar>
 	<SidebarInset>
-		<header class="flex h-12 items-center gap-2 border-b px-4">
-			<SidebarTrigger />
-			{#if $sessionStore.activeSession}
-				<span class="text-sm text-muted-foreground">
-					Session: {$sessionStore.activeSession.getName() || 'Untitled'}
-				</span>
-			{/if}
+		<header class="flex h-12 items-center justify-between border-b px-4">
+			<div class="flex items-center gap-2">
+				<SidebarTrigger />
+				{#if $sessionStore.activeSession}
+					<span class="text-sm text-muted-foreground">
+						Session: {$sessionStore.activeSession.getName() || 'Untitled'}
+					</span>
+				{/if}
+			</div>
+			<button
+				onclick={toggleDarkMode}
+				class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80"
+				title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+			>
+				{#if darkMode}
+					<Moon class="h-4 w-4" />
+				{:else}
+					<Sun class="h-4 w-4" />
+				{/if}
+			</button>
 		</header>
 		<main class="flex-1 p-4">
 			{@render children()}
