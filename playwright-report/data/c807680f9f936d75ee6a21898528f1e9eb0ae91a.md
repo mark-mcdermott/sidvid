@@ -1,0 +1,79 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Sessions
+            - button "+ New" [ref=e30] [cursor=pointer]
+          - generic [ref=e31]: No sessions yet. Create one to get started.
+        - generic [ref=e32]:
+          - generic [ref=e33]: Conversations
+          - list [ref=e35]:
+            - listitem [ref=e36]:
+              - link "The Quick Case" [ref=e37] [cursor=pointer]:
+                - /url: /conversation/02e600d8-e3de-441f-9244-34214446ed8a
+      - img "Sid" [ref=e40]
+    - main [ref=e41]:
+      - button "Toggle Sidebar" [ref=e43] [cursor=pointer]:
+        - img
+        - generic [ref=e44]: Toggle Sidebar
+      - main [ref=e45]:
+        - generic [ref=e47]:
+          - generic [ref=e49]:
+            - heading "Story Generation" [level=1] [ref=e50]
+            - paragraph [ref=e51]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e52]:
+            - paragraph [ref=e53]: "Prompt (5s):"
+            - paragraph [ref=e54]: A detective solving a mystery
+          - generic [ref=e55]:
+            - heading "The Quick Case" [level=2] [ref=e57]
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - heading "Scene 1" [level=3] [ref=e60]
+                - generic [ref=e61]:
+                  - paragraph [ref=e62]: "Description:"
+                  - paragraph [ref=e63]: A detective kneels, examining a small, shimmering diamond earring on the ground.
+                - generic [ref=e64]:
+                  - paragraph [ref=e65]: "Action:"
+                  - paragraph [ref=e66]: The detective picks up the earring, inspecting it closely.
+              - generic [ref=e67]:
+                - heading "Scene 2" [level=3] [ref=e68]
+                - generic [ref=e69]:
+                  - paragraph [ref=e70]: "Description:"
+                  - paragraph [ref=e71]: The detective approaches a glamorous woman at a crowded gala, returning the earring.
+                - generic [ref=e72]:
+                  - paragraph [ref=e73]: "Action:"
+                  - paragraph [ref=e74]: The woman gratefully accepts the earring with a smile, mystery solved.
+            - group [ref=e75]:
+              - generic "View raw content" [ref=e76] [cursor=pointer]
+          - generic [ref=e77]:
+            - button "Try Again" [ref=e78] [cursor=pointer]
+            - button "Edit Story Manually" [ref=e79] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e80] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e81] [cursor=pointer]:
+              - /url: /characters
+  - generic [ref=e82]: untitled page
+```

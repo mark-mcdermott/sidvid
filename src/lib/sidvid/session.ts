@@ -10,11 +10,16 @@ import type {
   CharacterOptions,
   SceneOptions,
   ScenePipeline,
-  SceneSlot
+  SceneSlot,
+  VideoPipeline,
+  VideoSceneThumbnail,
+  Video,
+  VideoOptions
 } from './types';
 import { generateStory, editStory } from './api/story';
 import { generateCharacter, enhanceCharacterDescription } from './api/character';
 import { generateScene } from './api/scene';
+import { generateVideo, getVideoStatus, waitForVideo } from './api/video';
 
 export interface SessionMetadata {
   id: string;
@@ -62,6 +67,9 @@ export class Session {
 
   // Scene pipeline state
   private scenePipeline?: ScenePipeline;
+
+  // Video pipeline state
+  private videoPipeline?: VideoPipeline;
 
   // Metadata
   private createdAt: number;
@@ -130,7 +138,9 @@ export class Session {
 
       // Initialize character history
       this.characters.forEach(char => {
-        this.characterMap.set(char.id, [char]);
+        if (char.id) {
+          this.characterMap.set(char.id, [char]);
+        }
       });
     }
 
@@ -143,7 +153,9 @@ export class Session {
 
       // Initialize scene history
       this.scenes.forEach(scene => {
-        this.sceneMap.set(scene.id, [scene]);
+        if (scene.id) {
+          this.sceneMap.set(scene.id, [scene]);
+        }
       });
     }
 
@@ -324,7 +336,6 @@ export class Session {
       description,
       style: options?.style || 'cinematic',
       aspectRatio: options?.aspectRatio || '16:9',
-      size: options?.size || '1024x1024',
       quality: options?.quality || 'standard'
     });
 
@@ -591,7 +602,6 @@ export class Session {
         description,
         style: options?.style || 'cinematic',
         aspectRatio: options?.aspectRatio || '16:9',
-        size: options?.size || '1792x1024',
         quality: options?.quality || 'standard'
       });
 
@@ -672,6 +682,188 @@ export class Session {
     this.touch();
   }
 
+  // ===== Video Pipeline Workflow =====
+
+  /**
+   * Initialize the video pipeline from completed scene slots.
+   * Collects all completed scene images as thumbnails for video generation.
+   */
+  initializeVideoPipeline(): VideoPipeline {
+    if (!this.scenePipeline) {
+      throw new Error('No scene pipeline. Initialize and generate scene images first.');
+    }
+
+    const completedSlots = this.scenePipeline.slots.filter(
+      s => s.status === 'completed' && s.generatedScene?.imageUrl
+    );
+
+    if (completedSlots.length === 0) {
+      throw new Error('No completed scene images. Generate scene images first.');
+    }
+
+    const sceneThumbnails: VideoSceneThumbnail[] = completedSlots.map(slot => ({
+      id: slot.id,
+      sceneNumber: slot.storyScene.number,
+      imageUrl: slot.generatedScene!.imageUrl!, // Already filtered to ensure imageUrl exists
+      description: slot.customDescription || slot.storyScene.description
+    }));
+
+    this.videoPipeline = {
+      status: 'idle',
+      progress: 0,
+      sceneThumbnails,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    this.touch();
+    return this.videoPipeline;
+  }
+
+  /**
+   * Get the current video pipeline state.
+   */
+  getVideoPipeline(): VideoPipeline | undefined {
+    return this.videoPipeline;
+  }
+
+  /**
+   * Build a video prompt from the scene thumbnails and story.
+   */
+  buildVideoPrompt(): string {
+    if (!this.videoPipeline) {
+      throw new Error('No video pipeline. Initialize it first.');
+    }
+
+    const story = this.getCurrentStory();
+    const storyContext = story ? `Story: "${story.title}". ` : '';
+
+    const sceneDescriptions = this.videoPipeline.sceneThumbnails
+      .map(t => `Scene ${t.sceneNumber}: ${t.description}`)
+      .join('. ');
+
+    return `${storyContext}Create a cinematic video showing: ${sceneDescriptions}`;
+  }
+
+  /**
+   * Generate a video from the scene pipeline.
+   * This starts the video generation and returns immediately with the video ID.
+   */
+  async generateVideo(options?: Partial<VideoOptions>): Promise<Video> {
+    if (!this.videoPipeline) {
+      // Auto-initialize if scene pipeline exists
+      this.initializeVideoPipeline();
+    }
+
+    if (!this.videoPipeline) {
+      throw new Error('Cannot generate video without scene images.');
+    }
+
+    // Build prompt from scenes
+    const prompt = options?.prompt || this.buildVideoPrompt();
+    this.videoPipeline.generatedPrompt = prompt;
+
+    // Update status to generating
+    this.videoPipeline.status = 'generating';
+    this.videoPipeline.progress = 0;
+    this.videoPipeline.updatedAt = Date.now();
+
+    try {
+      const video = await generateVideo(this.client, {
+        prompt,
+        duration: options?.duration || 8,
+        size: options?.size || '1280x720',
+        model: options?.model || 'sora-2'
+      });
+
+      this.videoPipeline.currentVideoId = video.id;
+      this.videoPipeline.progress = video.progress;
+      this.videoPipeline.updatedAt = Date.now();
+
+      this.touch();
+      await this.autoSaveIfEnabled();
+
+      return video;
+    } catch (error) {
+      this.videoPipeline.status = 'failed';
+      this.videoPipeline.error = error instanceof Error ? error.message : 'Video generation failed';
+      this.videoPipeline.updatedAt = Date.now();
+      this.touch();
+      throw error;
+    }
+  }
+
+  /**
+   * Check the status of the current video generation.
+   */
+  async checkVideoStatus(): Promise<Video> {
+    if (!this.videoPipeline?.currentVideoId) {
+      throw new Error('No video generation in progress.');
+    }
+
+    const video = await getVideoStatus(this.client, this.videoPipeline.currentVideoId);
+
+    this.videoPipeline.progress = video.progress;
+    this.videoPipeline.updatedAt = Date.now();
+
+    if (video.status === 'completed') {
+      this.videoPipeline.status = 'completed';
+      this.videoPipeline.video = video;
+    } else if (video.status === 'failed') {
+      this.videoPipeline.status = 'failed';
+      this.videoPipeline.error = 'Video generation failed';
+    }
+
+    this.touch();
+    return video;
+  }
+
+  /**
+   * Wait for the current video generation to complete.
+   * Polls the video status until completed or failed.
+   */
+  async waitForVideoCompletion(options?: { pollInterval?: number; timeout?: number }): Promise<Video> {
+    if (!this.videoPipeline?.currentVideoId) {
+      throw new Error('No video generation in progress.');
+    }
+
+    const video = await waitForVideo(this.client, this.videoPipeline.currentVideoId, options);
+
+    this.videoPipeline.status = 'completed';
+    this.videoPipeline.video = video;
+    this.videoPipeline.progress = 100;
+    this.videoPipeline.updatedAt = Date.now();
+
+    this.touch();
+    await this.autoSaveIfEnabled();
+
+    return video;
+  }
+
+  /**
+   * Reset the video pipeline to regenerate.
+   */
+  resetVideoPipeline(): void {
+    if (this.videoPipeline) {
+      this.videoPipeline.status = 'idle';
+      this.videoPipeline.currentVideoId = undefined;
+      this.videoPipeline.video = undefined;
+      this.videoPipeline.progress = 0;
+      this.videoPipeline.error = undefined;
+      this.videoPipeline.generatedPrompt = undefined;
+      this.videoPipeline.updatedAt = Date.now();
+      this.touch();
+    }
+  }
+
+  /**
+   * Clear the video pipeline entirely.
+   */
+  clearVideoPipeline(): void {
+    this.videoPipeline = undefined;
+    this.touch();
+  }
+
   // ===== Storyboard Workflow =====
 
   createStoryboard(): Storyboard {
@@ -684,7 +876,7 @@ export class Session {
           id: `frame-${Date.now()}-${char.id}`,
           imageUrl: char.imageUrl,
           type: 'character',
-          sourceId: char.id
+          sourceId: char.id || ''
         });
       }
     });
@@ -696,7 +888,7 @@ export class Session {
           id: `frame-${Date.now()}-${scene.id}`,
           imageUrl: scene.imageUrl,
           type: 'scene',
-          sourceId: scene.id
+          sourceId: scene.id || ''
         });
       }
     });
@@ -751,6 +943,7 @@ export class Session {
       sceneMap: Array.from(this.sceneMap.entries()),
       storyboard: this.storyboard,
       scenePipeline: this.scenePipeline,
+      videoPipeline: this.videoPipeline,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     };
@@ -770,6 +963,7 @@ export class Session {
     this.sceneMap = new Map(data.sceneMap || []);
     this.storyboard = data.storyboard;
     this.scenePipeline = data.scenePipeline;
+    this.videoPipeline = data.videoPipeline;
     this.createdAt = data.createdAt || Date.now();
     this.updatedAt = data.updatedAt || Date.now();
   }

@@ -484,13 +484,17 @@ async function enhanceCharacterFromSession(args: string[]) {
   }
 
   const char = characters[index];
+  if (!char.id) {
+    console.error('Character has no ID');
+    process.exit(1);
+  }
   const spinner = startSpinner('Enhancing character...');
   const enhanced = await session.enhanceCharacter(char.id, prompt);
   await session.save();
   spinner.stop();
 
   console.log('Enhanced Description:');
-  console.log(enhanced.enhancedDescription);
+  console.log(enhanced.enhancedDescription || enhanced.description);
 }
 
 async function generateCharacterImageFromSession(args: string[]) {
@@ -512,6 +516,10 @@ async function generateCharacterImageFromSession(args: string[]) {
   }
 
   const char = characters[index];
+  if (!char.id) {
+    console.error('Character has no ID');
+    process.exit(1);
+  }
   const spinner = startSpinner('Generating character image...');
   const withImage = await session.generateCharacterImage(char.id, {
     style: 'realistic',

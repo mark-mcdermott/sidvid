@@ -1,5 +1,6 @@
 export interface SidVidConfig {
   openaiApiKey: string;
+  klingApiKey?: string;
   defaultModel?: string;
   defaultImageModel?: string;
   defaultVideoModel?: string;
@@ -41,6 +42,7 @@ export interface Story {
 
 export interface StoryScene {
   number: number;
+  title?: string;
   description: string;
   dialogue?: string;
   action?: string;
@@ -59,8 +61,11 @@ export interface EnhanceCharacterOptions {
 }
 
 export interface Character {
+  id?: string;
+  name?: string;
   description: string;
-  imageUrl: string;
+  enhancedDescription?: string;
+  imageUrl?: string;
   revisedPrompt?: string;
 }
 
@@ -72,8 +77,10 @@ export interface SceneOptions {
 }
 
 export interface Scene {
+  id?: string;
   description: string;
-  imageUrl: string;
+  enhancedDescription?: string;
+  imageUrl?: string;
   revisedPrompt?: string;
 }
 
@@ -96,14 +103,21 @@ export interface StoryboardFrame {
 export interface VideoOptions {
   prompt: string;
   storyboard?: Storyboard;
-  duration?: 4 | 8 | 12;
+  /** Scene image URL for image-to-video generation */
+  imageUrl?: string;
+  /** Duration in seconds (5 or 10 for Kling, 4/8/12 for Sora) */
+  duration?: 4 | 5 | 8 | 10 | 12;
   size?: '720x1280' | '1280x720' | '1024x1792' | '1792x1024';
-  model?: 'sora-2' | 'sora-2-pro';
+  /** Video generation provider */
+  provider?: 'mock' | 'kling' | 'sora';
+  /** Kling-specific: enable audio generation */
+  sound?: boolean;
+  model?: 'sora-2' | 'sora-2-pro' | 'kling-2.6';
 }
 
 export interface Video {
   id: string;
-  status: 'queued' | 'in_progress' | 'completed' | 'failed';
+  status: 'queued' | 'in_progress' | 'completed' | 'failed' | 'generating';
   progress: number;
   url?: string;
 }
@@ -144,5 +158,42 @@ export interface ScenePipeline {
   /** When the pipeline was created */
   createdAt: number;
   /** When the pipeline was last modified */
+  updatedAt: number;
+}
+
+// ===== Video Pipeline Types =====
+
+/**
+ * Represents a scene thumbnail for the video pipeline.
+ */
+export interface VideoSceneThumbnail {
+  id: string;
+  sceneNumber: number;
+  imageUrl: string;
+  description: string;
+}
+
+/**
+ * The video generation pipeline state.
+ * Tracks the video generation process from scene images to final video.
+ */
+export interface VideoPipeline {
+  /** Current status of the video pipeline */
+  status: 'idle' | 'generating' | 'completed' | 'failed';
+  /** ID of the video being generated (from Sora API) */
+  currentVideoId?: string;
+  /** Generation progress (0-100) */
+  progress: number;
+  /** The generated video (if completed) */
+  video?: Video;
+  /** Error message if generation failed */
+  error?: string;
+  /** Scene thumbnails used as input */
+  sceneThumbnails: VideoSceneThumbnail[];
+  /** Generated video prompt */
+  generatedPrompt?: string;
+  /** When the pipeline was created */
+  createdAt: number;
+  /** When the pipeline was last updated */
   updatedAt: number;
 }

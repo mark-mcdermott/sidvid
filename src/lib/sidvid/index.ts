@@ -8,6 +8,10 @@ export { MemoryStorageAdapter } from './storage/memory-adapter';
 export { BrowserStorageAdapter } from './storage/browser-adapter';
 export type { StorageAdapter } from './storage/adapter';
 
+// Video generation API
+export { initKlingClient } from './api/video';
+export { KlingClient } from './api/kling';
+
 export type {
   SidVidConfig,
   StoryOptions,
@@ -28,6 +32,8 @@ export type {
   Video,
   ScenePipeline,
   SceneSlot,
+  VideoPipeline,
+  VideoSceneThumbnail,
 } from './types';
 
 export {

@@ -1,0 +1,47 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - link "SidVid" [ref=e9] [cursor=pointer]:
+      - /url: /
+      - img "SidVid" [ref=e10]
+    - generic [ref=e11]:
+      - list [ref=e14]:
+        - listitem [ref=e15]:
+          - link "Story" [ref=e16] [cursor=pointer]:
+            - /url: /story
+        - listitem [ref=e17]:
+          - link "Characters" [ref=e18] [cursor=pointer]:
+            - /url: /characters
+        - listitem [ref=e19]:
+          - link "Scenes" [ref=e20] [cursor=pointer]:
+            - /url: /scenes
+        - listitem [ref=e21]:
+          - link "Storyboard" [ref=e22] [cursor=pointer]:
+            - /url: /storyboard
+        - listitem [ref=e23]:
+          - link "Video" [ref=e24] [cursor=pointer]:
+            - /url: /video
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: Sessions
+          - button "+ New" [ref=e30] [cursor=pointer]
+        - generic [ref=e31]: No sessions yet. Create one to get started.
+      - generic [ref=e32]:
+        - generic [ref=e33]: Conversations
+        - generic:
+          - list
+    - img "Sid" [ref=e36]
+  - main [ref=e37]:
+    - button "Toggle Sidebar" [ref=e39] [cursor=pointer]:
+      - img
+      - generic [ref=e40]: Toggle Sidebar
+    - main [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e44]:
+          - heading "Scene Generation" [level=1] [ref=e45]
+          - paragraph [ref=e46]: Drag a story and/or characters into a scene wireframe
+        - button "+" [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]: +
+```

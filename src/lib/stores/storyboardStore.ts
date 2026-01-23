@@ -237,8 +237,17 @@ function calculateTotalDuration(items: TimelineItem[]): number {
 }
 
 // Load storyboard state from localStorage
+// Only loads if current state has no wireframes with scenes (i.e., fresh data wasn't just set)
 export function loadStoryboardFromStorage() {
 	if (typeof window === 'undefined') return;
+
+	// Check if we already have wireframes with scenes (set by setScenes)
+	const currentState = get(storyboardStore);
+	const hasActiveScenes = currentState.wireframes.some(wf => wf.scene !== null);
+	if (hasActiveScenes) {
+		// Don't overwrite fresh data from scenes page
+		return;
+	}
 
 	const saved = localStorage.getItem('storyboard-state');
 	if (saved) {
@@ -262,3 +271,54 @@ export function saveStoryboardToStorage() {
 	const state = get(storyboardStore);
 	localStorage.setItem('storyboard-state', JSON.stringify(state));
 }
+
+// Scene data from scene pipeline
+export interface SceneData {
+	id: string;
+	sceneNumber: number;
+	description: string;
+	imageUrl: string;
+	characterIds: string[];
+}
+
+// Set scenes from scene pipeline
+export function setScenes(scenes: SceneData[]) {
+	storyboardStore.update(state => {
+		// Create wireframes from scenes
+		const wireframes: Wireframe[] = scenes.map((scene, index) => ({
+			id: `wireframe-scene-${scene.id}`,
+			scene: {
+				id: scene.id,
+				imageUrl: scene.imageUrl,
+				name: `Scene ${scene.sceneNumber}`
+			},
+			characters: [], // Characters can be added via drag/drop
+			duration: 5
+		}));
+
+		// Add an empty wireframe at the end for adding more
+		wireframes.push({
+			id: `wireframe-empty-${Date.now()}`,
+			scene: null,
+			characters: [],
+			duration: 5
+		});
+
+		const timelineItems = buildTimelineFromWireframes(wireframes);
+
+		return {
+			...state,
+			wireframes,
+			timelineItems,
+			totalDuration: calculateTotalDuration(timelineItems)
+		};
+	});
+}
+
+// Wrapper object for the store with methods
+export const storyboardStoreActions = {
+	subscribe: storyboardStore.subscribe,
+	set: storyboardStore.set,
+	update: storyboardStore.update,
+	setScenes
+};

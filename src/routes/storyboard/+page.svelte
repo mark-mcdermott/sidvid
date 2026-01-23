@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import {
 		storyboardStore,
 		addSceneToWireframe,
@@ -19,10 +21,18 @@
 		type WireframeCharacter
 	} from '$lib/stores/storyboardStore';
 	import { characterStore } from '$lib/stores/characterStore';
-	import { Play, Pause, X } from '@lucide/svelte';
+	import { sessionStore } from '$lib/stores/sessionStore';
+	import { Play, Pause, X, Edit, Loader2 } from '@lucide/svelte';
+	import type { ActionData } from './$types';
 
-	// Mock scenes for sidebar (in real app, would come from scene store)
-	let availableScenes = $state<WireframeScene[]>([]);
+	let { form }: { form: ActionData } = $props();
+
+	// Track which wireframes are being edited with prompt
+	let editingWireframes = $state<Set<string>>(new Set());
+	let editPrompts = $state<Record<string, string>>({});
+	let regeneratingWireframes = $state<Set<string>>(new Set());
+
+	// Available characters from character store
 	let availableCharacters = $state<WireframeCharacter[]>([]);
 
 	// Playback interval
@@ -42,25 +52,37 @@
 				}));
 		});
 
-		// Load scenes from localStorage (mocked for now)
-		const savedScenes = localStorage.getItem('generated-scenes');
-		if (savedScenes) {
-			try {
-				const parsed = JSON.parse(savedScenes);
-				availableScenes = parsed.map((s: { url: string; prompt: string }, i: number) => ({
-					id: `scene-${i + 1}`,
-					name: `Scene ${i + 1}`,
-					imageUrl: s.url
-				}));
-			} catch (e) {
-				console.error('Failed to load scenes:', e);
-			}
-		}
-
 		return () => {
 			unsubscribe();
 			if (playbackInterval) clearInterval(playbackInterval);
 		};
+	});
+
+	// Handle form action results
+	$effect(() => {
+		if (form?.action === 'editSlotWithPrompt') {
+			if (form.success && form.wireframeId && form.imageUrl) {
+				// Update wireframe with new image
+				storyboardStore.update(state => {
+					const wireframes = state.wireframes.map(wf => {
+						if (wf.id === form.wireframeId && wf.scene) {
+							return {
+								...wf,
+								scene: {
+									...wf.scene,
+									imageUrl: form.imageUrl
+								}
+							};
+						}
+						return wf;
+					});
+					return { ...state, wireframes };
+				});
+				// Clear editing state
+				editingWireframes = new Set([...editingWireframes].filter(id => id !== form.wireframeId));
+				regeneratingWireframes = new Set([...regeneratingWireframes].filter(id => id !== form.wireframeId));
+			}
+		}
 	});
 
 	// Watch for playback state changes
@@ -126,7 +148,7 @@
 		}
 	}
 
-	function handleRemoveCharacter(wireframeId: string, characterId: string, characterName: string) {
+	function handleRemoveCharacter(wireframeId: string, characterId: string) {
 		removeCharacterFromWireframe(wireframeId, characterId);
 	}
 
@@ -134,7 +156,26 @@
 		createNewStoryboard();
 	}
 
+	function toggleEditMode(wireframeId: string) {
+		if (editingWireframes.has(wireframeId)) {
+			editingWireframes = new Set([...editingWireframes].filter(id => id !== wireframeId));
+		} else {
+			editingWireframes = new Set([...editingWireframes, wireframeId]);
+		}
+	}
+
 	function handleSendToVideo() {
+		// Initialize video pipeline from session if available
+		const session = $sessionStore.activeSession;
+		if (session) {
+			try {
+				session.initializeVideoPipeline();
+				sessionStore.update(s => ({ ...s }));
+			} catch (e) {
+				// Video pipeline initialization may fail if no scene images
+				console.log('Could not initialize video pipeline:', e);
+			}
+		}
 		goto('/video');
 	}
 
@@ -142,9 +183,21 @@
 		return `${Math.floor(seconds)}s`;
 	}
 
+	// Get scenes from storyboard store (populated by scenes page via setScenes)
+	let availableScenes = $derived(
+		$storyboardStore.wireframes
+			.filter(wf => wf.scene !== null)
+			.map(wf => wf.scene!)
+	);
+
 	// Calculate total duration
 	let totalDuration = $derived(
 		$storyboardStore.timelineItems.reduce((sum, item) => sum + item.duration, 0)
+	);
+
+	// Check if we have any wireframes with content
+	let hasContent = $derived(
+		$storyboardStore.wireframes.some(wf => wf.scene !== null || wf.characters.length > 0)
 	);
 </script>
 
@@ -154,13 +207,14 @@
 		<div class="flex items-center justify-between">
 			<div>
 				<h1 class="text-3xl font-bold">Storyboard Editor</h1>
-				<p class="text-muted-foreground">Arrange your characters and scenes with drag-and-drop</p>
+				<p class="text-muted-foreground">Arrange your scenes and edit with prompts</p>
 			</div>
 			<div class="flex gap-2">
 				<Button variant="outline" onclick={handleNewStoryboard}>New Storyboard</Button>
 				<Button
-					disabled={$storyboardStore.timelineItems.length === 0}
+					disabled={!hasContent}
 					onclick={handleSendToVideo}
+					data-send-to-video
 				>
 					Send to Video
 				</Button>
@@ -168,55 +222,131 @@
 		</div>
 
 		<!-- Wireframe Grid -->
-		<div class="grid grid-cols-3 gap-4">
-			{#each $storyboardStore.wireframes as wireframe}
-				<div
-					data-storyboard-wireframe={wireframe.id}
-					class="relative flex min-h-48 flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 p-4 transition-colors hover:border-muted-foreground/50"
-					class:border-primary={$storyboardStore.selectedWireframeId === wireframe.id}
-					class:border-solid={wireframe.scene !== null || wireframe.characters.length > 0}
-					ondragover={handleDragOver}
-					ondrop={(e) => handleDrop(e, wireframe.id)}
-					onclick={() => handleWireframeClick(wireframe.id)}
-					role="button"
-					tabindex="0"
-				>
-					{#if wireframe.scene || wireframe.characters.length > 0}
-						<!-- Scene background -->
-						{#if wireframe.scene}
-							<img
-								src={wireframe.scene.imageUrl}
-								alt={wireframe.scene.name}
-								class="absolute inset-0 h-full w-full rounded-lg object-cover"
-							/>
-						{/if}
-
-						<!-- Characters overlay -->
-						{#if wireframe.characters.length > 0}
-							<div class="relative z-10 flex flex-wrap gap-2 p-2">
-								{#each wireframe.characters as character}
-									<div class="group relative">
-										<img
-											src={character.imageUrl}
-											alt={character.name}
-											class="h-16 w-16 rounded-full border-2 border-white object-cover shadow-lg"
-										/>
-										<button
-											class="absolute -right-1 -top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-destructive text-white group-hover:flex"
-											onclick={(e) => { e.stopPropagation(); handleRemoveCharacter(wireframe.id, character.id, character.name); }}
-											aria-label={`Remove ${character.name}`}
-										>
-											<X class="h-3 w-3" />
-										</button>
-									</div>
-								{/each}
+		<div class="flex flex-wrap gap-4" data-wireframes-container>
+			{#each $storyboardStore.wireframes as wireframe, index}
+				<div class="flex flex-col gap-2">
+					<div
+						data-storyboard-wireframe={wireframe.id}
+						class="relative flex w-64 flex-col items-center justify-center rounded-lg border-2 transition-colors
+							{$storyboardStore.selectedWireframeId === wireframe.id ? 'border-primary' : ''}
+							{wireframe.scene === null && wireframe.characters.length === 0 ? 'border-dashed border-gray-300' : 'border-solid'}
+							{wireframe.scene !== null ? 'border-green-500' : ''}
+							hover:border-gray-400"
+						style="aspect-ratio: 16/9;"
+						ondragover={handleDragOver}
+						ondrop={(e) => handleDrop(e, wireframe.id)}
+						onclick={() => handleWireframeClick(wireframe.id)}
+						role="button"
+						tabindex="0"
+					>
+						{#if regeneratingWireframes.has(wireframe.id)}
+							<!-- Loading state -->
+							<div class="flex items-center justify-center">
+								<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" data-spinner />
 							</div>
+						{:else if wireframe.scene || wireframe.characters.length > 0}
+							<!-- Scene background -->
+							{#if wireframe.scene}
+								<img
+									src={wireframe.scene.imageUrl}
+									alt={wireframe.scene.name}
+									class="absolute inset-0 h-full w-full rounded-lg object-cover"
+									data-scene-image
+								/>
+							{/if}
+
+							<!-- Characters overlay -->
+							{#if wireframe.characters.length > 0}
+								<div class="relative z-10 flex flex-wrap gap-2 p-2">
+									{#each wireframe.characters as character}
+										<div class="group relative">
+											<img
+												src={character.imageUrl}
+												alt={character.name}
+												class="h-12 w-12 rounded-full border-2 border-white object-cover shadow-lg"
+											/>
+											<button
+												class="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-destructive text-white group-hover:flex"
+												onclick={(e) => { e.stopPropagation(); handleRemoveCharacter(wireframe.id, character.id); }}
+												aria-label={`Remove ${character.name}`}
+											>
+												<X class="h-3 w-3" />
+											</button>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						{:else}
+							<span class="text-sm text-muted-foreground">Drop scene or character here</span>
 						{/if}
-					{:else}
-						<span class="text-sm text-muted-foreground">Drop scene or character here</span>
+					</div>
+
+					<!-- Edit With Prompt button/form -->
+					{#if wireframe.scene}
+						{#if editingWireframes.has(wireframe.id)}
+							<form
+								method="POST"
+								action="?/editSlotWithPrompt"
+								class="flex flex-col gap-2"
+								use:enhance={() => {
+									regeneratingWireframes = new Set([...regeneratingWireframes, wireframe.id]);
+									return async ({ update }) => {
+										await update();
+										regeneratingWireframes = new Set([...regeneratingWireframes].filter(id => id !== wireframe.id));
+									};
+								}}
+							>
+								<input type="hidden" name="wireframeId" value={wireframe.id} />
+								<input type="hidden" name="originalDescription" value={wireframe.scene.name} />
+								<Textarea
+									name="editPrompt"
+									placeholder="Describe changes..."
+									class="text-xs h-16"
+									bind:value={editPrompts[wireframe.id]}
+								/>
+								<div class="flex gap-1">
+									<Button type="submit" size="sm" class="flex-1" disabled={regeneratingWireframes.has(wireframe.id)}>
+										{#if regeneratingWireframes.has(wireframe.id)}
+											<Loader2 class="mr-1 h-3 w-3 animate-spin" />
+											Regenerating...
+										{:else}
+											Regenerate
+										{/if}
+									</Button>
+									<Button type="button" size="sm" variant="outline" onclick={() => toggleEditMode(wireframe.id)}>
+										Cancel
+									</Button>
+								</div>
+							</form>
+						{:else}
+							<Button
+								size="sm"
+								variant="outline"
+								class="w-full"
+								onclick={() => toggleEditMode(wireframe.id)}
+								data-edit-with-prompt={wireframe.id}
+							>
+								<Edit class="mr-1 h-3 w-3" />
+								Edit With Prompt
+							</Button>
+						{/if}
 					{/if}
 				</div>
 			{/each}
+
+			<!-- Empty + wireframe for adding more -->
+			<div>
+				<div
+					data-add-wireframe
+					class="flex w-64 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20"
+					style="aspect-ratio: 16/9;"
+					onclick={handleNewStoryboard}
+					role="button"
+					tabindex="0"
+				>
+					<span class="text-4xl text-muted-foreground">+</span>
+				</div>
+			</div>
 		</div>
 
 		<!-- Timeline Section -->
@@ -327,7 +457,7 @@
 		<div data-sidebar-section="scenes">
 			<h3 class="mb-2 font-semibold">Scenes</h3>
 			{#if availableScenes.length === 0}
-				<p class="text-sm text-muted-foreground">No scenes generated yet</p>
+				<p class="text-sm text-muted-foreground">No scenes generated yet. Generate scenes first.</p>
 			{:else}
 				<div class="grid grid-cols-2 gap-2">
 					{#each availableScenes as scene}
@@ -371,46 +501,6 @@
 							<span class="text-xs">{character.name}</span>
 						</div>
 					{/each}
-				</div>
-			{/if}
-		</div>
-
-		<!-- Storyboard Thumbnails Section -->
-		<div data-sidebar-section="storyboard">
-			<h3 class="mb-2 font-semibold">Storyboards</h3>
-			{#if $storyboardStore.storyboards.length === 0}
-				<p class="text-sm text-muted-foreground">No storyboards saved yet</p>
-			{:else}
-				<div class="grid grid-cols-2 gap-2">
-					{#each $storyboardStore.storyboards as storyboard}
-						<div
-							class="cursor-pointer rounded border p-1 transition-colors hover:bg-muted"
-							data-storyboard-thumbnail
-						>
-							{#if storyboard.thumbnailUrl}
-								<img
-									src={storyboard.thumbnailUrl}
-									alt={storyboard.name}
-									class="h-16 w-full rounded object-cover"
-								/>
-							{:else}
-								<div class="flex h-16 w-full items-center justify-center rounded bg-muted">
-									<span class="text-xs text-muted-foreground">No preview</span>
-								</div>
-							{/if}
-							<span class="text-xs">{storyboard.name}</span>
-						</div>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Conversations for storyboard (placeholder) -->
-			{#if $storyboardStore.storyboards.length > 0}
-				<div class="mt-4">
-					<h4 class="mb-2 text-sm font-medium">Conversations</h4>
-					<div data-conversation-item class="rounded border p-2 text-xs text-muted-foreground">
-						Storyboard created
-					</div>
 				</div>
 			{/if}
 		</div>

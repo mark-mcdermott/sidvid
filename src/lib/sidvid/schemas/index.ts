@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const sidVidConfigSchema = z.object({
   openaiApiKey: z.string().min(1, 'OpenAI API key is required'),
+  klingApiKey: z.string().optional(),
   defaultModel: z.string().optional(),
   defaultImageModel: z.string().optional(),
   defaultVideoModel: z.string().optional(),
@@ -30,7 +31,16 @@ export const sceneOptionsSchema = z.object({
 
 export const videoOptionsSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
-  duration: z.union([z.literal(4), z.literal(8), z.literal(12)]).optional().default(8),
+  imageUrl: z.string().url().optional(),
+  duration: z.union([
+    z.literal(4),
+    z.literal(5),
+    z.literal(8),
+    z.literal(10),
+    z.literal(12)
+  ]).optional().default(5),
   size: z.enum(['720x1280', '1280x720', '1024x1792', '1792x1024']).optional().default('1280x720'),
-  model: z.enum(['sora-2', 'sora-2-pro']).optional().default('sora-2'),
+  provider: z.enum(['mock', 'kling', 'sora']).optional().default('mock'),
+  sound: z.boolean().optional().default(true),
+  model: z.enum(['sora-2', 'sora-2-pro', 'kling-2.6']).optional().default('kling-2.6'),
 });

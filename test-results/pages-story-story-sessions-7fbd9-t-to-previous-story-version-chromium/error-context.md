@@ -1,0 +1,112 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Sessions
+            - button "+ New" [ref=e30] [cursor=pointer]
+          - generic [ref=e31]: No sessions yet. Create one to get started.
+        - generic [ref=e32]:
+          - generic [ref=e33]: Conversations
+          - list [ref=e35]:
+            - listitem [ref=e36]:
+              - link "Quick Detective Reveal" [ref=e37] [cursor=pointer]:
+                - /url: /conversation/31570639-ee01-488f-b259-5ad21ade0d2f
+            - listitem [ref=e38]:
+              - link "The Clue" [ref=e39] [cursor=pointer]:
+                - /url: /conversation/bf661145-b76b-41fa-85ba-771a83aeb519
+            - listitem [ref=e40]:
+              - link "The Case of the Missing..." [ref=e41] [cursor=pointer]:
+                - /url: /conversation/29d73676-9013-42ec-a184-18fdb950cbb1
+            - listitem [ref=e42]:
+              - link "The Quick Case" [ref=e43] [cursor=pointer]:
+                - /url: /conversation/02e600d8-e3de-441f-9244-34214446ed8a
+      - img "Sid" [ref=e46]
+    - main [ref=e47]:
+      - button "Toggle Sidebar" [ref=e49] [cursor=pointer]:
+        - img
+        - generic [ref=e50]: Toggle Sidebar
+      - main [ref=e51]:
+        - generic [ref=e53]:
+          - generic [ref=e55]:
+            - heading "Story Generation" [level=1] [ref=e56]
+            - paragraph [ref=e57]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e58]:
+            - paragraph [ref=e59]: "Prompt (5s):"
+            - paragraph [ref=e60]: A detective story
+          - generic [ref=e61]:
+            - heading "Quick Detective Reveal" [level=2] [ref=e63]
+            - generic [ref=e64]:
+              - generic [ref=e65]:
+                - heading "Scene 1" [level=3] [ref=e66]
+                - generic [ref=e67]:
+                  - paragraph [ref=e68]: "Description:"
+                  - paragraph [ref=e69]: A detective quickly examines a crime scene, focusing on a single clue.
+                - generic [ref=e70]:
+                  - paragraph [ref=e71]: "Action:"
+                  - paragraph [ref=e72]: Detective gets a flash of insight when noticing a unique footprint in the mud.
+              - generic [ref=e73]:
+                - heading "Scene 2" [level=3] [ref=e74]
+                - generic [ref=e75]:
+                  - paragraph [ref=e76]: "Description:"
+                  - paragraph [ref=e77]: The detective apprehends the culprit based on the footprint evidence.
+                - generic [ref=e78]:
+                  - paragraph [ref=e79]: "Action:"
+                  - paragraph [ref=e80]: In one swift motion, the detective points out the footprint to the surprised suspect, leading to their capture.
+            - group [ref=e81]:
+              - generic "View raw content" [ref=e82] [cursor=pointer]
+          - generic [ref=e83]:
+            - paragraph [ref=e84]: "Prompt (5s):"
+            - paragraph [ref=e85]: "Edit: Add explosions"
+          - generic [ref=e86]:
+            - heading "Quick Detective Reveal" [level=2] [ref=e88]
+            - generic [ref=e89]:
+              - generic [ref=e90]:
+                - heading "Scene 1" [level=3] [ref=e91]
+                - generic [ref=e92]:
+                  - paragraph [ref=e93]: "Description:"
+                  - paragraph [ref=e94]: The detective stands in a dimly lit alley, scrutinizing a suspicious package.
+                - generic [ref=e95]:
+                  - paragraph [ref=e96]: "Action:"
+                  - paragraph [ref=e97]: As the detective leans closer, the package suddenly explodes, sending papers flying.
+              - generic [ref=e98]:
+                - heading "Scene 2" [level=3] [ref=e99]
+                - generic [ref=e100]:
+                  - paragraph [ref=e101]: "Description:"
+                  - paragraph [ref=e102]: Amidst the chaos, the detective emerges from the smoke, unscathed and holding a crucial clue.
+                - generic [ref=e103]:
+                  - paragraph [ref=e104]: "Action:"
+                  - paragraph [ref=e105]: The detective reveals a small, intact piece of evidence, hinting at the mystery's solution.
+            - group [ref=e106]:
+              - generic "View raw content" [ref=e107] [cursor=pointer]
+          - generic [ref=e108]:
+            - button "Try Again" [ref=e109] [cursor=pointer]
+            - button "Edit Story Manually" [ref=e110] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e111] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e112] [cursor=pointer]:
+              - /url: /characters
+  - generic [ref=e113]: untitled page
+```

@@ -377,7 +377,7 @@
 						</div>
 						<div class="space-y-4">
 							{#each entry.story.scenes as scene}
-								<div class="rounded-md bg-muted/50 p-3">
+								<div class="rounded-md bg-muted/50 p-3" data-scene-number={scene.number}>
 									<h3 class="mb-2 font-semibold">Scene {scene.number}</h3>
 
 									<div class="mb-2">
@@ -414,7 +414,7 @@
 					</div>
 					<div class="space-y-4">
 						{#each entry.story.scenes as scene}
-							<div class="rounded-md bg-muted/50 p-3">
+							<div class="rounded-md bg-muted/50 p-3" data-scene-number={scene.number}>
 								<h3 class="mb-2 font-semibold">Scene {scene.number}</h3>
 
 								<div class="mb-2">

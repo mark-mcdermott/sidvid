@@ -1,0 +1,133 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Sessions
+            - button "+ New" [ref=e30] [cursor=pointer]
+          - generic [ref=e31]: No sessions yet. Create one to get started.
+        - generic [ref=e32]:
+          - generic [ref=e33]: Conversations
+          - list [ref=e35]:
+            - listitem [ref=e36]:
+              - link "The Clue" [ref=e37] [cursor=pointer]:
+                - /url: /conversation/bf661145-b76b-41fa-85ba-771a83aeb519
+            - listitem [ref=e38]:
+              - link "The Case of the Missing..." [ref=e39] [cursor=pointer]:
+                - /url: /conversation/29d73676-9013-42ec-a184-18fdb950cbb1
+            - listitem [ref=e40]:
+              - link "The Quick Case" [ref=e41] [cursor=pointer]:
+                - /url: /conversation/02e600d8-e3de-441f-9244-34214446ed8a
+      - img "Sid" [ref=e44]
+    - main [ref=e45]:
+      - button "Toggle Sidebar" [ref=e47] [cursor=pointer]:
+        - img
+        - generic [ref=e48]: Toggle Sidebar
+      - main [ref=e49]:
+        - generic [ref=e51]:
+          - generic [ref=e53]:
+            - heading "Story Generation" [level=1] [ref=e54]
+            - paragraph [ref=e55]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e56]:
+            - paragraph [ref=e57]: "Prompt (5s):"
+            - paragraph [ref=e58]: A detective story
+          - generic [ref=e59]:
+            - heading "The Clue" [level=2] [ref=e61]
+            - generic [ref=e62]:
+              - generic [ref=e63]:
+                - heading "Scene 1" [level=3] [ref=e64]
+                - generic [ref=e65]:
+                  - paragraph [ref=e66]: "Description:"
+                  - paragraph [ref=e67]: A dimly lit room filled with papers and a single desk lamp casting a small circle of light.
+                - generic [ref=e68]:
+                  - paragraph [ref=e69]: "Action:"
+                  - paragraph [ref=e70]: The detective quickly scans through papers, then spots a clue—a distinct footprint marked on one of them.
+              - generic [ref=e71]:
+                - heading "Scene 2" [level=3] [ref=e72]
+                - generic [ref=e73]:
+                  - paragraph [ref=e74]: "Description:"
+                  - paragraph [ref=e75]: An alleyway at dusk, shadows are long, and a suspect darts away, dropping a shoe.
+                - generic [ref=e76]:
+                  - paragraph [ref=e77]: "Action:"
+                  - paragraph [ref=e78]: The detective picks up the shoe, matching it to the footprint in one swift motion.
+            - group [ref=e79]:
+              - generic "View raw content" [ref=e80] [cursor=pointer]
+          - generic [ref=e81]:
+            - paragraph [ref=e82]: "Prompt (5s):"
+            - paragraph [ref=e83]: "Edit: Add more tension"
+          - generic [ref=e84]:
+            - heading "The Clue" [level=2] [ref=e86]
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - heading "Scene 1" [level=3] [ref=e89]
+                - generic [ref=e90]:
+                  - paragraph [ref=e91]: "Description:"
+                  - paragraph [ref=e92]: A dimly lit alley with shadows stretching ominously.
+                - generic [ref=e93]:
+                  - paragraph [ref=e94]: "Action:"
+                  - paragraph [ref=e95]: A figure, tense and alert, glances over their shoulder, clutching a small, mysterious object tightly.
+              - generic [ref=e96]:
+                - heading "Scene 2" [level=3] [ref=e97]
+                - generic [ref=e98]:
+                  - paragraph [ref=e99]: "Description:"
+                  - paragraph [ref=e100]: A narrow escape route, barely visible in the gloom.
+                - generic [ref=e101]:
+                  - paragraph [ref=e102]: "Action:"
+                  - paragraph [ref=e103]: The figure dashes down the alley, the sound of footsteps echoing behind them, creating an urgent sense of pursuit.
+            - group [ref=e104]:
+              - generic "View raw content" [ref=e105] [cursor=pointer]
+          - generic [ref=e106]:
+            - paragraph [ref=e107]: "Prompt (5s):"
+            - paragraph [ref=e108]: A detective story
+          - generic [ref=e109]:
+            - heading "The Quick Clue" [level=2] [ref=e111]
+            - generic [ref=e112]:
+              - generic [ref=e113]:
+                - heading "Scene 1" [level=3] [ref=e114]
+                - generic [ref=e115]:
+                  - paragraph [ref=e116]: "Description:"
+                  - paragraph [ref=e117]: A detective spots a mysterious note on the ground amidst bustling city traffic.
+                - generic [ref=e118]:
+                  - paragraph [ref=e119]: "Action:"
+                  - paragraph [ref=e120]: Detective stoops to pick up the note and quickly scans it.
+              - generic [ref=e121]:
+                - heading "Scene 2" [level=3] [ref=e122]
+                - generic [ref=e123]:
+                  - paragraph [ref=e124]: "Description:"
+                  - paragraph [ref=e125]: The detective finds a vital clue on the note leading to a suspect's address.
+                - generic [ref=e126]:
+                  - paragraph [ref=e127]: "Action:"
+                  - paragraph [ref=e128]: Detective's eyes widen as they glance from the note to the nearby alleyway.
+            - group [ref=e129]:
+              - generic "View raw content" [ref=e130] [cursor=pointer]
+          - generic [ref=e131]:
+            - button "Try Again" [ref=e132] [cursor=pointer]
+            - button "Edit Story Manually" [ref=e133] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e134] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e135] [cursor=pointer]:
+              - /url: /characters
+  - generic [ref=e136]: untitled page
+```

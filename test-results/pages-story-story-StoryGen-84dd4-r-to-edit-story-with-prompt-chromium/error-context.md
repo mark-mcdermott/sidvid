@@ -1,0 +1,129 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Sessions
+            - button "+ New" [ref=e30] [cursor=pointer]
+          - generic [ref=e31]: No sessions yet. Create one to get started.
+        - generic [ref=e32]:
+          - generic [ref=e33]: Conversations
+          - list [ref=e35]:
+            - listitem [ref=e36]:
+              - link "The Robot's Brief Adventure" [ref=e37] [cursor=pointer]:
+                - /url: /conversation/e2103d52-2833-4ad1-ad06-59c6270cb4d4
+            - listitem [ref=e38]:
+              - link "Sudden Revelation" [ref=e39] [cursor=pointer]:
+                - /url: /conversation/2f27c30a-b342-462d-af4c-18f42db6b26b
+            - listitem [ref=e40]:
+              - link "The Forgotten Key" [ref=e41] [cursor=pointer]:
+                - /url: /conversation/4f926fcc-c623-432a-924e-b1aaa30783a8
+            - listitem [ref=e42]:
+              - link "The Last Clue" [ref=e43] [cursor=pointer]:
+                - /url: /conversation/eefd7a85-abb3-4ca4-bbdf-357cfd50eb8d
+            - listitem [ref=e44]:
+              - link "The Swift Clue" [ref=e45] [cursor=pointer]:
+                - /url: /conversation/8c02ea0d-79e7-4734-b65e-54253d2169ac
+            - listitem [ref=e46]:
+              - link "The Missing Clue" [ref=e47] [cursor=pointer]:
+                - /url: /conversation/e187cda6-4fa3-44bc-a781-4ad00ed43878
+            - listitem [ref=e48]:
+              - link "The Lost Clue" [ref=e49] [cursor=pointer]:
+                - /url: /conversation/11f3059c-8a1d-4b57-8a13-c2dbf81872ba
+            - listitem [ref=e50]:
+              - link "The Quick Case" [ref=e51] [cursor=pointer]:
+                - /url: /conversation/41b72e57-a27c-4442-a1ae-e9017d1a1a0f
+            - listitem [ref=e52]:
+              - link "The Missing Clue" [ref=e53] [cursor=pointer]:
+                - /url: /conversation/42cc4844-87b0-4f59-adaa-7855b232bc6d
+            - listitem [ref=e54]:
+              - link "The Missing Clue" [ref=e55] [cursor=pointer]:
+                - /url: /conversation/b9cf68b6-02aa-4a2f-98ec-1942c7e45bb6
+            - listitem [ref=e56]:
+              - link "Quick Detective Reveal" [ref=e57] [cursor=pointer]:
+                - /url: /conversation/31570639-ee01-488f-b259-5ad21ade0d2f
+            - listitem [ref=e58]:
+              - link "The Clue" [ref=e59] [cursor=pointer]:
+                - /url: /conversation/bf661145-b76b-41fa-85ba-771a83aeb519
+            - listitem [ref=e60]:
+              - link "The Case of the Missing..." [ref=e61] [cursor=pointer]:
+                - /url: /conversation/29d73676-9013-42ec-a184-18fdb950cbb1
+            - listitem [ref=e62]:
+              - link "The Quick Case" [ref=e63] [cursor=pointer]:
+                - /url: /conversation/02e600d8-e3de-441f-9244-34214446ed8a
+      - img "Sid" [ref=e66]
+    - main [ref=e67]:
+      - button "Toggle Sidebar" [ref=e69] [cursor=pointer]:
+        - img
+        - generic [ref=e70]: Toggle Sidebar
+      - main [ref=e71]:
+        - generic [ref=e73]:
+          - generic [ref=e75]:
+            - heading "Story Generation" [level=1] [ref=e76]
+            - paragraph [ref=e77]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e78]:
+            - paragraph [ref=e79]: "Prompt (5s):"
+            - paragraph [ref=e80]: A robot story
+          - generic [ref=e81]:
+            - heading "The Robot's Brief Adventure" [level=2] [ref=e83]
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - heading "Scene 1" [level=3] [ref=e86]
+                - generic [ref=e87]:
+                  - paragraph [ref=e88]: "Description:"
+                  - paragraph [ref=e89]: A small robot rolls up to a mysterious, glowing button.
+                - generic [ref=e90]:
+                  - paragraph [ref=e91]: "Action:"
+                  - paragraph [ref=e92]: The robot curiously reaches out to press the button.
+              - generic [ref=e93]:
+                - heading "Scene 2" [level=3] [ref=e94]
+                - generic [ref=e95]:
+                  - paragraph [ref=e96]: "Description:"
+                  - paragraph [ref=e97]: Upon pressing the button, lights dance around and the robot jubilantly spins.
+                - generic [ref=e98]:
+                  - paragraph [ref=e99]: "Action:"
+                  - paragraph [ref=e100]: The robot spins in delight as a cascade of colorful lights fills the screen.
+            - group [ref=e101]:
+              - generic "View raw content" [ref=e102] [cursor=pointer]
+          - generic [ref=e103]:
+            - button "Regenerating..." [disabled]:
+              - img
+              - text: Regenerating...
+            - button "Edit Story Manually" [ref=e104] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e105] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e106] [cursor=pointer]:
+              - /url: /characters
+          - generic [ref=e108]:
+            - heading "Edit Story with Prompt" [level=3] [ref=e109]
+            - paragraph [ref=e110]: Describe the changes you want to make to the story
+            - textbox "E.g., 'Add more action to scene 2' or 'Make the dialogue more dramatic'. Press Enter to submit, Shift+Enter for new line." [ref=e111]: Add more explosions
+            - generic [ref=e112]:
+              - button "Cancel" [ref=e113] [cursor=pointer]
+              - button "Regenerating..." [disabled]:
+                - img
+                - text: Regenerating...
+  - generic [ref=e114]: untitled page
+```

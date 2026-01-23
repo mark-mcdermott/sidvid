@@ -1,0 +1,106 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - link "SidVid" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img "SidVid" [ref=e10]
+      - generic [ref=e11]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Story" [ref=e16] [cursor=pointer]:
+              - /url: /story
+          - listitem [ref=e17]:
+            - link "Characters" [ref=e18] [cursor=pointer]:
+              - /url: /characters
+          - listitem [ref=e19]:
+            - link "Scenes" [ref=e20] [cursor=pointer]:
+              - /url: /scenes
+          - listitem [ref=e21]:
+            - link "Storyboard" [ref=e22] [cursor=pointer]:
+              - /url: /storyboard
+          - listitem [ref=e23]:
+            - link "Video" [ref=e24] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Sessions
+            - button "+ New" [ref=e30] [cursor=pointer]
+          - generic [ref=e31]: No sessions yet. Create one to get started.
+        - generic [ref=e32]:
+          - generic [ref=e33]: Conversations
+          - list [ref=e35]:
+            - listitem [ref=e36]:
+              - link "The Swift Clue" [ref=e37] [cursor=pointer]:
+                - /url: /conversation/8c02ea0d-79e7-4734-b65e-54253d2169ac
+            - listitem [ref=e38]:
+              - link "The Missing Clue" [ref=e39] [cursor=pointer]:
+                - /url: /conversation/e187cda6-4fa3-44bc-a781-4ad00ed43878
+            - listitem [ref=e40]:
+              - link "The Lost Clue" [ref=e41] [cursor=pointer]:
+                - /url: /conversation/11f3059c-8a1d-4b57-8a13-c2dbf81872ba
+            - listitem [ref=e42]:
+              - link "The Quick Case" [ref=e43] [cursor=pointer]:
+                - /url: /conversation/41b72e57-a27c-4442-a1ae-e9017d1a1a0f
+            - listitem [ref=e44]:
+              - link "The Missing Clue" [ref=e45] [cursor=pointer]:
+                - /url: /conversation/42cc4844-87b0-4f59-adaa-7855b232bc6d
+            - listitem [ref=e46]:
+              - link "The Missing Clue" [ref=e47] [cursor=pointer]:
+                - /url: /conversation/b9cf68b6-02aa-4a2f-98ec-1942c7e45bb6
+            - listitem [ref=e48]:
+              - link "Quick Detective Reveal" [ref=e49] [cursor=pointer]:
+                - /url: /conversation/31570639-ee01-488f-b259-5ad21ade0d2f
+            - listitem [ref=e50]:
+              - link "The Clue" [ref=e51] [cursor=pointer]:
+                - /url: /conversation/bf661145-b76b-41fa-85ba-771a83aeb519
+            - listitem [ref=e52]:
+              - link "The Case of the Missing..." [ref=e53] [cursor=pointer]:
+                - /url: /conversation/29d73676-9013-42ec-a184-18fdb950cbb1
+            - listitem [ref=e54]:
+              - link "The Quick Case" [ref=e55] [cursor=pointer]:
+                - /url: /conversation/02e600d8-e3de-441f-9244-34214446ed8a
+      - img "Sid" [ref=e58]
+    - main [ref=e59]:
+      - button "Toggle Sidebar" [ref=e61] [cursor=pointer]:
+        - img
+        - generic [ref=e62]: Toggle Sidebar
+      - main [ref=e63]:
+        - generic [ref=e65]:
+          - generic [ref=e67]:
+            - heading "Story Generation" [level=1] [ref=e68]
+            - paragraph [ref=e69]: Generate a story from your prompt using ChatGPT
+          - generic [ref=e70]:
+            - paragraph [ref=e71]: "Prompt (5s):"
+            - paragraph [ref=e72]: A detective story
+          - generic [ref=e73]:
+            - heading "The Swift Clue" [level=2] [ref=e75]
+            - generic [ref=e76]:
+              - generic [ref=e77]:
+                - heading "Scene 1" [level=3] [ref=e78]
+                - generic [ref=e79]:
+                  - paragraph [ref=e80]: "Description:"
+                  - paragraph [ref=e81]: Detective spots a shiny object glinting under a streetlamp on a cobblestone alley.
+                - generic [ref=e82]:
+                  - paragraph [ref=e83]: "Action:"
+                  - paragraph [ref=e84]: Detective bends down swiftly to retrieve the object, revealing it's a key with a peculiar symbol.
+              - generic [ref=e85]:
+                - heading "Scene 2" [level=3] [ref=e86]
+                - generic [ref=e87]:
+                  - paragraph [ref=e88]: "Description:"
+                  - paragraph [ref=e89]: Detective holds the key up to a padlocked door on a nearby darkened, mysterious building.
+                - generic [ref=e90]:
+                  - paragraph [ref=e91]: "Action:"
+                  - paragraph [ref=e92]: Detective inserts the key into the lock; the door clicks open, and the detective glances around before quickly slipping inside.
+            - group [ref=e93]:
+              - generic "View raw content" [ref=e94] [cursor=pointer]
+          - generic [ref=e95]:
+            - button "Try Again" [ref=e96] [cursor=pointer]
+            - button "Edit Story Manually" [ref=e97] [cursor=pointer]
+            - button "Edit Story with Prompt" [ref=e98] [cursor=pointer]
+            - link "Send to Character Generation" [ref=e99] [cursor=pointer]:
+              - /url: /characters
+  - generic [ref=e100]: untitled page
+```

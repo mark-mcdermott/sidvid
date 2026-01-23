@@ -1,0 +1,105 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - link "SidVid" [ref=e9] [cursor=pointer]:
+      - /url: /
+      - img "SidVid" [ref=e10]
+    - generic [ref=e11]:
+      - list [ref=e14]:
+        - listitem [ref=e15]:
+          - link "Story" [ref=e16] [cursor=pointer]:
+            - /url: /story
+        - listitem [ref=e17]:
+          - link "Characters" [ref=e18] [cursor=pointer]:
+            - /url: /characters
+        - listitem [ref=e19]:
+          - link "Scenes" [ref=e20] [cursor=pointer]:
+            - /url: /scenes
+        - listitem [ref=e21]:
+          - link "Storyboard" [ref=e22] [cursor=pointer]:
+            - /url: /storyboard
+        - listitem [ref=e23]:
+          - link "Video" [ref=e24] [cursor=pointer]:
+            - /url: /video
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: Sessions
+          - button "+ New" [ref=e30] [cursor=pointer]
+        - generic [ref=e31]: No sessions yet. Create one to get started.
+      - generic [ref=e33]: Video
+      - generic [ref=e34]:
+        - generic [ref=e35]: Conversations
+        - list [ref=e37]:
+          - listitem [ref=e38]:
+            - link "Quick Encounter in Space" [ref=e39] [cursor=pointer]:
+              - /url: /conversation/f79c6878-cf52-423d-ab16-2bec89f7051e
+          - listitem [ref=e40]:
+            - link "The Swift Clue" [ref=e41] [cursor=pointer]:
+              - /url: /conversation/e9ed9692-716d-4441-9976-022b7b695335
+          - listitem [ref=e42]:
+            - link "Robot's Quick Adventure" [ref=e43] [cursor=pointer]:
+              - /url: /conversation/24715cb8-2f30-40c9-af7c-137efe62cbc5
+          - listitem [ref=e44]:
+            - link "First Line, Second Line" [ref=e45] [cursor=pointer]:
+              - /url: /conversation/11cd8a76-1e82-4cad-a941-9bb0c1962f1b
+          - listitem [ref=e46]:
+            - link "Galactic Dash" [ref=e47] [cursor=pointer]:
+              - /url: /conversation/922cfaba-d5ba-4e16-b64b-f94ea8ca6589
+          - listitem [ref=e48]:
+            - link "The Robot's Brief Adventure" [ref=e49] [cursor=pointer]:
+              - /url: /conversation/e2103d52-2833-4ad1-ad06-59c6270cb4d4
+          - listitem [ref=e50]:
+            - link "Sudden Revelation" [ref=e51] [cursor=pointer]:
+              - /url: /conversation/2f27c30a-b342-462d-af4c-18f42db6b26b
+          - listitem [ref=e52]:
+            - link "The Forgotten Key" [ref=e53] [cursor=pointer]:
+              - /url: /conversation/4f926fcc-c623-432a-924e-b1aaa30783a8
+          - listitem [ref=e54]:
+            - link "The Last Clue" [ref=e55] [cursor=pointer]:
+              - /url: /conversation/eefd7a85-abb3-4ca4-bbdf-357cfd50eb8d
+          - listitem [ref=e56]:
+            - link "The Swift Clue" [ref=e57] [cursor=pointer]:
+              - /url: /conversation/8c02ea0d-79e7-4734-b65e-54253d2169ac
+          - listitem [ref=e58]:
+            - link "The Missing Clue" [ref=e59] [cursor=pointer]:
+              - /url: /conversation/e187cda6-4fa3-44bc-a781-4ad00ed43878
+          - listitem [ref=e60]:
+            - link "The Lost Clue" [ref=e61] [cursor=pointer]:
+              - /url: /conversation/11f3059c-8a1d-4b57-8a13-c2dbf81872ba
+          - listitem [ref=e62]:
+            - link "The Quick Case" [ref=e63] [cursor=pointer]:
+              - /url: /conversation/41b72e57-a27c-4442-a1ae-e9017d1a1a0f
+          - listitem [ref=e64]:
+            - link "The Missing Clue" [ref=e65] [cursor=pointer]:
+              - /url: /conversation/42cc4844-87b0-4f59-adaa-7855b232bc6d
+          - listitem [ref=e66]:
+            - link "The Missing Clue" [ref=e67] [cursor=pointer]:
+              - /url: /conversation/b9cf68b6-02aa-4a2f-98ec-1942c7e45bb6
+          - listitem [ref=e68]:
+            - link "Quick Detective Reveal" [ref=e69] [cursor=pointer]:
+              - /url: /conversation/31570639-ee01-488f-b259-5ad21ade0d2f
+          - listitem [ref=e70]:
+            - link "The Clue" [ref=e71] [cursor=pointer]:
+              - /url: /conversation/bf661145-b76b-41fa-85ba-771a83aeb519
+          - listitem [ref=e72]:
+            - link "The Case of the Missing..." [ref=e73] [cursor=pointer]:
+              - /url: /conversation/29d73676-9013-42ec-a184-18fdb950cbb1
+          - listitem [ref=e74]:
+            - link "The Quick Case" [ref=e75] [cursor=pointer]:
+              - /url: /conversation/02e600d8-e3de-441f-9244-34214446ed8a
+    - img "Sid" [ref=e78]
+  - main [ref=e79]:
+    - button "Toggle Sidebar" [ref=e81] [cursor=pointer]:
+      - img
+      - generic [ref=e82]: Toggle Sidebar
+    - main [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e86]:
+          - heading "Video Generation" [level=1] [ref=e87]
+          - paragraph [ref=e88]: Generate your final video using Sora
+        - paragraph [ref=e91]: No scenes available. Generate scenes first.
+        - generic [ref=e92]:
+          - button "Generate Video" [disabled]
+```

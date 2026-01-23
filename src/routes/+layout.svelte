@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import {
 		SidebarProvider,
 		Sidebar,
@@ -28,21 +29,88 @@
 
 	let showNewSessionDialog = $state(false);
 
+	// Active section for homepage single-page nav
+	let activeSection = $state<string>('story');
+
 	const menuItems = [
-		{ title: 'Story', href: '/story' },
-		{ title: 'Characters', href: '/characters' },
-		{ title: 'Scenes', href: '/scenes' },
-		{ title: 'Storyboard', href: '/storyboard' },
-		{ title: 'Video', href: '/video' }
+		{ title: 'Story', href: '/', section: 'story' },
+		{ title: 'Characters', href: '/', section: 'characters' },
+		{ title: 'Scenes', href: '/', section: 'scenes' },
+		{ title: 'Storyboard', href: '/', section: 'storyboard' },
+		{ title: 'Video', href: '/', section: 'video' }
 	];
 
 	async function handleNewSession() {
 		showNewSessionDialog = true;
 	}
 
+	function scrollToSection(section: string) {
+		if (!browser) return;
+
+		const element = document.getElementById(section);
+		if (element) {
+			element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			activeSection = section;
+		}
+	}
+
+	function handleSectionClick(e: Event, section: string) {
+		// Only handle section scrolling on homepage
+		if ($page.url.pathname === '/') {
+			e.preventDefault();
+			scrollToSection(section);
+		}
+	}
+
+	// Set up intersection observer to detect which section is in view
+	function setupScrollObserver() {
+		if (!browser) return;
+
+		const sections = ['story', 'characters', 'scenes', 'storyboard', 'video'];
+		const observerOptions = {
+			root: null,
+			rootMargin: '-20% 0px -70% 0px',
+			threshold: 0
+		};
+
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting) {
+					activeSection = entry.target.id;
+				}
+			});
+		}, observerOptions);
+
+		sections.forEach((section) => {
+			const element = document.getElementById(section);
+			if (element) {
+				observer.observe(element);
+			}
+		});
+
+		return () => observer.disconnect();
+	}
+
 	onMount(async () => {
 		await loadConversations();
 		await refreshSessions();
+
+		// Set up scroll observer for homepage
+		let cleanup: (() => void) | undefined;
+		if ($page.url.pathname === '/') {
+			cleanup = setupScrollObserver();
+		}
+
+		return () => {
+			if (cleanup) cleanup();
+		};
+	});
+
+	// Re-setup observer when navigating to homepage
+	$effect(() => {
+		if (browser && $page.url.pathname === '/') {
+			setupScrollObserver();
+		}
 	});
 </script>
 
@@ -55,7 +123,7 @@
 		<SidebarHeader>
 			<div class="flex items-center gap-2 px-4 py-2">
 				<a href="/" class="hover:opacity-80 transition-opacity">
-					<img src="/logo.png" alt="SidVid" class="h-[10.125rem]" />
+					<img src="/logo-no-ice.png" alt="SidVid" class="h-[10.125rem]" />
 				</a>
 			</div>
 		</SidebarHeader>
@@ -67,7 +135,8 @@
 							<SidebarMenuItem>
 								<SidebarMenuButton
 									href={item.href}
-									class={$page.url.pathname === item.href ? 'font-bold' : ''}
+									class={($page.url.pathname === '/' && activeSection === item.section) ? 'font-bold' : ''}
+									onclick={(e) => handleSectionClick(e, item.section)}
 								>
 									{item.title}
 								</SidebarMenuButton>
@@ -83,8 +152,8 @@
 				</SidebarGroupContent>
 			</SidebarGroup>
 
-			{#if $page.url.pathname === '/scenes'}
-				<!-- Story section for scenes page -->
+			{#if $page.url.pathname === '/' && (activeSection === 'scenes' || activeSection === 'storyboard')}
+				<!-- Story section for scenes/storyboard sections -->
 				{#if $storyStore.stories.length > 0}
 					<SidebarGroup data-sidebar-section="story">
 						<SidebarGroupLabel>Story</SidebarGroupLabel>
@@ -113,7 +182,7 @@
 					</SidebarGroup>
 				{/if}
 
-				<!-- Characters section for scenes page -->
+				<!-- Characters section for scenes/storyboard sections -->
 				{#if $characterStore.characters.length > 0}
 					<SidebarGroup data-sidebar-section="characters">
 						<SidebarGroupLabel>Characters</SidebarGroupLabel>
@@ -151,7 +220,7 @@
 				{/if}
 			{/if}
 
-			{#if $page.url.pathname === '/video'}
+			{#if $page.url.pathname === '/' && activeSection === 'video'}
 				<SidebarGroup data-sidebar-section="video">
 					<SidebarGroupLabel>Video</SidebarGroupLabel>
 					<SidebarGroupContent>
