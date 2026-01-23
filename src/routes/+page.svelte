@@ -1188,7 +1188,7 @@
 <!-- Testing Mode Toggle -->
 <button
 	onclick={() => testingMode = !testingMode}
-	class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
+	class="fixed bottom-4 right-4 z-50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
 	title="Toggle testing mode"
 >
 	<FlaskConical class="h-4 w-4" />

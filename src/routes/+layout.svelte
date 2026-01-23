@@ -24,10 +24,12 @@
 	import { storyStore } from '$lib/stores/storyStore';
 	import { sessionStore, refreshSessions, createNewSession } from '$lib/stores/sessionStore';
 	import { SessionList, SessionDialog } from '$lib/components/sessions';
+	import { ChevronDown, ChevronUp } from '@lucide/svelte';
 
 	let { children } = $props();
 
 	let showNewSessionDialog = $state(false);
+	let showAllConversations = $state(false);
 
 	// Active section for homepage single-page nav
 	let activeSection = $state<string>('story');
@@ -235,7 +237,7 @@
 				<SidebarGroupLabel>Conversations</SidebarGroupLabel>
 				<SidebarGroupContent>
 					<SidebarMenu>
-						{#each $conversationStore.conversations as conv}
+						{#each $conversationStore.conversations.slice(0, 2) as conv}
 							<SidebarMenuItem>
 								<SidebarMenuButton
 									href="/conversation/{conv.id}"
@@ -246,6 +248,36 @@
 								</SidebarMenuButton>
 							</SidebarMenuItem>
 						{/each}
+						{#if $conversationStore.conversations.length > 2}
+							<SidebarMenuItem>
+								<div class="flex w-full justify-start px-2 py-1">
+									<button
+										onclick={() => showAllConversations = !showAllConversations}
+										class="flex cursor-pointer items-center gap-2 rounded-full border px-2 py-1 text-sm font-medium transition-colors border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80"
+										title={showAllConversations ? 'Show fewer conversations' : 'Show more conversations'}
+									>
+										{#if showAllConversations}
+											<ChevronDown class="h-4 w-4" />
+										{:else}
+											<ChevronUp class="h-4 w-4" />
+										{/if}
+									</button>
+								</div>
+							</SidebarMenuItem>
+							{#if showAllConversations}
+								{#each $conversationStore.conversations.slice(2) as conv}
+									<SidebarMenuItem>
+										<SidebarMenuButton
+											href="/conversation/{conv.id}"
+											class={$page.url.pathname === `/conversation/${conv.id}` ? 'font-bold' : ''}
+											title={conv.title}
+										>
+											{conv.title}
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								{/each}
+							{/if}
+						{/if}
 					</SidebarMenu>
 				</SidebarGroupContent>
 			</SidebarGroup>
