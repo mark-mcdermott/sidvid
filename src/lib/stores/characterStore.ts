@@ -1,13 +1,27 @@
 import { writable } from 'svelte/store';
 import type { StoryCharacter } from '$lib/sidvid';
 
+export interface CharacterImage {
+	id: string;
+	imageUrl: string;
+	revisedPrompt?: string;
+}
+
 export interface CharacterEntry {
-	name: string;
+	slug: string;
+	name?: string;
 	description: string;
 	enhancedDescription?: string;
-	imageUrl?: string;
-	revisedPrompt?: string;
+	images: CharacterImage[];
+	selectedImageId?: string;
 	isExpanded?: boolean;
+}
+
+// Helper to get active image URL for backwards compatibility
+export function getActiveImageUrl(char: CharacterEntry): string | undefined {
+	if (!char.images || char.images.length === 0) return undefined;
+	const selected = char.images.find(img => img.id === char.selectedImageId);
+	return selected?.imageUrl || char.images[char.images.length - 1]?.imageUrl;
 }
 
 export interface CharacterState {
@@ -44,8 +58,9 @@ export function loadStoryCharacters(characters: StoryCharacter[]) {
 		...state,
 		storyCharacters: characters,
 		characters: characters.map(c => ({
-			name: c.name,
+			slug: c.name,
 			description: c.description,
+			images: [],
 			isExpanded: false
 		}))
 	}));

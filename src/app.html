@@ -1,8 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			// Prevent FOUC: Check localStorage before CSS loads
+			// Only remove dark class if user explicitly chose light mode
+			if (localStorage.getItem('sidvid-dark-mode') === 'false') {
+				document.documentElement.classList.remove('dark');
+			}
+			// Prevent sidebar FOUC in testing mode: add class to disable transitions
+			if (localStorage.getItem('sidvid-testing-mode') === 'true') {
+				document.documentElement.classList.add('sidebar-closed-initial');
+			}
+		</script>
+		<style>
+			/* Hide sidebar immediately in testing mode to prevent FOUC */
+			.sidebar-closed-initial [data-slot="sidebar"] {
+				display: none !important;
+			}
+			.sidebar-closed-initial [data-slot="sidebar-gap"] {
+				width: 0 !important;
+				transition: none !important;
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

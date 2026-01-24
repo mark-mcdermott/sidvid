@@ -174,6 +174,44 @@ export const actions = {
 		}
 	},
 
+	generateCharacterImage: async ({ request }) => {
+		const data = await request.formData();
+		const description = data.get('description');
+		const characterIndex = data.get('characterIndex');
+
+		if (!description || typeof description !== 'string') {
+			return { success: false, error: 'Character description is required', action: 'generateCharacterImage' };
+		}
+
+		const index = characterIndex ? parseInt(characterIndex as string, 10) : 0;
+
+		try {
+			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
+
+			const character = await sidvid.generateCharacter({
+				description,
+				style: 'realistic',
+				size: '1024x1024',
+				quality: 'standard'
+			});
+
+			return {
+				success: true,
+				character,
+				characterIndex: index,
+				action: 'generateCharacterImage'
+			};
+		} catch (error) {
+			console.error('Error generating character image:', error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Failed to generate character image',
+				characterIndex: index,
+				action: 'generateCharacterImage'
+			};
+		}
+	},
+
 	improveDescription: async ({ request }) => {
 		const data = await request.formData();
 		const description = data.get('description');

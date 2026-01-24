@@ -197,3 +197,80 @@ export interface VideoPipeline {
   /** When the pipeline was last updated */
   updatedAt: number;
 }
+
+// ===== API Timing Types =====
+
+/**
+ * Enumeration of API call types to track for progress estimation
+ */
+export type ApiCallType =
+  | 'generateStory'
+  | 'editStory'
+  | 'enhanceDescription'
+  | 'generateCharacter'
+  | 'generateScene'
+  | 'generateVideo';
+
+/**
+ * A single timing record for an API call
+ */
+export interface ApiTimingRecord {
+  /** Unique identifier for this record */
+  id: string;
+  /** Type of API call */
+  type: ApiCallType;
+  /** Duration in milliseconds */
+  durationMs: number;
+  /** When the call started (ISO timestamp) */
+  startedAt: string;
+  /** When the call completed (ISO timestamp) */
+  completedAt: string;
+  /** Whether the call succeeded */
+  success: boolean;
+}
+
+/**
+ * Aggregated timing statistics for a single API call type
+ */
+export interface ApiTimingStats {
+  type: ApiCallType;
+  /** Number of recorded calls */
+  count: number;
+  /** Average duration in milliseconds */
+  averageMs: number;
+  /** Median duration in milliseconds */
+  medianMs: number;
+  /** Minimum observed duration */
+  minMs: number;
+  /** Maximum observed duration */
+  maxMs: number;
+}
+
+/**
+ * Complete timing data stored per user
+ */
+export interface ApiTimingData {
+  /** Version for future migrations */
+  version: 1;
+  /** Raw timing records (last N per type) */
+  records: ApiTimingRecord[];
+  /** Cached statistics per API type */
+  stats: Partial<Record<ApiCallType, ApiTimingStats>>;
+  /** When data was last modified */
+  updatedAt: string;
+}
+
+/**
+ * Default timing estimates in milliseconds for first-time users
+ */
+export const DEFAULT_TIMING_ESTIMATES: Record<ApiCallType, number> = {
+  generateStory: 20000,      // 20 seconds
+  editStory: 20000,          // 20 seconds
+  enhanceDescription: 10000, // 10 seconds
+  generateCharacter: 45000,  // 45 seconds
+  generateScene: 45000,      // 45 seconds
+  generateVideo: 300000,     // 5 minutes
+};
+
+/** Maximum number of timing records to keep per API call type */
+export const MAX_TIMING_RECORDS_PER_TYPE = 50;

@@ -17,12 +17,14 @@
 		SidebarMenuItem,
 		SidebarMenuButton,
 		SidebarInset,
-		SidebarTrigger
+		SidebarTrigger,
+		useSidebar
 	} from '$lib/components/ui/sidebar';
 	import { conversationStore, loadConversations } from '$lib/stores/conversationStore';
-	import { characterStore } from '$lib/stores/characterStore';
+	import { characterStore, getActiveImageUrl } from '$lib/stores/characterStore';
 	import { storyStore } from '$lib/stores/storyStore';
 	import { sessionStore, refreshSessions, createNewSession } from '$lib/stores/sessionStore';
+	import { apiTimingStore } from '$lib/stores/apiTimingStore';
 	import { SessionList, SessionDialog } from '$lib/components/sessions';
 	import { ChevronDown, ChevronUp, Sun, Moon } from '@lucide/svelte';
 
@@ -30,14 +32,23 @@
 
 	let showNewSessionDialog = $state(false);
 	let showAllConversations = $state(false);
-	let darkMode = $state(false);
+
+	// Dark mode: default true, sync with localStorage (FOUC prevented in app.html)
+	let darkMode = $state(browser ? localStorage.getItem('sidvid-dark-mode') !== 'false' : true);
 
 	function toggleDarkMode() {
 		darkMode = !darkMode;
 		if (browser) {
 			document.documentElement.classList.toggle('dark', darkMode);
+			localStorage.setItem('sidvid-dark-mode', String(darkMode));
 		}
 	}
+
+	// Testing mode: check localStorage to determine if sidebar should start closed
+	let testingMode = $state(browser ? localStorage.getItem('sidvid-testing-mode') === 'true' : false);
+
+	// Sidebar open state: closed by default in testing mode
+	let sidebarOpen = $state(!testingMode);
 
 	// Active section for homepage single-page nav
 	let activeSection = $state<string>('story');
@@ -102,8 +113,12 @@
 	}
 
 	onMount(async () => {
+		// Remove sidebar FOUC prevention class now that Svelte has hydrated
+		document.documentElement.classList.remove('sidebar-closed-initial');
+
 		await loadConversations();
 		await refreshSessions();
+		await apiTimingStore.load();
 
 		// Set up scroll observer for homepage
 		let cleanup: (() => void) | undefined;
@@ -128,7 +143,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<SidebarProvider>
+<SidebarProvider bind:open={sidebarOpen}>
 	<Sidebar>
 		<SidebarHeader>
 			<div class="flex items-center gap-2 px-4 py-2">
@@ -207,20 +222,20 @@
 											e.dataTransfer?.setData('application/json', JSON.stringify({
 												type: 'character',
 												index,
-												name: char.name,
-												imageUrl: char.imageUrl
+												name: char.slug,
+												imageUrl: getActiveImageUrl(char)
 											}));
 										}}
 									>
-										{#if char.imageUrl}
-											<img src={char.imageUrl} alt={char.name} class="w-12 h-12 rounded object-cover" />
+										{#if getActiveImageUrl(char)}
+											<img src={getActiveImageUrl(char)} alt={char.slug} class="w-12 h-12 rounded object-cover" />
 										{:else}
 											<div class="w-12 h-12 rounded bg-muted flex items-center justify-center text-xs">
-												{char.name.charAt(0)}
+												{char.slug.charAt(0)}
 											</div>
 										{/if}
 										<div class="flex-1 min-w-0">
-											<div class="text-sm font-medium truncate">{char.name}</div>
+											<div class="text-sm font-medium truncate">{char.slug}</div>
 										</div>
 									</div>
 								{/each}
@@ -297,9 +312,15 @@
 		</SidebarFooter>
 	</Sidebar>
 	<SidebarInset>
+		{@const sidebar = useSidebar()}
 		<header class="flex h-12 items-center justify-between border-b px-4">
-			<div class="flex items-center gap-2">
+			<div class="flex items-center">
 				<SidebarTrigger />
+				{#if !sidebar.open}
+					<a href="/" class="hover:opacity-80 transition-opacity">
+						<img src={darkMode ? "/logo-white.png" : "/logo.png"} alt="SidVid" class="h-12" />
+					</a>
+				{/if}
 				{#if $sessionStore.activeSession}
 					<span class="text-sm text-muted-foreground">
 						Session: {$sessionStore.activeSession.getName() || 'Untitled'}

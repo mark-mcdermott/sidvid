@@ -5,11 +5,14 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2 } from '@lucide/svelte';
+	import { ProgressBar } from '$lib/components/ui/progress-bar';
+	import { createTimingContext } from '$lib/utils/apiTiming';
+	import type { ApiCallType } from '$lib/sidvid/types';
 
 	// Stores
 	import { storyStore } from '$lib/stores/storyStore';
-	import { characterStore, loadStoryCharacters, ensureCharacterExpanded } from '$lib/stores/characterStore';
+	import { characterStore, loadStoryCharacters, ensureCharacterExpanded, getActiveImageUrl, resetCharacterStore } from '$lib/stores/characterStore';
 	import { sessionStore } from '$lib/stores/sessionStore';
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import {
@@ -25,6 +28,7 @@
 		loadStoryboardFromStorage,
 		saveStoryboardToStorage,
 		setScenes,
+		resetStoryboardStore,
 		type WireframeScene,
 		type WireframeCharacter
 	} from '$lib/stores/storyboardStore';
@@ -33,11 +37,27 @@
 	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
 	import type { SceneSlot, Story } from '$lib/sidvid';
 	import type { ActionData } from './$types';
+	import { browser } from '$app/environment';
 
 	let { form }: { form: ActionData } = $props();
 
 	// ========== Testing Mode ==========
 	let testingMode = $state(false);
+
+	// Load testing mode preference from localStorage on init
+	if (browser) {
+		const savedTestingMode = localStorage.getItem('sidvid-testing-mode');
+		if (savedTestingMode !== null) {
+			testingMode = savedTestingMode === 'true';
+		}
+	}
+
+	function toggleTestingMode() {
+		testingMode = !testingMode;
+		if (browser) {
+			localStorage.setItem('sidvid-testing-mode', String(testingMode));
+		}
+	}
 
 	// ========== Active Section State ==========
 	type Section = 'story' | 'characters' | 'scenes' | 'storyboard' | 'video';
@@ -66,6 +86,14 @@
 	let mainFormElement: HTMLFormElement | undefined = $state();
 	let editFormElement: HTMLFormElement | undefined = $state();
 	let tryAgainFormElement: HTMLFormElement | undefined = $state();
+	let shouldNavigateToCharactersAfterStory = $state(false);
+
+	// Derived value for the latest story object (stringified) - ensures we always get the current version for editing
+	let latestStoryForEdit = $derived(
+		$storyStore.stories.length > 0
+			? JSON.stringify($storyStore.stories[$storyStore.stories.length - 1].story)
+			: ''
+	);
 
 	const lengthOptions = [
 		{ value: '2s', label: '2s' },
@@ -83,11 +111,31 @@
 
 	let selectedLengthValue = $state($storyStore.selectedLength.value);
 
+	// Editable story fields for Manual Edit mode
+	interface EditableScene {
+		number: number;
+		description: string;
+		dialogue: string;
+		action: string;
+	}
+	interface EditableCharacter {
+		name: string;
+		description: string;
+	}
+	let editableTitle = $state('');
+	let editableScenes = $state<EditableScene[]>([]);
+	let editableCharacters = $state<EditableCharacter[]>([]);
+
 	function handleStoryKeydown(e: KeyboardEvent, formElement?: HTMLFormElement) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
 			formElement?.requestSubmit();
 		}
+	}
+
+	function handleUseThisStory() {
+		shouldNavigateToCharactersAfterStory = true;
+		mainFormElement?.requestSubmit();
 	}
 
 	// ========== Character State ==========
@@ -96,11 +144,14 @@
 	let improvingType = $state<'smart' | 'regenerate' | null>(null);
 	let activeCharacterIndex = $state(0);
 	let lastProcessedEnhancedText = $state<string>('');
+	let showAddCharacterForm = $state(false);
 	let lastProcessedImageUrl = $state<string>('');
 	let characterRefs: { [key: number]: HTMLDivElement } = {};
 	let enhancedCharacters = $state<Set<number>>(new Set());
 	let showPromptTextarea = $state<Set<number>>(new Set());
 	let userPrompts = $state<{ [key: number]: string }>({});
+	let generatingCharacterImages = $state<Set<number>>(new Set());
+	let autoGenerateCharacterImages = $state(false);
 
 	function getCurrentDescription(index: number) {
 		const char = $characterStore.characters[index];
@@ -122,8 +173,9 @@
 				characters: [
 					...state.characters,
 					{
-						name: 'Custom Character',
+						slug: 'Custom Character',
 						description: customDesc,
+						images: [],
 						isExpanded: false
 					}
 				],
@@ -133,6 +185,40 @@
 			const newIndex = $characterStore.characters.length - 1;
 			await handleCharacterClick(newIndex);
 		}
+	}
+
+	function selectCharacterImage(charIndex: number, imageId: string) {
+		characterStore.update(state => {
+			const updatedCharacters = [...state.characters];
+			if (charIndex < updatedCharacters.length) {
+				updatedCharacters[charIndex] = {
+					...updatedCharacters[charIndex],
+					selectedImageId: imageId
+				};
+			}
+			return { ...state, characters: updatedCharacters };
+		});
+	}
+
+	function deleteCharacterImage(charIndex: number, imageId: string) {
+		characterStore.update(state => {
+			const updatedCharacters = [...state.characters];
+			if (charIndex < updatedCharacters.length) {
+				const char = updatedCharacters[charIndex];
+				const newImages = char.images.filter(img => img.id !== imageId);
+				// If deleted image was selected, select the last remaining image
+				let newSelectedId = char.selectedImageId;
+				if (char.selectedImageId === imageId && newImages.length > 0) {
+					newSelectedId = newImages[newImages.length - 1].id;
+				}
+				updatedCharacters[charIndex] = {
+					...char,
+					images: newImages,
+					selectedImageId: newSelectedId
+				};
+			}
+			return { ...state, characters: updatedCharacters };
+		});
 	}
 
 	async function handleCharacterClick(index: number) {
@@ -154,6 +240,112 @@
 	function closePromptTextarea(index: number) {
 		showPromptTextarea = new Set([...showPromptTextarea].filter(i => i !== index));
 		userPrompts[index] = '';
+	}
+
+	async function generateCharacterImageForIndex(index: number, forceRegenerate = false) {
+		const char = $characterStore.characters[index];
+		if (!char || (char.images.length > 0 && !forceRegenerate)) return; // Skip if already has image and not regenerating
+
+		const description = char.enhancedDescription || char.description;
+		if (!description) return;
+
+		generatingCharacterImages = new Set([...generatingCharacterImages, index]);
+
+		try {
+			const formData = new FormData();
+			formData.append('description', description);
+			formData.append('characterIndex', index.toString());
+
+			const response = await fetch('?/generateCharacterImage', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+			console.log('Character image generation result:', result);
+
+			// SvelteKit form actions return data in a specific format
+			// The data is in result.data as a serialized array: [[action_index, action_data]]
+			let actionData = null;
+
+			if (result.data) {
+				try {
+					const parsed = JSON.parse(result.data);
+					// SvelteKit uses devalue format where object values are indices into the array
+					// e.g., [{success: 1, character: 2}, true, {imageUrl: 3}, "url..."]
+					// means success=parsed[1]=true, character=parsed[2]={imageUrl: 3}, etc.
+					if (Array.isArray(parsed) && parsed.length > 0) {
+						const mainObj = parsed[0];
+						if (typeof mainObj === 'object' && mainObj !== null) {
+							// Resolve devalue references
+							const resolveValue = (val: any): any => {
+								if (typeof val === 'number' && parsed[val] !== undefined) {
+									const resolved = parsed[val];
+									if (typeof resolved === 'object' && resolved !== null) {
+										// Recursively resolve nested objects
+										const resolvedObj: any = Array.isArray(resolved) ? [] : {};
+										for (const key in resolved) {
+											resolvedObj[key] = resolveValue(resolved[key]);
+										}
+										return resolvedObj;
+									}
+									return resolved;
+								}
+								return val;
+							};
+
+							actionData = {};
+							for (const key in mainObj) {
+								actionData[key] = resolveValue(mainObj[key]);
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Error parsing result.data:', e);
+				}
+			} else if (result.success !== undefined) {
+				actionData = result;
+			}
+
+			console.log('Parsed action data:', actionData);
+
+			if (actionData?.success && actionData?.character?.imageUrl) {
+				const newImageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+				characterStore.update(state => {
+					const updatedCharacters = [...state.characters];
+					if (index < updatedCharacters.length) {
+						const existingImages = updatedCharacters[index].images || [];
+						const newImage = {
+							id: newImageId,
+							imageUrl: actionData.character.imageUrl,
+							revisedPrompt: actionData.character.revisedPrompt
+						};
+						updatedCharacters[index] = {
+							...updatedCharacters[index],
+							images: [...existingImages, newImage],
+							selectedImageId: newImageId
+						};
+					}
+					return { ...state, characters: updatedCharacters };
+				});
+			} else {
+				console.error('Character image generation failed or no imageUrl:', actionData);
+			}
+		} catch (error) {
+			console.error(`Error generating image for character ${index}:`, error);
+		} finally {
+			generatingCharacterImages = new Set([...generatingCharacterImages].filter(i => i !== index));
+		}
+	}
+
+	async function generateAllCharacterImages() {
+		const characters = $characterStore.characters;
+		// Generate images sequentially to avoid rate limiting
+		for (let i = 0; i < characters.length; i++) {
+			if (!characters[i].imageUrl) {
+				await generateCharacterImageForIndex(i);
+			}
+		}
 	}
 
 	// ========== Scene State ==========
@@ -749,14 +941,16 @@
 		selectedLengthValue = $storyStore.selectedLength.value;
 	});
 
-	// Story form effect
+	// Story form effect - handles both generateStory and editStory actions
 	$effect(() => {
-		if (form?.action === 'generateStory' && form?.success && form?.story) {
+		if ((form?.action === 'generateStory' || form?.action === 'editStory') && form?.success && form?.story) {
 			const currentRawContent = form.story.rawContent;
 			const lastContent = untrack(() => lastStoryRawContent);
 
 			if (currentRawContent !== lastContent) {
 				untrack(() => {
+					const isEdit = form.action === 'editStory';
+
 					let storyPrompt: string;
 					if (capturedPromptForNextStory) {
 						storyPrompt = capturedPromptForNextStory;
@@ -767,19 +961,76 @@
 						storyPrompt = $storyStore.prompt;
 					}
 
-					storyStore.update(state => ({
-						...state,
-						stories: [...state.stories, {
-							story: form.story!,
-							prompt: storyPrompt,
-							length: (state.isTryingAgain ? state.tryAgainLength?.label : state.selectedLength?.label) || '5s'
-						}],
-						isEditingManually: false,
-						editedStoryContent: ''
-					}));
+					if (isEdit) {
+						// For edits, add new entry to keep visual history (like Try Again)
+						// and clear downstream data
+						resetCharacterStore();
+						resetStoryboardStore();
+						localSlots = [];
+						sceneVideos = [];
+
+						storyStore.update(state => ({
+							...state,
+							stories: [...state.stories, {
+								story: form.story!,
+								prompt: storyPrompt,
+								length: state.selectedLength?.label || '5s'
+							}],
+							isEditingManually: false,
+							isEditingWithPrompt: false,
+							editedStoryContent: '',
+							editPrompt: ''
+						}));
+					} else {
+						// For new stories, add to the list
+						storyStore.update(state => ({
+							...state,
+							stories: [...state.stories, {
+								story: form.story!,
+								prompt: storyPrompt,
+								length: (state.isTryingAgain ? state.tryAgainLength?.label : state.selectedLength?.label) || '5s'
+							}],
+							isEditingManually: false,
+							editedStoryContent: ''
+						}));
+					}
 					lastStoryRawContent = currentRawContent;
+
+					// Always populate characters and scenes from the story
+					if (form.story!.characters && form.story!.characters.length > 0) {
+						loadStoryCharacters(form.story!.characters);
+						// Auto-generate character images after loading
+						autoGenerateCharacterImages = true;
+					}
+					if (form.story!.scenes && form.story!.scenes.length > 0) {
+						localSlots = form.story!.scenes.map((scene, index) => ({
+							id: `slot-local-${Date.now()}-${index}`,
+							storySceneIndex: index,
+							storyScene: scene,
+							characterIds: [],
+							status: 'pending' as const
+						}));
+					}
+
+					// Auto-navigate to characters if "Generate Video Now" was clicked
+					if (shouldNavigateToCharactersAfterStory) {
+						shouldNavigateToCharactersAfterStory = false;
+						// Scroll to characters section after a small delay to allow DOM update
+						setTimeout(() => scrollToSection('characters'), 100);
+					}
 				});
 			}
+		}
+	});
+
+	// Auto-generate character images effect
+	$effect(() => {
+		if (autoGenerateCharacterImages && $characterStore.characters.length > 0) {
+			autoGenerateCharacterImages = false;
+			// Small delay to ensure the store is updated
+			setTimeout(() => {
+				generateAllCharacterImages();
+			}, 100);
 		}
 	});
 
@@ -1019,9 +1270,20 @@
 	function startManualEdit() {
 		const latestEntry = $storyStore.stories[$storyStore.stories.length - 1];
 		if (latestEntry) {
+			// Populate editable fields from the story
+			editableTitle = latestEntry.story.title;
+			editableScenes = latestEntry.story.scenes.map(scene => ({
+				number: scene.number,
+				description: scene.description || '',
+				dialogue: scene.dialogue || '',
+				action: scene.action || ''
+			}));
+			editableCharacters = (latestEntry.story.characters || []).map(char => ({
+				name: char.name,
+				description: char.description
+			}));
 			storyStore.update(state => ({
 				...state,
-				editedStoryContent: latestEntry.story.rawContent,
 				isEditingManually: true
 			}));
 			setTimeout(() => {
@@ -1031,37 +1293,86 @@
 	}
 
 	function cancelEdit() {
+		editableTitle = '';
+		editableScenes = [];
+		editableCharacters = [];
 		storyStore.update(state => ({
 			...state,
-			isEditingManually: false,
-			editedStoryContent: ''
+			isEditingManually: false
 		}));
 	}
 
 	function saveChanges() {
 		const latestEntry = $storyStore.stories[$storyStore.stories.length - 1];
-		if (latestEntry && $storyStore.editedStoryContent) {
-			try {
-				const parsed = JSON.parse($storyStore.editedStoryContent);
-				storyStore.update(state => {
-					const updatedStories = [...state.stories];
-					updatedStories[updatedStories.length - 1] = {
-						...latestEntry,
-						story: {
-							...latestEntry.story,
-							rawContent: state.editedStoryContent,
-							title: parsed.title || latestEntry.story.title,
-							scenes: parsed.scenes || latestEntry.story.scenes
-						}
-					};
-					return {
-						...state,
-						stories: updatedStories,
-						isEditingManually: false
-					};
-				});
-			} catch (error) {
-				alert('Invalid JSON format. Please check your edits.');
+		if (latestEntry && editableTitle && editableScenes.length > 0) {
+			// Build updated scenes from editable fields
+			const updatedScenes = editableScenes.map(scene => ({
+				number: scene.number,
+				description: scene.description,
+				dialogue: scene.dialogue || undefined,
+				action: scene.action || undefined
+			}));
+
+			// Build updated characters from editable fields
+			const updatedCharacters = editableCharacters.map(char => ({
+				name: char.name,
+				description: char.description
+			}));
+
+			// Build new rawContent JSON from edited fields
+			const newRawContent = JSON.stringify({
+				title: editableTitle,
+				scenes: updatedScenes,
+				characters: updatedCharacters,
+				sceneVisuals: latestEntry.story.sceneVisuals
+			});
+
+			// Clear all downstream data (characters, scenes, storyboard, videos)
+			resetCharacterStore();
+			resetStoryboardStore();
+			localSlots = [];
+			sceneVideos = [];
+
+			// Update the story
+			storyStore.update(state => {
+				const updatedStories = [...state.stories];
+				updatedStories[updatedStories.length - 1] = {
+					...latestEntry,
+					story: {
+						...latestEntry.story,
+						rawContent: newRawContent,
+						title: editableTitle,
+						scenes: updatedScenes,
+						characters: updatedCharacters
+					}
+				};
+				return {
+					...state,
+					stories: updatedStories,
+					isEditingManually: false
+				};
+			});
+
+			// Clear editable fields
+			editableTitle = '';
+			editableScenes = [];
+			editableCharacters = [];
+
+			// Reload characters from edited data and trigger auto-generation
+			if (updatedCharacters.length > 0) {
+				loadStoryCharacters(updatedCharacters);
+				autoGenerateCharacterImages = true;
+			}
+
+			// Reload scenes from updated story
+			if (updatedScenes.length > 0) {
+				localSlots = updatedScenes.map((scene, index) => ({
+					id: `slot-local-${Date.now()}-${index}`,
+					storySceneIndex: index,
+					storyScene: scene,
+					characterIds: [],
+					status: 'pending' as const
+				}));
 			}
 		}
 	}
@@ -1154,11 +1465,11 @@
 
 		const unsubscribe = characterStore.subscribe(charState => {
 			availableCharacters = charState.characters
-				.filter(c => c.imageUrl)
+				.filter(c => c.images && c.images.length > 0)
 				.map((c, i) => ({
 					id: `char-${i}`,
-					name: c.name,
-					imageUrl: c.imageUrl!
+					name: c.slug,
+					imageUrl: getActiveImageUrl(c)!
 				}));
 		});
 
@@ -1187,11 +1498,11 @@
 
 <!-- Testing Mode Toggle -->
 <button
-	onclick={() => testingMode = !testingMode}
+	onclick={toggleTestingMode}
 	class="fixed bottom-4 right-4 z-50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
 	title="Toggle testing mode"
 >
-	<FlaskConical class="h-4 w-4" />
+	<FlaskConical class="!mr-0 h-4 w-4" />
 </button>
 
 <div class="flex flex-col gap-8">
@@ -1207,8 +1518,11 @@
 			action="?/generateStory"
 			use:enhance={() => {
 				const currentPrompt = $storyStore.prompt;
+				const timing = createTimingContext('generateStory');
+				timing.start();
 				storyStore.update(state => ({ ...state, isGenerating: true }));
-				return async ({ update }) => {
+				return async ({ result, update }) => {
+					timing.complete(result.type === 'success');
 					await update({ reset: false });
 					storyStore.update(state => ({
 						...state,
@@ -1218,24 +1532,25 @@
 				};
 			}}
 		>
-			<div class="flex flex-col gap-4">
-				<div class="flex items-start justify-between">
+			<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
+				<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 					<div>
-						<h1 class="text-3xl font-bold">Story Generation</h1>
-						<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
+						<h1 class="text-3xl font-bold mb-3">Story</h1>
+						<p class="text-muted-foreground">Create your story text</p>
 					</div>
 					{#if testingMode}
 						<div class="flex gap-1">
-							<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe' }))} title="Insert test prompt">
-								<FlaskConical class="h-4 w-4 opacity-50" />
+							<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe', stories: [] }))} title="Insert test prompt and clear history">
+								<FlaskConical class="!mr-0 h-4 w-4 opacity-50" />
 							</Button>
 							<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
-								<FlaskConical class="h-4 w-4" />
+								<FlaskConical class="!mr-0 h-4 w-4" />
 							</Button>
 						</div>
 					{/if}
 				</div>
 
+				<div class="flex flex-col gap-4">
 				{#if form?.action === 'generateStory' && form?.error}
 					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 						{form.error}
@@ -1264,7 +1579,7 @@
 						<Textarea
 							bind:value={$storyStore.prompt}
 							name="prompt"
-							placeholder="Enter your story prompt (e.g., 'A detective solving a mystery in a futuristic city'). Press Enter to submit, Shift+Enter for new line."
+							placeholder="An anime cartoon about cybernetic capybara hackers infiltrating an encrypted government network in a Brazilian favela."
 							class="min-h-32"
 							required
 							onkeydown={(e) => handleStoryKeydown(e, mainFormElement)}
@@ -1272,15 +1587,31 @@
 					</div>
 
 					<div class="flex gap-2">
-						<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
-							{#if $storyStore.isGenerating}
-								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<Button
+							onclick={handleUseThisStory}
+							disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}
+						>
+							{#if $storyStore.isGenerating && shouldNavigateToCharactersAfterStory}
+								<Loader2 class="h-4 w-4 animate-spin" />
 								Generating...
 							{:else}
-								Generate Story
+								<Video class="h-4 w-4" />
+								Generate Video
+							{/if}
+						</Button>
+						<Button type="submit" variant="outline" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
+							{#if $storyStore.isGenerating && !shouldNavigateToCharactersAfterStory}
+								<Loader2 class="h-4 w-4 animate-spin" />
+								Expanding...
+							{:else}
+								<Pencil class="h-4 w-4" />
+								Fine-tune
 							{/if}
 						</Button>
 					</div>
+					{#if $storyStore.isGenerating}
+						<ProgressBar type="generateStory" isActive={true} class="mt-2 max-w-md" />
+					{/if}
 				{/if}
 
 				{#each $storyStore.stories as entry, index}
@@ -1293,12 +1624,74 @@
 						<div bind:this={latestStoryCardElement} class="flex flex-col gap-4 rounded-md border p-4">
 							{#if $storyStore.isEditingManually}
 								<div class="flex flex-col gap-4">
-									<h2 class="text-xl font-semibold">Edit Story</h2>
-									<Textarea
-										bind:value={$storyStore.editedStoryContent}
-										class="min-h-96 font-mono text-sm"
-										placeholder="Edit your story here..."
-									/>
+									<div>
+										<Input
+											bind:value={editableTitle}
+											class="text-xl font-semibold"
+											placeholder="Story title..."
+										/>
+									</div>
+									<div class="space-y-4">
+										{#each editableScenes as scene, sceneIndex}
+											<div class="rounded-md bg-muted/50 p-3">
+												<h3 class="mb-2 font-semibold">Scene {scene.number}</h3>
+
+												<div class="mb-2">
+													<p class="text-xs font-medium text-muted-foreground uppercase">Description:</p>
+													<Textarea
+														bind:value={editableScenes[sceneIndex].description}
+														class="mt-1 min-h-20 text-sm"
+														placeholder="Scene description..."
+													/>
+												</div>
+
+												<div class="mb-2">
+													<p class="text-xs font-medium text-muted-foreground uppercase">Dialogue:</p>
+													<Textarea
+														bind:value={editableScenes[sceneIndex].dialogue}
+														class="mt-1 min-h-16 text-sm italic"
+														placeholder="Dialogue (optional)..."
+													/>
+												</div>
+
+												<div>
+													<p class="text-xs font-medium text-muted-foreground uppercase">Action:</p>
+													<Textarea
+														bind:value={editableScenes[sceneIndex].action}
+														class="mt-1 min-h-16 text-sm"
+														placeholder="Action (optional)..."
+													/>
+												</div>
+											</div>
+										{/each}
+									</div>
+
+									{#if editableCharacters.length > 0}
+										<div class="space-y-4">
+											<h3 class="font-semibold">Characters</h3>
+											{#each editableCharacters as char, charIndex}
+												<div class="rounded-md bg-muted/50 p-3">
+													<div class="mb-2">
+														<p class="text-xs font-medium text-muted-foreground uppercase">Name:</p>
+														<Input
+															bind:value={editableCharacters[charIndex].name}
+															class="mt-1 text-sm font-medium"
+															placeholder="Character name..."
+														/>
+													</div>
+													<div>
+														<p class="text-xs font-medium text-muted-foreground uppercase">Description:</p>
+														<Textarea
+															bind:value={editableCharacters[charIndex].description}
+															class="mt-1 min-h-16 text-sm"
+															placeholder="Character description..."
+														/>
+													</div>
+												</div>
+											{/each}
+										</div>
+									{/if}
+
 									<div class="flex gap-2">
 										<Button onclick={cancelEdit} variant="outline">Cancel</Button>
 										<Button onclick={saveChanges}>Save Changes</Button>
@@ -1365,15 +1758,21 @@
 								disabled={$storyStore.isGenerating}
 							>
 								{#if $storyStore.isGenerating}
-									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+									<Loader2 class="h-4 w-4 animate-spin" />
 									Regenerating...
 								{:else}
+									<RotateCcw class="h-4 w-4" />
 									Try Again
 								{/if}
 							</Button>
-							<Button onclick={startManualEdit} variant="outline">Edit Story Manually</Button>
-							<Button onclick={startPromptEdit} variant="outline">Edit Story with Prompt</Button>
-							<Button onclick={goToCharacters}>Send to Character Generation</Button>
+							<Button onclick={startManualEdit} variant="outline">
+								<Pencil class="h-4 w-4" />
+								Manual Edit
+							</Button>
+							<Button onclick={startPromptEdit} variant="outline">
+								<Sparkles class="h-4 w-4" />
+								Prompt Edit
+							</Button>
 						</div>
 
 						{#if $storyStore.isEditingWithPrompt}
@@ -1381,10 +1780,16 @@
 								bind:this={editFormElement}
 								method="POST"
 								action="?/editStory"
-								use:enhance={() => {
+								use:enhance={({ formData }) => {
+									// Set currentStory at submission time to ensure we have the latest version (full Story object)
+									const currentStoryJSON = latestStoryForEdit;
+									formData.set('currentStory', currentStoryJSON);
+									const timing = createTimingContext('editStory');
+									timing.start();
 									storyStore.update(state => ({ ...state, isGenerating: true }));
 									capturedPromptForNextStory = `Edit: ${$storyStore.editPrompt}`;
-									return async ({ update }) => {
+									return async ({ result, update }) => {
+										timing.complete(result.type === 'success');
 										await update({ reset: false });
 										storyStore.update(state => ({
 											...state,
@@ -1396,11 +1801,11 @@
 								}}
 							>
 								<div bind:this={editPromptElement} class="flex flex-col gap-4 rounded-md border p-4">
-									<h3 class="text-lg font-semibold">Edit Story with Prompt</h3>
+									<h3 class="text-lg font-semibold">Prompt Edit</h3>
 									<p class="text-sm text-muted-foreground">
 										Describe the changes you want to make to the story
 									</p>
-									<input type="hidden" name="currentStory" value={entry.story.rawContent} />
+									<input type="hidden" name="currentStory" value="" />
 									<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
 									<Textarea
 										bind:value={$storyStore.editPrompt}
@@ -1413,18 +1818,22 @@
 										<Button type="button" onclick={cancelPromptEdit} variant="outline">Cancel</Button>
 										<Button type="submit" disabled={$storyStore.isGenerating || !$storyStore.editPrompt.trim()}>
 											{#if $storyStore.isGenerating}
-												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+												<Loader2 class="h-4 w-4 animate-spin" />
 												Regenerating...
 											{:else}
 												Regenerate Story
 											{/if}
 										</Button>
 									</div>
+									{#if $storyStore.isGenerating}
+										<ProgressBar type="editStory" isActive={true} class="mt-2" />
+									{/if}
 								</div>
 							</form>
 						{/if}
 					{/if}
 				{/each}
+				</div>
 			</div>
 		</form>
 
@@ -1457,10 +1866,10 @@
 		bind:this={sectionRefs.characters}
 		class="scroll-mt-16 border-b pb-8"
 	>
-		<div class="flex flex-col gap-4">
-			<div class="flex items-start justify-between">
+		<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
+			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
-					<h1 class="text-3xl font-bold">Character Generation</h1>
+					<h1 class="text-3xl font-bold mb-3">Characters</h1>
 					<p class="text-muted-foreground">
 						{#if $characterStore.storyCharacters.length > 0}
 							Generate character images from your story, or add custom characters
@@ -1471,225 +1880,283 @@
 				</div>
 				{#if testingMode}
 					<Button variant="outline" size="sm" onclick={loadTestCharacters} title="Load test data">
-						<FlaskConical class="h-4 w-4" />
+						<FlaskConical class="!mr-0 h-4 w-4" />
 					</Button>
 				{/if}
 			</div>
 
+			<div class="flex flex-col gap-4">
 			{#if form?.action?.includes('Description') && form?.error}
 				<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 					{form.error}
 				</div>
 			{/if}
 
-			{#if $characterStore.characters.length > 0}
-				<div class="rounded-md border p-4">
-					<h2 class="mb-3 text-lg font-semibold">
-						{#if $characterStore.storyCharacters.length > 0}
-							Characters from Story
-						{:else}
-							Characters
-						{/if}
-					</h2>
-					<div class="flex flex-wrap gap-2">
-						{#each $characterStore.characters as char, index}
-							<Button
-								variant={$characterStore.expandedCharacterIndices.has(index) ? 'default' : 'outline'}
-								size="sm"
-								onclick={() => handleCharacterClick(index)}
-							>
-								{char.name}
-							</Button>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
-			<div class="rounded-md border p-4">
-				<h2 class="mb-3 text-lg font-semibold">Add Custom Character</h2>
-				<div class="flex gap-2">
-					<Textarea
-						bind:value={$characterStore.customDescription}
-						placeholder="Enter character description (e.g., 'A brave space captain with short silver hair'). Press Enter to add, Shift+Enter for new line."
-						class="min-h-24 flex-1"
-						onkeydown={handleCharacterKeydown}
-					/>
-					<Button onclick={addCustomCharacter} variant="outline">Add</Button>
-				</div>
-			</div>
-
-			{#if $characterStore.characters.length > 0}
-				<div class="flex justify-center">
-					<Button onclick={goToScenes} size="lg">
-						Begin Scene Generation
-					</Button>
-				</div>
-			{/if}
-
+			<!-- Character rows -->
 			{#each $characterStore.characters as char, index}
-				{#if $characterStore.expandedCharacterIndices.has(index)}
-					<div
-						bind:this={characterRefs[index]}
-						class="flex flex-col gap-4 rounded-md border p-4"
-						data-character-content={index}
-					>
-						<div>
-							<h2 class="mb-2 text-xl font-semibold">{char.name}</h2>
-							<p class="text-sm text-muted-foreground">{char.description}</p>
-						</div>
+				<div
+					bind:this={characterRefs[index]}
+					class="flex flex-col gap-2 py-3"
+					data-character-content={index}
+				>
+					<!-- Row 1: Character images + Generate/Regenerate button -->
+					<div class="flex items-start gap-2">
+						<!-- Show all character images -->
+						{#each char.images as img, imgIndex}
+							{@const isSelected = char.selectedImageId === img.id || (!char.selectedImageId && imgIndex === char.images.length - 1)}
+							{@const isLastImage = imgIndex === char.images.length - 1}
+							{@const canDelete = !isLastImage && char.images.length > 1}
+							<div class="flex flex-col items-center">
+								<button
+									type="button"
+									class="relative w-12 h-12 rounded overflow-hidden group {isSelected ? 'ring-4 ring-gray-400' : 'cursor-pointer'}"
+									onclick={(e) => {
+										// Check if click was on trash icon area (bottom-right 20x20 px)
+										const rect = e.currentTarget.getBoundingClientRect();
+										const clickX = e.clientX - rect.left;
+										const clickY = e.clientY - rect.top;
+										const isTrashArea = canDelete && clickX > rect.width - 20 && clickY > rect.height - 20;
 
-						{#if char.enhancedDescription}
-							<div class="rounded-md bg-muted/50 p-3">
-								<p class="mb-1 text-xs font-medium uppercase text-muted-foreground">
-									Enhanced Description:
-								</p>
-								<p class="text-sm">{char.enhancedDescription}</p>
+										if (isTrashArea) {
+											deleteCharacterImage(index, img.id);
+										} else if (!isSelected) {
+											selectCharacterImage(index, img.id);
+										}
+									}}
+									title={isSelected ? 'Selected image' : 'Click to select'}
+								>
+									<img src={img.imageUrl} alt={char.slug} class="w-full h-full object-cover" />
+									{#if canDelete}
+										<div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-1">
+											<Trash2 class="!mr-0 h-4 w-4 text-red-500" />
+										</div>
+									{/if}
+								</button>
+								<!-- Reserve space for progress bar to prevent layout shift -->
+								<div class="h-5 w-12"></div>
+							</div>
+						{/each}
+
+						<!-- Loading placeholder when generating -->
+						{#if generatingCharacterImages.has(index)}
+							<div class="flex flex-col items-center">
+								<div class="w-12 h-12 rounded bg-muted flex items-center justify-center">
+									<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+								</div>
+								<ProgressBar type="generateCharacter" isActive={true} class="w-12 mt-1" />
+							</div>
+						{:else if char.images.length === 0}
+							<!-- Placeholder when no images -->
+							<div class="flex flex-col items-center">
+								<div class="w-12 h-12 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
+									{char.slug.charAt(0)}
+								</div>
+								<!-- Reserve space for progress bar to prevent layout shift -->
+								<div class="h-5 w-12"></div>
 							</div>
 						{/if}
 
-						{#if char.imageUrl}
-							<div>
-								<img src={char.imageUrl} alt={char.name} class="rounded-md" />
-							</div>
-						{/if}
-
-						<div class="flex flex-col gap-3">
-							<div class="flex flex-wrap gap-2">
-								{#if !enhancedCharacters.has(index)}
-									<form
-										method="POST"
-										action="?/enhanceDescription"
-										use:enhance={() => {
-											isCharacterGenerating = true;
-											activeCharacterIndex = index;
-											return async ({ update }) => {
-												await update();
-												isCharacterGenerating = false;
-											};
-										}}
-									>
-										<input type="hidden" name="description" value={getCurrentDescription(index)} />
-										<Button
-											type="submit"
-											variant="outline"
-											disabled={isCharacterGenerating || !char.description}
-										>
-											{#if isCharacterGenerating && activeCharacterIndex === index}
-												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-												Enhancing...
-											{:else}
-												Enhance Description
-											{/if}
-										</Button>
-									</form>
-								{:else if !showPromptTextarea.has(index)}
-									<form
-										method="POST"
-										action="?/improveDescription"
-										use:enhance={() => {
-											isImproving = true;
-											improvingType = 'smart';
-											activeCharacterIndex = index;
-											return async ({ update }) => {
-												await update();
-												isImproving = false;
-												improvingType = null;
-											};
-										}}
-									>
-										<input type="hidden" name="description" value={getCurrentDescription(index)} />
-										<Button
-											type="submit"
-											variant="outline"
-											disabled={isImproving || isCharacterGenerating}
-										>
-											{#if isImproving && activeCharacterIndex === index && improvingType === 'smart'}
-												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-												Improving...
-											{:else}
-												Smart Improve Description
-											{/if}
-										</Button>
-									</form>
+						{#if !generatingCharacterImages.has(index)}
+							{#if char.images.length > 0}
+								<!-- Regenerate button for characters with existing images -->
+								<div class="flex flex-col items-center">
 									<Button
+										type="button"
 										variant="outline"
-										onclick={() => openPromptTextarea(index)}
-										disabled={isImproving || isCharacterGenerating}
+										class="w-12 h-12 p-0"
+										disabled={isCharacterGenerating || !getCurrentDescription(index)}
+										title="Generate another image"
+										onclick={() => generateCharacterImageForIndex(index, true)}
 									>
-										Improve Description With Prompt
+										{#if isCharacterGenerating && activeCharacterIndex === index}
+											<Loader2 class="!mr-0 h-5 w-5 animate-spin" />
+										{:else}
+											<RotateCcw class="!mr-0 h-5 w-5" />
+										{/if}
 									</Button>
-								{/if}
-
+									<!-- Reserve space for progress bar to prevent layout shift -->
+									<div class="h-5 w-12"></div>
+								</div>
+							{:else}
+								<!-- Generate button for characters without images -->
 								<form
 									method="POST"
 									action="?/generateImage"
 									use:enhance={() => {
+										const timing = createTimingContext('generateCharacter');
+										timing.start();
 										isCharacterGenerating = true;
 										activeCharacterIndex = index;
-										return async ({ update }) => {
+										return async ({ result, update }) => {
+											timing.complete(result.type === 'success');
 											await update();
 											isCharacterGenerating = false;
 										};
 									}}
 								>
 									<input type="hidden" name="description" value={getCurrentDescription(index)} />
-									<Button type="submit" disabled={isCharacterGenerating || !getCurrentDescription(index)}>
+									<Button type="submit" size="sm" disabled={isCharacterGenerating || !getCurrentDescription(index)}>
 										{#if isCharacterGenerating && activeCharacterIndex === index && form?.action === 'generateImage'}
-											<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+											<Loader2 class="h-4 w-4 animate-spin" />
 											Generating...
 										{:else}
+											<Sparkles class="h-4 w-4" />
 											Generate Image
 										{/if}
 									</Button>
 								</form>
-							</div>
-
-							{#if showPromptTextarea.has(index)}
-								<div class="flex flex-col gap-2 rounded-md border p-3">
-									<Textarea
-										bind:value={userPrompts[index]}
-										placeholder="Describe how you'd like to change the description..."
-										class="min-h-20"
-									/>
-									<div class="flex gap-2">
-										<form
-											method="POST"
-											action="?/improveDescription"
-											use:enhance={() => {
-												isImproving = true;
-												improvingType = 'regenerate';
-												activeCharacterIndex = index;
-												return async ({ update }) => {
-													await update();
-													isImproving = false;
-													improvingType = null;
-												};
-											}}
-										>
-											<input type="hidden" name="description" value={getCurrentDescription(index)} />
-											<input type="hidden" name="userPrompt" value={userPrompts[index] || ''} />
-											<Button
-												type="submit"
-												disabled={isImproving || !userPrompts[index]?.trim()}
-											>
-												{#if isImproving && activeCharacterIndex === index && improvingType === 'regenerate'}
-													<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-													Regenerating...
-												{:else}
-													Regenerate Description
-												{/if}
-											</Button>
-										</form>
-										<Button variant="outline" onclick={() => closePromptTextarea(index)}>
-											Cancel
-										</Button>
-									</div>
-								</div>
 							{/if}
+							{#if isCharacterGenerating && activeCharacterIndex === index && form?.action === 'generateImage'}
+								<ProgressBar type="generateCharacter" isActive={true} class="flex-1 max-w-xs" />
+							{/if}
+						{/if}
+					</div>
+
+					<!-- Row 2: Slug, name, description, and action buttons -->
+					<div class="flex flex-wrap items-start gap-2">
+						<div class="flex-1 min-w-0">
+							<span class="font-semibold">{char.slug}</span>{#if char.name} <span class="text-muted-foreground">({char.name})</span>{/if}:
+							<span class="text-sm text-muted-foreground">{char.enhancedDescription || char.description}</span>
+						</div>
+						<div class="flex flex-wrap gap-1">
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => openPromptTextarea(index)}
+								disabled={isImproving || isCharacterGenerating}
+							>
+								<Pencil class="mr-1 h-3 w-3" />
+								Edit Manually
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => openPromptTextarea(index)}
+								disabled={isImproving || isCharacterGenerating}
+							>
+								<Sparkles class="mr-1 h-3 w-3" />
+								Edit With Prompt
+							</Button>
+							<form
+								method="POST"
+								action="?/improveDescription"
+								use:enhance={() => {
+									const timing = createTimingContext('enhanceDescription');
+									timing.start();
+									isImproving = true;
+									improvingType = 'smart';
+									activeCharacterIndex = index;
+									return async ({ result, update }) => {
+										timing.complete(result.type === 'success');
+										await update();
+										isImproving = false;
+										improvingType = null;
+									};
+								}}
+							>
+								<input type="hidden" name="description" value={getCurrentDescription(index)} />
+								<Button
+									type="submit"
+									variant="outline"
+									size="sm"
+									disabled={isImproving || isCharacterGenerating}
+								>
+									{#if isImproving && activeCharacterIndex === index && improvingType === 'smart'}
+										<Loader2 class="mr-1 h-3 w-3 animate-spin" />
+										Expanding...
+									{:else}
+										<Wand2 class="mr-1 h-3 w-3" />
+										Smart Expand
+									{/if}
+								</Button>
+							</form>
 						</div>
 					</div>
-				{/if}
+
+					<!-- Progress bar for Smart Expand -->
+					{#if isImproving && activeCharacterIndex === index && improvingType === 'smart'}
+						<ProgressBar type="enhanceDescription" isActive={true} class="max-w-xs" />
+					{/if}
+
+					<!-- Edit prompt textarea (shown when Edit With Prompt is clicked) -->
+					{#if showPromptTextarea.has(index)}
+						<div class="flex flex-col gap-2 rounded-md border p-3 mt-2">
+							<Textarea
+								bind:value={userPrompts[index]}
+								placeholder="Describe how you'd like to change the description..."
+								class="min-h-20"
+							/>
+							<div class="flex gap-2">
+								<form
+									method="POST"
+									action="?/improveDescription"
+									use:enhance={() => {
+										const timing = createTimingContext('enhanceDescription');
+										timing.start();
+										isImproving = true;
+										improvingType = 'regenerate';
+										activeCharacterIndex = index;
+										return async ({ result, update }) => {
+											timing.complete(result.type === 'success');
+											await update();
+											isImproving = false;
+											improvingType = null;
+										};
+									}}
+								>
+									<input type="hidden" name="description" value={getCurrentDescription(index)} />
+									<input type="hidden" name="userPrompt" value={userPrompts[index] || ''} />
+									<Button
+										type="submit"
+										size="sm"
+										disabled={isImproving || !userPrompts[index]?.trim()}
+									>
+										{#if isImproving && activeCharacterIndex === index && improvingType === 'regenerate'}
+											<Loader2 class="h-4 w-4 animate-spin" />
+											Regenerating...
+										{:else}
+											Apply Changes
+										{/if}
+									</Button>
+									{#if isImproving && activeCharacterIndex === index && improvingType === 'regenerate'}
+										<ProgressBar type="enhanceDescription" isActive={true} class="mt-2" />
+									{/if}
+								</form>
+								<Button variant="outline" size="sm" onclick={() => closePromptTextarea(index)}>
+									Cancel
+								</Button>
+							</div>
+						</div>
+					{/if}
+				</div>
 			{/each}
+
+			<!-- Add Character button -->
+			{#if showAddCharacterForm}
+				<div class="rounded-md border p-4">
+					<h2 class="mb-3 text-lg font-semibold">Add Custom Character</h2>
+					<div class="flex gap-2">
+						<Textarea
+							bind:value={$characterStore.customDescription}
+							placeholder="Enter character description (e.g., 'A brave space captain with short silver hair'). Press Enter to add, Shift+Enter for new line."
+							class="min-h-24 flex-1"
+							onkeydown={handleCharacterKeydown}
+						/>
+						<Button onclick={addCustomCharacter} variant="outline">Add</Button>
+					</div>
+					<Button onclick={() => showAddCharacterForm = false} variant="ghost" size="sm" class="mt-2">
+						Cancel
+					</Button>
+				</div>
+			{:else}
+				<div>
+					<Button onclick={() => showAddCharacterForm = true} variant="outline">
+						<Plus class="h-4 w-4" />
+						Add Character
+					</Button>
+				</div>
+			{/if}
+			</div>
 		</div>
 	</section>
 
@@ -1699,13 +2166,13 @@
 		bind:this={sectionRefs.scenes}
 		class="scroll-mt-16 border-b pb-8"
 	>
-		<div class="flex flex-col gap-4">
-			<div class="flex items-center justify-between">
+		<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
+			<div class="flex items-center justify-between sm:flex-col sm:items-start sm:gap-2">
 				<div>
-					<h1 class="text-3xl font-bold">Scene Generation</h1>
+					<h1 class="text-3xl font-bold mb-3">Scenes</h1>
 					<p class="text-muted-foreground">Generate scene images using DALL-E</p>
 				</div>
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2 sm:flex-col sm:items-start">
 					{#if slots.length > 0}
 						<div class="text-sm text-muted-foreground">
 							{completedCount}/{slots.length} generated
@@ -1716,19 +2183,20 @@
 					{/if}
 					{#if testingMode}
 						<Button variant="outline" size="sm" onclick={loadTestScenes} title="Load test data">
-							<FlaskConical class="h-4 w-4" />
+							<FlaskConical class="!mr-0 h-4 w-4" />
 						</Button>
 					{/if}
 				</div>
 			</div>
 
+			<div class="flex flex-col gap-4">
 			<div class="flex flex-wrap gap-4 items-start" data-wireframes-container>
 				{#each slots as slot, index (slot.id)}
 					<div>
 						<div
 							data-scene-wireframe={index}
 							data-scene-number={slot.storyScene.number}
-							class="wireframe relative flex flex-col w-64 border rounded-lg p-2 transition-colors {dragOverIndex === index ? 'border-primary bg-primary/10 border-solid' : slot.status === 'completed' ? 'border-green-500 border-solid' : slot.status === 'generating' || generatingSlots.has(slot.id) ? 'border-blue-500 border-solid animate-pulse' : slot.status === 'failed' ? 'border-red-500 border-solid' : 'border-dashed border-black'}"
+							class="wireframe relative flex flex-col w-64 border border-dashed rounded-lg p-2 transition-colors {dragOverIndex === index ? 'border-primary bg-primary/10 border-solid' : slot.status === 'completed' ? 'border-green-500 border-solid' : slot.status === 'generating' || generatingSlots.has(slot.id) ? 'border-blue-500 border-solid animate-pulse' : slot.status === 'failed' ? 'border-red-500 border-solid' : 'border-white'}"
 							style="aspect-ratio: 16/9;"
 						>
 							{#if slot.generatedScene?.imageUrl}
@@ -1754,7 +2222,7 @@
 										<input type="hidden" name="characterDescriptions" value={getCharacterDescriptions(slot)} />
 										<Button type="submit" size="sm" variant="secondary" disabled={isAnyGenerating}>
 											{#if generatingSlots.has(slot.id)}
-												<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
+												<Loader2 class="h-4 w-4 animate-spin" data-spinner />
 												Regenerating...
 											{:else}
 												Regenerate
@@ -1801,6 +2269,8 @@
 								action="?/generateSlotImage"
 								class="mt-2"
 								use:enhance={() => {
+									const timing = createTimingContext('generateScene');
+									timing.start();
 									generatingSlots = new Set([...generatingSlots, slot.id]);
 									const session = $sessionStore.activeSession;
 									if (session) {
@@ -1813,7 +2283,8 @@
 											}
 										}
 									}
-									return async ({ update }) => {
+									return async ({ result, update }) => {
+										timing.complete(result.type === 'success');
 										await update();
 										generatingSlots = new Set([...generatingSlots].filter(id => id !== slot.id));
 									};
@@ -1830,12 +2301,15 @@
 									disabled={isAnyGenerating}
 								>
 									{#if generatingSlots.has(slot.id) || slot.status === 'generating'}
-										<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
+										<Loader2 class="h-4 w-4 animate-spin" data-spinner />
 										Generating...
 									{:else}
 										Generate
 									{/if}
 								</Button>
+								{#if generatingSlots.has(slot.id) || slot.status === 'generating'}
+									<ProgressBar type="generateScene" isActive={true} class="mt-2" />
+								{/if}
 							</form>
 						{/if}
 					</div>
@@ -1845,7 +2319,7 @@
 					<button
 						type="button"
 						data-add-wireframe
-						class="wireframe flex items-center justify-center w-64 border border-dashed border-black rounded-lg cursor-pointer hover:bg-muted/50 bg-transparent"
+						class="wireframe flex items-center justify-center w-64 border border-dashed border-white rounded-lg cursor-pointer hover:bg-muted/50 bg-transparent"
 						style="aspect-ratio: 16/9;"
 						onclick={addSlot}
 					>
@@ -1859,6 +2333,7 @@
 					<Button onclick={goToStoryboard}>Send to Storyboard</Button>
 				</div>
 			{/if}
+			</div>
 		</div>
 	</section>
 
@@ -1878,7 +2353,7 @@
 					<div class="flex gap-2">
 						{#if testingMode}
 							<Button variant="outline" size="sm" onclick={loadTestStoryboard} title="Load test data">
-								<FlaskConical class="h-4 w-4" />
+								<FlaskConical class="!mr-0 h-4 w-4" />
 							</Button>
 						{/if}
 						<Button variant="outline" onclick={handleNewStoryboard}>New Storyboard</Button>
@@ -1899,7 +2374,7 @@
 								data-storyboard-wireframe={wireframe.id}
 								class="relative flex w-64 flex-col items-center justify-center rounded-lg border-2 transition-colors
 									{$storyboardStore.selectedWireframeId === wireframe.id ? 'border-primary' : ''}
-									{wireframe.scene === null && wireframe.characters.length === 0 ? 'border-dashed border-gray-300' : 'border-solid'}
+									{wireframe.scene === null && wireframe.characters.length === 0 ? 'border-dashed border-white' : 'border-solid'}
 									{wireframe.scene !== null ? 'border-green-500' : ''}
 									hover:border-gray-400"
 								style="aspect-ratio: 16/9;"
@@ -2003,7 +2478,7 @@
 					<div>
 						<div
 							data-add-wireframe
-							class="flex w-64 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20"
+							class="flex w-64 items-center justify-center rounded-lg border-2 border-dashed border-white bg-muted/10 cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20"
 							style="aspect-ratio: 16/9;"
 							onclick={handleNewStoryboard}
 							role="button"
@@ -2101,12 +2576,12 @@
 				<div class="flex gap-2">
 					{#if testingMode}
 						<Button variant="outline" size="sm" onclick={loadTestVideo} title="Load test data">
-							<FlaskConical class="h-4 w-4" />
+							<FlaskConical class="!mr-0 h-4 w-4" />
 						</Button>
 					{/if}
 					{#if allCompleted}
 						<Button variant="outline" onclick={handleRegenerate}>
-							<RotateCcw class="mr-2 h-4 w-4" />
+							<RotateCcw class="h-4 w-4" />
 							Regenerate All
 						</Button>
 					{/if}
@@ -2251,7 +2726,7 @@
 					data-generate-video
 				>
 					{#if isVideoGenerating}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
+						<Loader2 class="h-4 w-4 animate-spin" data-spinner />
 						Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
 					{:else}
 						Generate All Videos ({sceneVideos.length} clips)
@@ -2266,7 +2741,10 @@
 					action="?/generateSceneVideo"
 					class="hidden"
 					use:enhance={() => {
-						return async ({ update }) => {
+						const timing = createTimingContext('generateVideo');
+						timing.start();
+						return async ({ result, update }) => {
+							timing.complete(result.type === 'success');
 							await update();
 						};
 					}}
