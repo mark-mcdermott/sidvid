@@ -3,6 +3,7 @@ import type {
   SidVidConfig,
   StoryOptions,
   EditStoryOptions,
+  ExpandStoryOptions,
   Story,
   CharacterOptions,
   EnhanceCharacterOptions,
@@ -15,7 +16,7 @@ import type {
   Video,
 } from './types';
 import { sidVidConfigSchema } from './schemas';
-import { generateStory, editStory } from './api/story';
+import { generateStory, editStory, expandStory } from './api/story';
 import { generateCharacter, enhanceCharacterDescription } from './api/character';
 import { generateScene } from './api/scene';
 import { generateStoryboard } from './api/storyboard';
@@ -35,6 +36,10 @@ export class SidVid {
 
   async editStory(options: EditStoryOptions): Promise<Story> {
     return editStory(this.client, options);
+  }
+
+  async expandStory(options: ExpandStoryOptions): Promise<Story> {
+    return expandStory(this.client, options);
   }
 
   async generateCharacter(options: CharacterOptions): Promise<Character> {

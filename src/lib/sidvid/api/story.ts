@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { StoryOptions, EditStoryOptions, Story, StoryScene, StoryCharacter, StorySceneVisual } from '../types';
+import type { StoryOptions, EditStoryOptions, ExpandStoryOptions, Story, StoryScene, StoryCharacter, StorySceneVisual } from '../types';
 import { storyOptionsSchema } from '../schemas';
 import { getComplexityGuidance } from '../utils/story-helpers';
 
@@ -19,7 +19,9 @@ Format your response as JSON with the following structure:
   "characters": [
     {
       "name": "Character Name",
-      "description": "Physical description of the character as mentioned in the story, no embellishment"
+      "description": "Brief overall description of the character",
+      "physical": "Detailed physical description: appearance, clothing, distinguishing features (used for image generation)",
+      "profile": "Personality traits, background, motivations, and relevant history"
     }
   ],
   "sceneVisuals": [
@@ -32,7 +34,8 @@ Format your response as JSON with the following structure:
   ]
 }
 Keep descriptions vivid and visual, suitable for video generation.
-For characters and sceneVisuals, extract information directly from the story text without adding creative embellishments.`;
+For characters, provide detailed physical descriptions for image generation and personality/background for story context.
+For sceneVisuals, extract information directly from the story text without adding creative embellishments.`;
 
 export async function generateStory(
   client: OpenAI,
@@ -124,7 +127,9 @@ Return the EDITED story in this JSON format:
   "characters": [
     {
       "name": "Character Name",
-      "description": "Physical description of the character"
+      "description": "Brief overall description of the character",
+      "physical": "Detailed physical description: appearance, clothing, distinguishing features",
+      "profile": "Personality traits, background, motivations, and relevant history"
     }
   ],
   "sceneVisuals": [
@@ -147,6 +152,93 @@ Return only valid JSON.`;
     ],
     max_tokens: maxTokens,
     temperature: 0.5,
+    response_format: { type: 'json_object' }
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('No content returned from ChatGPT');
+  }
+
+  const parsed = JSON.parse(content) as {
+    title: string;
+    scenes: StoryScene[];
+    characters?: StoryCharacter[];
+    sceneVisuals?: StorySceneVisual[];
+  };
+
+  return {
+    title: parsed.title,
+    scenes: parsed.scenes,
+    rawContent: content,
+    characters: parsed.characters,
+    sceneVisuals: parsed.sceneVisuals,
+  };
+}
+
+export async function expandStory(
+  client: OpenAI,
+  options: ExpandStoryOptions
+): Promise<Story> {
+  const { currentStory, length = '5s', maxTokens = 4000 } = options;
+
+  const systemPrompt = `You are an expert screenwriter and creative artist. Your job is to dramatically expand and enrich story content while preserving its core identity, style, and genre.
+
+CRITICAL: Provide 4-5 times as much detail for EVERY field. Push the creative vision further while staying true to the original tone and direction.`;
+
+  const userPrompt = `CURRENT STORY:
+${currentStory.rawContent}
+
+EXPANSION INSTRUCTIONS:
+1. EXPAND each scene's description, dialogue, and action with 4-5x more detail
+2. EXPAND each character's physical description with vivid, specific visual details (colors, textures, expressions, posture, clothing details)
+3. EXPAND each character's profile with deeper personality insights, backstory, and motivations
+4. EXPAND each sceneVisual with rich atmospheric and compositional details
+5. KEEP the same title, number of scenes, and characters - just make everything much more detailed
+6. FOLLOW the lead of the existing text in terms of style, genre, and tone - but push it farther
+7. Write as an expert screenwriter would for a high-quality production
+
+The entire story must fit within a ${length} video.
+
+Return the EXPANDED story in this JSON format:
+{
+  "title": "${currentStory.title}",
+  "scenes": [
+    {
+      "number": 1,
+      "description": "Greatly expanded visual description of the scene",
+      "dialogue": "Expanded dialogue with more nuance and detail (optional)",
+      "action": "Greatly expanded action description"
+    }
+  ],
+  "characters": [
+    {
+      "name": "Character Name",
+      "description": "Expanded overall description",
+      "physical": "Greatly expanded physical description with vivid details",
+      "profile": "Greatly expanded personality, background, and motivations"
+    }
+  ],
+  "sceneVisuals": [
+    {
+      "sceneNumber": 1,
+      "setting": "Greatly expanded setting description",
+      "charactersPresent": ["Character Name 1", "Character Name 2"],
+      "visualDescription": "Greatly expanded visual composition details"
+    }
+  ]
+}
+
+Return only valid JSON.`;
+
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    max_tokens: maxTokens,
+    temperature: 0.7,
     response_format: { type: 'json_object' }
   });
 

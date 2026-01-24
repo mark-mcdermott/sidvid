@@ -20,9 +20,17 @@ export interface EditStoryOptions {
   maxTokens?: number;
 }
 
+export interface ExpandStoryOptions {
+  currentStory: Story;
+  length?: string;
+  maxTokens?: number;
+}
+
 export interface StoryCharacter {
   name: string;
   description: string;
+  physical?: string;
+  profile?: string;
 }
 
 export interface StorySceneVisual {

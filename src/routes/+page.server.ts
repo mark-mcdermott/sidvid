@@ -110,6 +110,39 @@ export const actions = {
 		}
 	},
 
+	smartExpandStory: async ({ request }) => {
+		const data = await request.formData();
+		const currentStoryJSON = data.get('currentStory');
+		const length = data.get('length');
+
+		if (!currentStoryJSON || typeof currentStoryJSON !== 'string') {
+			return { success: false, error: 'Current story is required', action: 'smartExpandStory' };
+		}
+
+		try {
+			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
+			const currentStory = JSON.parse(currentStoryJSON);
+
+			const story = await sidvid.expandStory({
+				currentStory,
+				length: typeof length === 'string' ? length : '5s'
+			});
+
+			return {
+				success: true,
+				story,
+				action: 'smartExpandStory'
+			};
+		} catch (error) {
+			console.error('Error expanding story:', error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Failed to expand story',
+				action: 'smartExpandStory'
+			};
+		}
+	},
+
 	// ========== Character Actions ==========
 	enhanceDescription: async ({ request }) => {
 		const data = await request.formData();

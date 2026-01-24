@@ -11,6 +11,8 @@ export interface CharacterEntry {
 	slug: string;
 	name?: string;
 	description: string;
+	physical?: string;
+	profile?: string;
 	enhancedDescription?: string;
 	images: CharacterImage[];
 	selectedImageId?: string;
@@ -60,6 +62,8 @@ export function loadStoryCharacters(characters: StoryCharacter[]) {
 		characters: characters.map(c => ({
 			slug: c.name,
 			description: c.description,
+			physical: c.physical || '',
+			profile: c.profile || '',
 			images: [],
 			isExpanded: false
 		}))

@@ -86,6 +86,7 @@
 	let mainFormElement: HTMLFormElement | undefined = $state();
 	let editFormElement: HTMLFormElement | undefined = $state();
 	let tryAgainFormElement: HTMLFormElement | undefined = $state();
+	let smartExpandFormElement: HTMLFormElement | undefined = $state();
 	let shouldNavigateToCharactersAfterStory = $state(false);
 
 	// Derived value for the latest story object (stringified) - ensures we always get the current version for editing
@@ -121,6 +122,8 @@
 	interface EditableCharacter {
 		name: string;
 		description: string;
+		physical: string;
+		profile: string;
 	}
 	let editableTitle = $state('');
 	let editableScenes = $state<EditableScene[]>([]);
@@ -941,15 +944,15 @@
 		selectedLengthValue = $storyStore.selectedLength.value;
 	});
 
-	// Story form effect - handles both generateStory and editStory actions
+	// Story form effect - handles generateStory, editStory, and smartExpandStory actions
 	$effect(() => {
-		if ((form?.action === 'generateStory' || form?.action === 'editStory') && form?.success && form?.story) {
+		if ((form?.action === 'generateStory' || form?.action === 'editStory' || form?.action === 'smartExpandStory') && form?.success && form?.story) {
 			const currentRawContent = form.story.rawContent;
 			const lastContent = untrack(() => lastStoryRawContent);
 
 			if (currentRawContent !== lastContent) {
 				untrack(() => {
-					const isEdit = form.action === 'editStory';
+					const isEdit = form.action === 'editStory' || form.action === 'smartExpandStory';
 
 					let storyPrompt: string;
 					if (capturedPromptForNextStory) {
@@ -1280,7 +1283,9 @@
 			}));
 			editableCharacters = (latestEntry.story.characters || []).map(char => ({
 				name: char.name,
-				description: char.description
+				description: char.description,
+				physical: char.physical || '',
+				profile: char.profile || ''
 			}));
 			storyStore.update(state => ({
 				...state,
@@ -1316,7 +1321,9 @@
 			// Build updated characters from editable fields
 			const updatedCharacters = editableCharacters.map(char => ({
 				name: char.name,
-				description: char.description
+				description: char.description,
+				physical: char.physical || undefined,
+				profile: char.profile || undefined
 			}));
 
 			// Build new rawContent JSON from edited fields
@@ -1383,9 +1390,6 @@
 			isEditingWithPrompt: true,
 			editPrompt: ''
 		}));
-		setTimeout(() => {
-			editPromptElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		}, 0);
 	}
 
 	function cancelPromptEdit() {
@@ -1405,6 +1409,19 @@
 			if (lengthInput) lengthInput.value = $storyStore.selectedLength.value;
 
 			tryAgainFormElement.requestSubmit();
+		}
+	}
+
+	function startSmartExpand() {
+		if ($storyStore.stories.length > 0 && smartExpandFormElement) {
+			const currentStoryInput = smartExpandFormElement.querySelector('input[name="currentStory"]') as HTMLInputElement;
+			const lengthInput = smartExpandFormElement.querySelector('input[name="length"]') as HTMLInputElement;
+
+			if (currentStoryInput) currentStoryInput.value = latestStoryForEdit;
+			if (lengthInput) lengthInput.value = $storyStore.selectedLength.value;
+
+			capturedPromptForNextStory = 'Smart Expand';
+			smartExpandFormElement.requestSubmit();
 		}
 	}
 
@@ -1679,12 +1696,28 @@
 															placeholder="Character name..."
 														/>
 													</div>
-													<div>
+													<div class="mb-2">
 														<p class="text-xs font-medium text-muted-foreground uppercase">Description:</p>
 														<Textarea
 															bind:value={editableCharacters[charIndex].description}
+															class="mt-1 min-h-12 text-sm"
+															placeholder="Brief overall description..."
+														/>
+													</div>
+													<div class="mb-2">
+														<p class="text-xs font-medium text-muted-foreground uppercase">Physical Description:</p>
+														<Textarea
+															bind:value={editableCharacters[charIndex].physical}
 															class="mt-1 min-h-16 text-sm"
-															placeholder="Character description..."
+															placeholder="Appearance, clothing, distinguishing features..."
+														/>
+													</div>
+													<div>
+														<p class="text-xs font-medium text-muted-foreground uppercase">Personality & Background:</p>
+														<Textarea
+															bind:value={editableCharacters[charIndex].profile}
+															class="mt-1 min-h-16 text-sm"
+															placeholder="Personality traits, background, motivations..."
 														/>
 													</div>
 												</div>
@@ -1762,7 +1795,7 @@
 									Regenerating...
 								{:else}
 									<RotateCcw class="h-4 w-4" />
-									Try Again
+									Regenerate
 								{/if}
 							</Button>
 							<Button onclick={startManualEdit} variant="outline">
@@ -1772,6 +1805,10 @@
 							<Button onclick={startPromptEdit} variant="outline">
 								<Sparkles class="h-4 w-4" />
 								Prompt Edit
+							</Button>
+							<Button onclick={startSmartExpand} variant="outline" disabled={$storyStore.isGenerating}>
+								<Wand2 class="h-4 w-4" />
+								Smart Expand
 							</Button>
 						</div>
 
@@ -1858,6 +1895,29 @@
 			<input type="hidden" name="prompt" value={$storyStore.prompt} />
 			<input type="hidden" name="length" value={$storyStore.selectedLength.value} />
 		</form>
+
+		<form
+			bind:this={smartExpandFormElement}
+			method="POST"
+			action="?/smartExpandStory"
+			class="hidden"
+			use:enhance={() => {
+				const timing = createTimingContext('editStory');
+				timing.start();
+				storyStore.update(state => ({ ...state, isGenerating: true }));
+				return async ({ result, update }) => {
+					timing.complete(result.type === 'success');
+					await update({ reset: false });
+					storyStore.update(state => ({
+						...state,
+						isGenerating: false
+					}));
+				};
+			}}
+		>
+			<input type="hidden" name="currentStory" value="" />
+			<input type="hidden" name="length" value={$storyStore.selectedLength.value} />
+		</form>
 	</section>
 
 	<!-- ========== CHARACTERS SECTION ========== -->
@@ -1885,7 +1945,7 @@
 				{/if}
 			</div>
 
-			<div class="flex flex-col gap-4">
+			<div class="flex flex-col gap-4 lg:max-w-[50%]">
 			{#if form?.action?.includes('Description') && form?.error}
 				<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 					{form.error}
@@ -1899,39 +1959,54 @@
 					class="flex flex-col gap-2 py-3"
 					data-character-content={index}
 				>
+					<!-- Character name -->
+					<h3 class="text-2xl font-semibold mb-2">
+						{char.slug}{#if char.name && char.name !== char.slug} <span class="text-muted-foreground font-normal">({char.name})</span>{/if}
+					</h3>
+
 					<!-- Row 1: Character images + Generate/Regenerate button -->
 					<div class="flex items-start gap-2">
 						<!-- Show all character images -->
 						{#each char.images as img, imgIndex}
 							{@const isSelected = char.selectedImageId === img.id || (!char.selectedImageId && imgIndex === char.images.length - 1)}
-							{@const isLastImage = imgIndex === char.images.length - 1}
-							{@const canDelete = !isLastImage && char.images.length > 1}
+							{@const canDelete = !isSelected && char.images.length > 1}
 							<div class="flex flex-col items-center">
-								<button
-									type="button"
-									class="relative w-12 h-12 rounded overflow-hidden group {isSelected ? 'ring-4 ring-gray-400' : 'cursor-pointer'}"
-									onclick={(e) => {
-										// Check if click was on trash icon area (bottom-right 20x20 px)
-										const rect = e.currentTarget.getBoundingClientRect();
-										const clickX = e.clientX - rect.left;
-										const clickY = e.clientY - rect.top;
-										const isTrashArea = canDelete && clickX > rect.width - 20 && clickY > rect.height - 20;
+								{#if isSelected}
+									<!-- Active image: not clickable, no trash -->
+									<div
+										class="relative w-12 h-12 rounded overflow-hidden ring-4 ring-gray-400"
+										title="Selected image"
+									>
+										<img src={img.imageUrl} alt={char.slug} class="w-full h-full object-cover" />
+									</div>
+								{:else}
+									<!-- Non-active image: clickable with trash on hover -->
+									<button
+										type="button"
+										class="relative w-12 h-12 rounded overflow-hidden group cursor-pointer"
+										onclick={(e) => {
+											// Check if click was on trash icon area (bottom-right 20x20 px)
+											const rect = e.currentTarget.getBoundingClientRect();
+											const clickX = e.clientX - rect.left;
+											const clickY = e.clientY - rect.top;
+											const isTrashArea = canDelete && clickX > rect.width - 20 && clickY > rect.height - 20;
 
-										if (isTrashArea) {
-											deleteCharacterImage(index, img.id);
-										} else if (!isSelected) {
-											selectCharacterImage(index, img.id);
-										}
-									}}
-									title={isSelected ? 'Selected image' : 'Click to select'}
-								>
-									<img src={img.imageUrl} alt={char.slug} class="w-full h-full object-cover" />
-									{#if canDelete}
-										<div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-1">
-											<Trash2 class="!mr-0 h-4 w-4 text-red-500" />
-										</div>
-									{/if}
-								</button>
+											if (isTrashArea) {
+												deleteCharacterImage(index, img.id);
+											} else {
+												selectCharacterImage(index, img.id);
+											}
+										}}
+										title="Click to select, trash icon to delete"
+									>
+										<img src={img.imageUrl} alt={char.slug} class="w-full h-full object-cover" />
+										{#if canDelete}
+											<div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-1">
+												<Trash2 class="!mr-0 h-4 w-4 text-red-500" />
+											</div>
+										{/if}
+									</button>
+								{/if}
 								<!-- Reserve space for progress bar to prevent layout shift -->
 								<div class="h-5 w-12"></div>
 							</div>
@@ -1958,23 +2033,53 @@
 
 						{#if !generatingCharacterImages.has(index)}
 							{#if char.images.length > 0}
-								<!-- Regenerate button for characters with existing images -->
+								<!-- New image button for characters with existing images -->
 								<div class="flex flex-col items-center">
 									<Button
 										type="button"
 										variant="outline"
 										class="w-12 h-12 p-0"
 										disabled={isCharacterGenerating || !getCurrentDescription(index)}
-										title="Generate another image"
+										title="New image"
 										onclick={() => generateCharacterImageForIndex(index, true)}
 									>
 										{#if isCharacterGenerating && activeCharacterIndex === index}
 											<Loader2 class="!mr-0 h-5 w-5 animate-spin" />
 										{:else}
-											<RotateCcw class="!mr-0 h-5 w-5" />
+											<Plus class="!mr-0 h-5 w-5" />
 										{/if}
 									</Button>
 									<!-- Reserve space for progress bar to prevent layout shift -->
+									<div class="h-5 w-12"></div>
+								</div>
+								<!-- Manual Edit button -->
+								<div class="flex flex-col items-center">
+									<Button
+										type="button"
+										variant="outline"
+										class="w-12 h-12 p-0"
+										title="Manual Edit"
+										onclick={() => {
+											// TODO: Implement manual edit for character
+										}}
+									>
+										<Pencil class="!mr-0 h-5 w-5" />
+									</Button>
+									<div class="h-5 w-12"></div>
+								</div>
+								<!-- Prompt Edit button -->
+								<div class="flex flex-col items-center">
+									<Button
+										type="button"
+										variant="outline"
+										class="w-12 h-12 p-0"
+										title="Prompt Edit"
+										onclick={() => {
+											// TODO: Implement prompt edit for character
+										}}
+									>
+										<Sparkles class="!mr-0 h-5 w-5" />
+									</Button>
 									<div class="h-5 w-12"></div>
 								</div>
 							{:else}
@@ -2012,10 +2117,25 @@
 						{/if}
 					</div>
 
-					<!-- Row 2: Slug, name, description, and action buttons -->
-					<div class="flex flex-wrap items-start gap-2">
-						<div class="flex-1 min-w-0">
-							<span class="font-semibold">{char.slug}</span>{#if char.name} <span class="text-muted-foreground">({char.name})</span>{/if}:
+					<!-- Physical description -->
+					{#if char.physical}
+						<div class="text-sm">
+							<span class="font-medium">Physical description:</span>
+							<span class="text-muted-foreground"> {char.physical}</span>
+						</div>
+					{/if}
+
+					<!-- Personality & background -->
+					{#if char.profile}
+						<div class="text-sm">
+							<span class="font-medium">Personality & background:</span>
+							<span class="text-muted-foreground"> {char.profile}</span>
+						</div>
+					{/if}
+
+					<!-- Row 2: Description and action buttons -->
+					<div class="flex flex-col gap-3">
+						<div>
 							<span class="text-sm text-muted-foreground">{char.enhancedDescription || char.description}</span>
 						</div>
 						<div class="flex flex-wrap gap-1">
