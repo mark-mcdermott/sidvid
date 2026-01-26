@@ -11,7 +11,7 @@ While SidVid integrates with ChatGPT, DALL-E, and Kling APIs, its real value lie
 1. **Story text generation** - Generate narrative with scenes, characters, dialogue
 2. **World building** - Create and manage characters, locations, objects, and concepts
 3. **Scene composition** - Assemble world elements into scenes with poster images
-4. **Storyboarding** - Arrange scenes with drag-and-drop, edit timing and transitions
+4. **Storyboarding** - Arrange scenes with drag-and-drop
 5. **Video generation** - Produce final video from storyboard
 
 Each step can be:
@@ -34,7 +34,7 @@ SidVid follows a **headless library** pattern:
 │  - Story history with branching                 │
 │  - World elements (characters, locations, etc.) │
 │  - Scene composition and poster images          │
-│  - Storyboard with timing/transitions           │
+│  - Storyboard with scene sequencing             │
 │  - State persistence (save/load sessions)       │
 │  ─────────────────────────────────────────────  │
 │  SidVid class (stateless API methods)           │
@@ -63,7 +63,7 @@ SidVid follows a **headless library** pattern:
 - Complete workflow state management
 - History with branching for stories and world elements
 - Scene pipeline with element composition
-- Storyboard with timing and transitions
+- Storyboard with scene sequencing
 - Persistence with pluggable storage adapters
 
 ### Reference UI (SvelteKit)
@@ -72,7 +72,7 @@ A lightweight web interface (~50% complete) for local development:
 - Story generation and editing
 - World element creation (characters, locations, objects, concepts)
 - Scene composition with drag-and-drop from sidebar
-- Storyboard editor with reordering and transitions
+- Storyboard editor with reordering
 - Video generation and preview
 - Built with SvelteKit, Svelte 5, Tailwind CSS, Zod
 
@@ -126,7 +126,7 @@ Each element can:
 **Storyboard Stage:**
 - Drag scenes from Scene section
 - Reorder scenes within storyboard
-- Edit timing and transitions
+- Reorder and preview
 - Preview storyboard
 - Send to video generation
 

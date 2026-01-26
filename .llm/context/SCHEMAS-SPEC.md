@@ -166,12 +166,8 @@ interface StoryboardEntry {
   id: string;
   sceneId: string;                   // Reference to source Scene
   duration: number;                  // Seconds
-  transitionIn?: TransitionType;
-  transitionOut?: TransitionType;
   order: number;                     // Position in sequence
 }
-
-type TransitionType = 'cut' | 'fade' | 'dissolve' | 'wipe' | 'slide';
 
 interface Storyboard {
   id: string;
@@ -482,7 +478,7 @@ User Prompt (or existing World Elements)
     ▼
 ┌─────────────────────────────────────────┐
 │  Stage 4: Storyboard                    │
-│  Scenes arranged with timing/transitions│
+│  Scenes arranged in sequence            │
 └─────────────────────────────────────────┘
     │
     │  Storyboard

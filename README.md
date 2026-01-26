@@ -637,7 +637,7 @@ sidvid video "$(jq -r '.scenes[0].description' story.json)" > video1.json
 
 - [ ] **Variable scene durations** - Support 5s or 10s per scene based on content complexity
 - [ ] **Built-in video assembly adapter** - Optional adapter for common platforms (FFmpeg, cloud services)
-- [ ] **Transition effects** - Apply transitions during video assembly (fade, dissolve, etc.)
+- [ ] **Transition effects** - Per-storyboard-scene transition options (fade, dissolve, cut, etc.) applied during video assembly
 
 ## License
 

@@ -152,8 +152,7 @@ User submits story prompt
 │  6. STORYBOARD AUTO-POPULATION          │
 │  - Create storyboard with all scenes    │
 │    in order                             │
-│  - Each entry: 5s duration, no          │
-│    transitions (defaults)               │
+│  - Each entry: 5s duration              │
 │  - User can reorder/remove/add later    │
 └─────────────────────────────────────────┘
     │
@@ -578,13 +577,12 @@ sidvid scene generate-all
 
 ## Stage 4: Storyboard
 
-The Storyboard arranges scenes into a timeline with timing and transitions.
+The Storyboard arranges scenes into a timeline.
 
 ### Auto-Population
 
 When a story is generated, the storyboard is **automatically populated** with all scenes in order (see Story Creation Pipeline). Each entry gets:
 - Duration: 5 seconds (matches scene duration)
-- Transitions: none (defaults)
 
 Users can then reorder, remove, or add additional scenes. Manual scene additions are still supported via drag-and-drop from the Scenes section.
 
@@ -603,8 +601,6 @@ Each entry in the storyboard tracks:
 - `id` - Unique identifier
 - `sceneId` - Reference to source scene
 - `duration` - How long this scene plays (seconds)
-- `transitionIn` - Transition effect entering this scene
-- `transitionOut` - Transition effect exiting this scene
 - `order` - Position in storyboard sequence
 
 ### UI Behavior
@@ -616,7 +612,7 @@ Each entry in the storyboard tracks:
 │                                                                  │
 │  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌ ─ ─ ─ ─ ┐      │
 │  │ Scene 1 │───▸│ Scene 2 │───▸│ Scene 3 │    │  drop   │      │
-│  │ (3.5s)  │fade│ (2.0s)  │cut │ (4.0s)  │    │  here   │      │
+│  │  (5s)   │    │  (5s)   │    │  (5s)   │    │  here   │      │
 │  └─────────┘    └─────────┘    └─────────┘    └ ─ ─ ─ ─ ┘      │
 │       ↑              ↑              ↑                            │
 │  [drag to reorder within storyboard]                            │
@@ -631,7 +627,7 @@ Each entry in the storyboard tracks:
 - **Reorder**: Drag storyboard entries to reorder
 - **Remove**: Drag out of storyboard or click remove button
 - **Duplicate**: Same scene can appear multiple times in storyboard
-- **Scene shows**: Poster image from the scene, with duration and transition indicators
+- **Scene shows**: Poster image from the scene, with duration indicator
 - **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 5
 
 ### Metadata Display
@@ -640,7 +636,6 @@ Each storyboard entry shows on hover (UI) or via CLI:
 - Scene description
 - Assigned world elements
 - Duration
-- Transition effects
 - Poster image URL
 
 ### Transitions
@@ -660,10 +655,8 @@ READY ──[generate video]──▸ VIDEO stage
 1. **Add Scene** - Drag scene from Scenes section into Storyboard
 2. **Reorder Scenes** - Drag storyboard entries to reorder
 3. **Remove Scene** - Remove scene from storyboard (doesn't delete original scene)
-4. **Edit Timing** - Adjust scene duration
-5. **Add Transition** - Add transition effect between scenes
-6. **Preview** - Play storyboard preview
-7. **Finalize** - Lock storyboard for video generation
+4. **Preview** - Play storyboard preview
+5. **Finalize** - Lock storyboard for video generation
 
 ### CLI Commands
 
@@ -682,9 +675,6 @@ sidvid storyboard remove <entry-id>
 
 # Set duration
 sidvid storyboard set-duration <entry-id> <seconds>
-
-# Set transition
-sidvid storyboard set-transition <entry-id> --in <type> --out <type>
 
 # Reorder
 sidvid storyboard move <entry-id> --to <index>
