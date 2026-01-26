@@ -441,6 +441,7 @@ Each scene displays as a card with the following layout:
 | Button | Action |
 |--------|--------|
 | **Regenerate (↻)** | Generate new poster image (becomes active, previous retained) |
+| **Clone** | Create a copy of this scene (new ID, copies description/elements/images) |
 | **Manual Edit** | Edit scene description directly in text fields |
 | **Prompt Edit** | Send edit instruction to ChatGPT to modify description |
 | **Expand** | AI automatically expands scene with more detail |
@@ -530,16 +531,17 @@ COMPLETE ──[remove scene]──▸ COMPLETE or PARTIAL
 2. **Generate Single Scene** - Generate poster image for one scene
 3. **Regenerate Scene** - Generate new poster image for completed scene (adds to image versions)
 4. **Add Scene** - Create new empty scene
-5. **Remove Scene** - Delete a scene (see Cascade Deletion below)
-6. **Reorder Scenes** - Drag and drop to reorder within Scenes section
-7. **Assign Element** - Add world element via + dropdown or sidebar drag
-8. **Unassign Element** - Remove world element from scene
-9. **Set Custom Description** - Override scene description
-10. **Edit with Prompt** - Send edit instruction to ChatGPT
-11. **Smart Expand** - AI automatically expands scene description
-12. **Select Active Image** - Choose which image version to use
-13. **Delete Image Version** - Remove a non-active image (trashcan icon)
-14. **Drag to Storyboard** - Click and drag scene to add to Storyboard
+5. **Clone Scene** - Create a copy of an existing scene (new ID, copies description/elements/images)
+6. **Remove Scene** - Delete a scene (see Cascade Deletion below)
+7. **Reorder Scenes** - Drag and drop to reorder within Scenes section
+8. **Assign Element** - Add world element via + dropdown or sidebar drag
+9. **Unassign Element** - Remove world element from scene
+10. **Set Custom Description** - Override scene description
+11. **Edit with Prompt** - Send edit instruction to ChatGPT
+12. **Smart Expand** - AI automatically expands scene description
+13. **Select Active Image** - Choose which image version to use
+14. **Delete Image Version** - Remove a non-active image (trashcan icon)
+15. **Drag to Storyboard** - Click and drag scene to add to Storyboard
 
 ### Cascade Deletion (Scenes)
 
@@ -573,6 +575,9 @@ sidvid scene generate <scene-id>
 
 # Generate all pending scenes
 sidvid scene generate-all
+
+# Clone scene (creates new scene with copied content)
+sidvid scene clone <scene-id>
 ```
 
 ## Stage 4: Storyboard
@@ -626,8 +631,8 @@ Each entry in the storyboard tracks:
 - **Add scene**: Drag scene from Scenes section into Storyboard (or drop zone)
 - **Reorder**: Drag storyboard entries to reorder
 - **Remove**: Drag out of storyboard or click remove button
-- **Duplicate**: Same scene can appear multiple times in storyboard
 - **Scene shows**: Poster image from the scene, with duration indicator
+- **Auto-updates**: When a scene is edited in Scenes section, storyboard entries referencing it update automatically
 - **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 5
 
 ### Metadata Display
