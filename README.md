@@ -1,6 +1,6 @@
 # SidVid
 
-AI-powered video generation platform using OpenAI's ChatGPT, DALL-E 3, and Sora. Create at each stage from idea to finished product (story idea, character generation, still scene generation, storyboard drag and drop and final video) and the product from one stage is input for the next.
+AI-powered video generation platform using ChatGPT, DALL-E 3 and Kling AI. Create at each stage from idea to finished product (story idea, character generation, still scene generation, storyboard drag and drop and final video) and the product from one stage is input for the next.
 
 ## Architecture
 
@@ -622,6 +622,22 @@ sidvid story "A hero's journey" > story.json
 sidvid character "$(jq -r '.characters[0].description' story.json)" > char1.json
 sidvid video "$(jq -r '.scenes[0].description' story.json)" > video1.json
 ```
+
+## Known Limitations & v2 Roadmap
+
+### Current Limitations (v1)
+
+| Limitation | Reason | Workaround |
+|------------|--------|------------|
+| **Fixed 5-second scenes** | Kling AI generates 5s or 10s clips; we default to 5s for simplicity | None currently - all scenes are 5 seconds |
+| **No built-in video stitching** | Video assembly requires FFmpeg or external service; not feasible in Cloudflare Workers | Implement your own assembly using FFmpeg, Shotstack, or similar |
+| **Target duration in 5s increments** | Matches Kling's clip duration constraints | Request duration as multiple of 5 |
+
+### v2 Roadmap
+
+- [ ] **Variable scene durations** - Support 5s or 10s per scene based on content complexity
+- [ ] **Built-in video assembly adapter** - Optional adapter for common platforms (FFmpeg, cloud services)
+- [ ] **Transition effects** - Apply transitions during video assembly (fade, dissolve, etc.)
 
 ## License
 

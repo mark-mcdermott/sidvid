@@ -89,7 +89,102 @@ Story generation returns:
 - `existingElementsUsed: [ids...]` - Which existing elements were referenced
 - `newElementsIntroduced: [{name, type, description}...]` - New elements to be appended
 
+## Story Creation Pipeline
+
+When a user submits a story prompt, the following auto-generation sequence executes:
+
+```
+User submits story prompt
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│  1. STORY GENERATION (ChatGPT)          │
+│  - Generate story from prompt           │
+│  - Extract characters, locations,       │
+│    objects, concepts                    │
+│  - Smart match against existing         │
+│    world elements                       │
+└─────────────────────────────────────────┘
+    │
+    │  Story + newElementsIntroduced
+    ▼
+┌─────────────────────────────────────────┐
+│  2. WORLD ELEMENT CREATION              │
+│  - Create WorldElement for each new     │
+│    element from story                   │
+│  - Existing matched elements unchanged  │
+└─────────────────────────────────────────┘
+    │
+    │  WorldElement[] (with IDs)
+    ▼
+┌─────────────────────────────────────────┐
+│  3. WORLD ELEMENT IMAGE GENERATION      │
+│  - Generate DALL-E image for each       │
+│    NEWLY CREATED element only           │
+│  - Matched existing elements: NO        │
+│    image regeneration                   │
+│  - User-edited elements: NO             │
+│    image regeneration                   │
+└─────────────────────────────────────────┘
+    │
+    │  WorldElement[] (with images)
+    ▼
+┌─────────────────────────────────────────┐
+│  4. SCENE CREATION                      │
+│  - Create Scene for each story.scenes[]│
+│  - Auto-assign referenced world         │
+│    elements to each scene               │
+└─────────────────────────────────────────┘
+    │
+    │  Scene[] (with assigned elements)
+    ▼
+┌─────────────────────────────────────────┐
+│  5. SCENE POSTER IMAGE GENERATION       │
+│  - Generate DALL-E poster image for     │
+│    each scene                           │
+│  - Uses scene description + assigned    │
+│    world element images as context      │
+└─────────────────────────────────────────┘
+    │
+    ▼
+Pipeline complete - UI shows all stages populated
+```
+
+### Image Generation Rules on Story Regeneration
+
+When a story is regenerated or edited:
+
+| Element Type | Condition | Image Behavior |
+|--------------|-----------|----------------|
+| World Element | Newly created from story | Auto-generate image |
+| World Element | Matched existing element | **No image regeneration** |
+| World Element | User has edited description | **No image regeneration** |
+| World Element | User manually regenerated | Keep user's image |
+| Scene | Newly created from story | Auto-generate poster image |
+| Scene | Existing scene updated | **No image regeneration** |
+
+**Key principle**: User modifications are respected. If a user has customized an element or its image, story regeneration will not overwrite their work.
+
+### Manual Regeneration
+
+Users can always manually regenerate images:
+- World elements: Click regenerate button on element
+- Scenes: Click regenerate button on scene
+
+Manual regeneration adds a new image version (see Image Version Management sections).
+
 ## Stage 1: Story
+
+### Story Generation Input
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `prompt` | Yes | Story idea/concept |
+| `targetDuration` | Yes | Total video length in **5-second increments** (5, 10, 15, 20, ...) |
+
+The AI generates `targetDuration / 5` scenes, each with a fixed 5-second duration.
+
+> **v2 TODO**: Support variable scene durations (5s or 10s) based on scene complexity.
 
 ### States
 
@@ -224,7 +319,19 @@ ERROR ──[retry]──▸ ENHANCING or GENERATING_IMAGE
 5. **Delete Image** - Remove a non-active image version (trashcan icon)
 6. **Branch from History** - Continue from earlier element version
 7. **Edit Manually** - Edit description text
-8. **Remove** - Delete element
+8. **Remove** - Delete element (see Cascade Deletion below)
+
+### Cascade Deletion (World Elements)
+
+When deleting a world element that is assigned to scenes:
+
+1. **Warning dialog** - "This element is used in X scenes. Deleting it will remove it from those scenes."
+2. **User confirms** - Element is deleted
+3. **Cascade behavior**:
+   - Element removed from all scenes' `assignedElements` arrays
+   - Scenes remain (just with fewer elements)
+   - Storyboard entries unaffected (they reference scenes, not elements directly)
+   - Scene poster images NOT auto-regenerated (user can manually regenerate if desired)
 
 ### UI Filtering
 
@@ -271,14 +378,66 @@ Each scene tracks:
 - `id` - Unique identifier
 - `description` - From story or custom
 - `customDescription` - User override (optional)
+- `enhancedDescription` - ChatGPT-enhanced description (optional)
 - `assignedElements` - World element IDs (characters, locations, objects, concepts)
-- `image` - Poster image (the scene's visual representation)
+- `images` - Array of generated poster images, each with:
   - `id` - Unique identifier
   - `imageUrl` - Generated image URL
   - `revisedPrompt` - DALL-E's revised prompt
+  - `isActive` - Whether this is the active image (only one can be active)
   - `createdAt` - Timestamp of generation
 - `status` - empty | pending | generating | completed | failed
 - `error` - Error message (if failed)
+
+### Scene Image Version Management
+
+- Latest generated image is **active by default**
+- Only one image can be active at a time per scene
+- Non-active images display a **trashcan icon** for deletion (except when only one image exists)
+- Non-active images can be **selected to become active**
+- Active image is used in Storyboard
+- When world element images change, Storyboard auto-shows the new active scene image
+
+### Scene Card UI
+
+Each scene displays as a card with the following layout:
+
+```
+┌─────────────────────────────────────────┐
+│  Scene 1: The Castle Entrance           │  ← Title (scene number + name)
+├─────────────────────────────────────────┤
+│  ┌─────────────────────────────────┐   │
+│  │                                  │   │
+│  │         [Poster Image]           │   │  ← Active image
+│  │                                  │   │
+│  │                          [↻]     │   │  ← Regenerate button (overlay)
+│  └─────────────────────────────────┘   │
+│                                         │
+│  Alice approaches the ancient castle    │  ← Description (truncated)
+│  gates as the sun sets behind...        │
+│  [Read More]                            │  ← Expands to full description
+│                                         │
+│  [Manual Edit] [Prompt Edit] [Expand]   │  ← Action buttons
+│                                         │
+│  Assigned: [Alice] [Castle] [Gem]       │  ← World elements (chips)
+│                                         │
+│  Image versions: [v1] [v2•] [v3]        │  ← Version selector (• = active)
+│                                [🗑]      │  ← Trashcan on non-active versions
+└─────────────────────────────────────────┘
+```
+
+### Scene Actions
+
+| Button | Action |
+|--------|--------|
+| **Regenerate (↻)** | Generate new poster image (becomes active, previous retained) |
+| **Manual Edit** | Edit scene description directly in text fields |
+| **Prompt Edit** | Send edit instruction to ChatGPT to modify description |
+| **Expand** | AI automatically expands scene with more detail |
+| **Read More/Show Less** | Toggle between truncated and full description |
+| **Version selector** | Click to make that version active |
+| **Trashcan (🗑)** | Delete non-active image version |
+| **Element chip (x)** | Remove element from scene |
 
 ### UI Visual States
 
@@ -359,14 +518,30 @@ COMPLETE ──[remove scene]──▸ COMPLETE or PARTIAL
 
 1. **Generate All Pending** - Generate poster images for all pending scenes
 2. **Generate Single Scene** - Generate poster image for one scene
-3. **Regenerate Scene** - Generate new poster image for completed scene
+3. **Regenerate Scene** - Generate new poster image for completed scene (adds to image versions)
 4. **Add Scene** - Create new empty scene
-5. **Remove Scene** - Delete a scene (trash icon)
+5. **Remove Scene** - Delete a scene (see Cascade Deletion below)
 6. **Reorder Scenes** - Drag and drop to reorder within Scenes section
 7. **Assign Element** - Add world element via + dropdown or sidebar drag
 8. **Unassign Element** - Remove world element from scene
 9. **Set Custom Description** - Override scene description
-10. **Drag to Storyboard** - Click and drag scene to add to Storyboard
+10. **Edit with Prompt** - Send edit instruction to ChatGPT
+11. **Smart Expand** - AI automatically expands scene description
+12. **Select Active Image** - Choose which image version to use
+13. **Delete Image Version** - Remove a non-active image (trashcan icon)
+14. **Drag to Storyboard** - Click and drag scene to add to Storyboard
+
+### Cascade Deletion (Scenes)
+
+When deleting a scene that is used in the storyboard:
+
+1. **Warning dialog** - "This scene is used in the storyboard. Deleting it will remove it from the storyboard."
+2. **User confirms** - Scene is deleted
+3. **Cascade behavior**:
+   - Scene removed from project's `scenes` array
+   - All storyboard entries referencing this scene are removed
+   - Storyboard reorders remaining entries automatically
+   - World elements are NOT affected (they exist independently)
 
 ### CLI Commands
 

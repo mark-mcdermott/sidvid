@@ -11,6 +11,7 @@ interface Story {
   id: string;
   title: string;
   prompt: string;                    // Original user prompt
+  targetDuration: number;            // Target video length in seconds (5s increments)
   narrative: string;                 // Full story text
   scenes: StoryScene[];              // Scene descriptions from story
   characters: StoryCharacter[];      // Characters mentioned in story
@@ -26,6 +27,7 @@ interface StoryScene {
   dialogue: string;                  // Spoken lines (empty if none)
   action: string;                    // What happens
   elementsPresent: string[];         // Names of elements in scene
+  duration: number;                  // Scene duration in seconds (default: 5)
 }
 
 interface StoryCharacter {
@@ -50,6 +52,15 @@ interface StoryConcept {
   description: string;
 }
 ```
+
+### Duration Constraints
+
+- **Target duration**: User specifies total video length in **5-second increments** (5, 10, 15, 20, etc.)
+- **Scene duration**: Each scene is **5 seconds** (fixed) - maps 1:1 to Kling AI video clips
+- **Scene count**: `targetDuration / 5` = number of scenes generated
+- **Video assembly**: Adapter/implementation responsibility (see Video Assembly below)
+
+> **v2 TODO**: Support variable scene durations (e.g., 5s or 10s per scene based on content complexity). Current limitation due to Kling AI's fixed clip durations.
 
 ---
 
@@ -101,7 +112,7 @@ interface WorldElementVersion {
 
 ## Scene
 
-Created in **Stage 3 (Scenes)** by composing world elements. Each scene generates a "poster image."
+Created in **Stage 3 (Scenes)** by composing world elements. Each scene generates "poster images" (supports versioning like world elements).
 
 ```typescript
 type SceneStatus = 'empty' | 'pending' | 'generating' | 'completed' | 'failed';
@@ -110,8 +121,10 @@ interface Scene {
   id: string;
   description: string;               // From story or custom
   customDescription?: string;        // User override
+  enhancedDescription?: string;      // ChatGPT-enhanced (optional)
   assignedElements: string[];        // World element IDs
-  image?: SceneImage;                // Poster image
+  images: SceneImage[];              // Multiple versions supported
+  duration: number;                  // Scene duration in seconds (default: 5)
   status: SceneStatus;
   error?: string;                    // Error message if failed
   createdAt: Date;
@@ -121,10 +134,19 @@ interface Scene {
 interface SceneImage {
   id: string;
   imageUrl: string;
-  revisedPrompt: string;
+  revisedPrompt: string;             // DALL-E's revised prompt
+  isActive: boolean;                 // Only one can be active
   createdAt: Date;
 }
 ```
+
+### Scene Image Version Management
+
+- Latest generated image is **active by default**
+- Only one image can be active at a time per scene
+- Non-active images can be selected to become active
+- Non-active images can be deleted (trashcan icon in UI), except when only one image exists
+- Active image is used in storyboard
 
 ### Scene Visual States (UI)
 
@@ -473,10 +495,54 @@ User Prompt (or existing World Elements)
 
 ---
 
+## Video Assembly
+
+The core library generates **individual video clips** (one per scene via Kling AI). Final video assembly is the **adapter/implementation's responsibility**.
+
+### What the Library Provides
+
+```typescript
+interface VideoClip {
+  id: string;
+  sceneId: string;                   // Reference to source scene
+  clipUrl: string;                   // Kling-generated video URL
+  duration: number;                  // Clip duration (5 seconds)
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  error?: string;
+  createdAt: Date;
+}
+
+interface Video {
+  id: string;
+  storyboardId: string;
+  clips: VideoClip[];                // Individual clips per scene
+  assembledUrl?: string;             // Final stitched video (if assembled)
+  totalDuration: number;             // Sum of clip durations
+  status: VideoStatus;
+  error?: string;
+  createdAt: Date;
+  completedAt?: Date;
+}
+```
+
+### Assembly Options (Implementation Choice)
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **FFmpeg on server** | Full control, no API costs | Needs separate service (not Cloudflare Workers) |
+| **FFmpeg.wasm in browser** | No server needed | Heavy (~25MB), slow |
+| **Video composition API** (Shotstack, Creatomate) | Easy, handles transitions | API costs, vendor dependency |
+| **No assembly** | Simplest | User gets individual clips |
+
+> **v2 TODO**: Provide optional built-in assembly adapter for common platforms.
+
+---
+
 ## Notes
 
 - **Non-linear workflow**: Users can start at any stage
 - **Append-only**: Existing elements never auto-deleted
 - **Smart matching**: Story generation matches existing elements by name, role, description
 - **History branching**: Stories and world elements support branching from any version
+- **Video assembly**: Stitching clips is adapter/implementation responsibility
 - See STATE-WORKFLOW-SPEC.md for complete state machine and UI behavior
