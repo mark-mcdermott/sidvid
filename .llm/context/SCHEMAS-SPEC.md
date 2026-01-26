@@ -182,23 +182,37 @@ interface Storyboard {
 
 ## Video
 
-Generated in **Stage 5 (Video)** from the finalized storyboard.
+Generated in **Stage 5 (Video)** from the storyboard.
 
 ```typescript
 type VideoStatus = 'not_started' | 'generating' | 'polling' | 'completed' | 'failed';
+
+interface VideoVersion {
+  id: string;
+  videoUrl: string;                  // Generated video URL
+  thumbnailUrl?: string;             // Video thumbnail
+  duration: number;                  // Video duration in seconds
+  isActive: boolean;                 // Only one can be active
+  createdAt: Date;
+}
 
 interface Video {
   id: string;
   storyboardId: string;
   status: VideoStatus;
-  videoUrl?: string;                 // Available when completed
-  thumbnailUrl?: string;
-  duration?: number;                 // Total duration in seconds
+  versions: VideoVersion[];          // Multiple versions supported
   error?: string;
   createdAt: Date;
-  completedAt?: Date;
 }
 ```
+
+### Video Version Management
+
+- Latest generated video is **active by default**
+- Only one video can be active at a time
+- Non-active videos can be selected to become active
+- Non-active videos can be deleted (trashcan icon in UI), except when only one exists
+- Active video is shown in the main player
 
 ---
 

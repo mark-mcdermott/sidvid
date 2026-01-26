@@ -607,7 +607,7 @@ Each entry in the storyboard tracks:
 - `duration` - How long this scene plays (seconds)
 - `order` - Position in storyboard sequence
 
-### UI Behavior
+### UI Layout
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -617,19 +617,33 @@ Each entry in the storyboard tracks:
 │  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌ ─ ─ ─ ─ ┐      │
 │  │ Scene 1 │───▸│ Scene 2 │───▸│ Scene 3 │    │  drop   │      │
 │  │  (5s)   │    │  (5s)   │    │  (5s)   │    │  here   │      │
-│  └─────────┘    └─────────┘    └─────────┘    └ ─ ─ ─ ─ ┘      │
+│  │   [×]   │    │   [×]   │    │   [×]   │    └ ─ ─ ─ ─ ┘      │
+│  └─────────┘    └─────────┘    └─────────┘                      │
 │       ↑              ↑              ↑                            │
 │  [drag to reorder within storyboard]                            │
 │                                                                  │
 │  ◂──── Scenes dragged here from Scenes section ────▸            │
 │                                                                  │
+│                              [Preview]  [Generate Video]         │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Storyboard Actions
+
+| Element | Action |
+|---------|--------|
+| **Preview** | Play slideshow of poster images with timing |
+| **Generate Video** | Proceed to Stage 5 (Video Generation) |
+| **× on entry** | Remove scene from storyboard (doesn't delete original scene) |
+| **Drag entry** | Reorder within storyboard |
+| **Drop zone** | Drag scene from Scenes section to add |
+
+### UI Behavior
 
 - **Auto-populated**: Storyboard starts with all story scenes in order (after story generation)
 - **Add scene**: Drag scene from Scenes section into Storyboard (or drop zone)
 - **Reorder**: Drag storyboard entries to reorder
-- **Remove**: Drag out of storyboard or click remove button
+- **Remove**: Click × on entry or drag out of storyboard
 - **Scene shows**: Poster image from the scene, with duration indicator
 - **Auto-updates**: When a scene is edited in Scenes section, storyboard entries referencing it update automatically
 - **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 5
@@ -697,6 +711,47 @@ sidvid storyboard preview
 | `COMPLETED` | Video ready for download/preview |
 | `FAILED` | Video generation failed |
 
+### UI Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  VIDEO                                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                            │  │
+│  │                    [Video Player]                          │  │
+│  │                    (active version)                        │  │
+│  │                                                            │  │
+│  │                         [▶]                                │  │
+│  │                                                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Video versions: [v1] [v2•] [v3]                                │
+│                       [🗑]                                       │
+│                                                                  │
+│                    [Regenerate]  [Download]                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Video Actions
+
+| Element | Action |
+|---------|--------|
+| **Video Player** | Play/pause the active video version |
+| **Regenerate** | Generate new video version (becomes active, previous retained) |
+| **Download** | Download the active video file |
+| **Version selector** | Click to make that version active |
+| **Trashcan (🗑)** | Delete non-active video version |
+
+### Video Version Management
+
+- Latest generated video is **active by default**
+- Only one video can be active at a time
+- Non-active videos display a **trashcan icon** for deletion (except when only one exists)
+- Non-active videos can be **selected to become active**
+- Active video is shown in the main player
+
 ### Transitions
 
 ```
@@ -710,10 +765,11 @@ FAILED ──[retry]──▸ GENERATING
 
 ### User Actions at COMPLETED State
 
-1. **Preview** - Watch generated video
-2. **Download** - Download video file
-3. **Regenerate** - Generate new video
-4. **Go Back** - Return to storyboard to make changes
+1. **Preview** - Watch generated video in player
+2. **Download** - Download active video file
+3. **Regenerate** - Generate new video version (adds to versions, becomes active)
+4. **Select Active Version** - Choose which video version to display
+5. **Delete Version** - Remove a non-active video (trashcan icon)
 
 ## Project Lifecycle
 
