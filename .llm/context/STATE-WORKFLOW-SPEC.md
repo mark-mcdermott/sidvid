@@ -146,6 +146,17 @@ User submits story prompt
 │    world element images as context      │
 └─────────────────────────────────────────┘
     │
+    │  Scene[] (with images)
+    ▼
+┌─────────────────────────────────────────┐
+│  6. STORYBOARD AUTO-POPULATION          │
+│  - Create storyboard with all scenes    │
+│    in order                             │
+│  - Each entry: 5s duration, no          │
+│    transitions (defaults)               │
+│  - User can reorder/remove/add later    │
+└─────────────────────────────────────────┘
+    │
     ▼
 Pipeline complete - UI shows all stages populated
 ```
@@ -567,15 +578,23 @@ sidvid scene generate-all
 
 ## Stage 4: Storyboard
 
-The Storyboard arranges scenes into a timeline with timing and transitions. Scenes are dragged from the Scenes section into the Storyboard.
+The Storyboard arranges scenes into a timeline with timing and transitions.
+
+### Auto-Population
+
+When a story is generated, the storyboard is **automatically populated** with all scenes in order (see Story Creation Pipeline). Each entry gets:
+- Duration: 5 seconds (matches scene duration)
+- Transitions: none (defaults)
+
+Users can then reorder, remove, or add additional scenes. Manual scene additions are still supported via drag-and-drop from the Scenes section.
 
 ### States
 
 | State | Description |
 |-------|-------------|
-| `EMPTY` | No storyboard, needs initialization |
+| `EMPTY` | No storyboard (only if user clears it or starts without story) |
 | `EDITING` | User can drag/drop, reorder, edit timing |
-| `PREVIEWING` | Playing preview of storyboard |
+| `PREVIEWING` | Playing slideshow preview (poster images with timing, not video) |
 | `READY` | Storyboard finalized for video generation |
 
 ### Storyboard Entry Properties
@@ -607,10 +626,13 @@ Each entry in the storyboard tracks:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+- **Auto-populated**: Storyboard starts with all story scenes in order (after story generation)
 - **Add scene**: Drag scene from Scenes section into Storyboard (or drop zone)
 - **Reorder**: Drag storyboard entries to reorder
 - **Remove**: Drag out of storyboard or click remove button
+- **Duplicate**: Same scene can appear multiple times in storyboard
 - **Scene shows**: Poster image from the scene, with duration and transition indicators
+- **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 5
 
 ### Metadata Display
 
