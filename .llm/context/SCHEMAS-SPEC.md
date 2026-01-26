@@ -172,7 +172,7 @@ interface StoryboardEntry {
 interface Storyboard {
   id: string;
   entries: StoryboardEntry[];
-  status: 'empty' | 'editing' | 'previewing' | 'ready';
+  status: 'empty' | 'editing' | 'previewing';
   createdAt: Date;
   updatedAt: Date;
 }

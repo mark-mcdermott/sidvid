@@ -598,7 +598,6 @@ Users can then reorder, remove, or add additional scenes. Manual scene additions
 | `EMPTY` | No storyboard (only if user clears it or starts without story) |
 | `EDITING` | User can drag/drop, reorder, edit timing |
 | `PREVIEWING` | Playing slideshow preview (poster images with timing, not video) |
-| `READY` | Storyboard finalized for video generation |
 
 ### Storyboard Entry Properties
 
@@ -650,9 +649,7 @@ EMPTY ──[drag scene in]──▸ EDITING
 EMPTY ──[initialize from scenes]──▸ EDITING
 EDITING ──[preview]──▸ PREVIEWING
 PREVIEWING ──[stop]──▸ EDITING
-EDITING ──[finalize]──▸ READY
-READY ──[edit]──▸ EDITING
-READY ──[generate video]──▸ VIDEO stage
+EDITING ──[generate video]──▸ VIDEO stage
 ```
 
 ### User Actions at EDITING State
@@ -661,7 +658,7 @@ READY ──[generate video]──▸ VIDEO stage
 2. **Reorder Scenes** - Drag storyboard entries to reorder
 3. **Remove Scene** - Remove scene from storyboard (doesn't delete original scene)
 4. **Preview** - Play storyboard preview
-5. **Finalize** - Lock storyboard for video generation
+5. **Generate Video** - Proceed to video generation (Stage 5)
 
 ### CLI Commands
 
