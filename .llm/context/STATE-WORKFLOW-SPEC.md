@@ -13,18 +13,18 @@ See [SCHEMAS-SPEC.md](./SCHEMAS-SPEC.md) for JSON structures produced at each st
 │                           SESSION LIFECYCLE                                   │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                               │
-│  ┌─────────┐   ┌────────┐   ┌───────┐   ┌────────┐   ┌───────────┐   ┌─────┐│
-│  │ PROJECT │──▸│ STORY  │◂─▸│ WORLD │──▸│ SCENES │──▸│STORYBOARD │──▸│VIDEO││
-│  └─────────┘   └────────┘   └───────┘   └────────┘   └───────────┘   └─────┘│
-│                     │            │           │              │            │    │
-│                     ▼            ▼           ▼              ▼            ▼    │
+│  ┌─────────┐   ┌────────┐   ┌───────┐   ┌───────────┐   ┌─────┐             │
+│  │ PROJECT │──▸│ STORY  │◂─▸│ WORLD │──▸│STORYBOARD │──▸│VIDEO│             │
+│  └─────────┘   └────────┘   └───────┘   └───────────┘   └─────┘             │
+│                     │            │             │            │                 │
+│                     ▼            ▼             ▼            ▼                 │
 │               ◂─────────── Users can go back and modify any stage ──────────▸│
 │               ◂─────────── Users can START at any content stage ────────────▸│
 │                                                                               │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**6 Stages:** Project → Story → World → Scenes → Storyboard → Video
+**5 Stages:** Project → Story → World → Storyboard → Video
 
 ---
 
@@ -72,7 +72,6 @@ The sidebar is collapsible. When collapsed, it is completely hidden.
 │    Project                       │  ← Indented, links to /project
 │    Story                         │  ← Indented, links to /story
 │    World                         │  ← Indented, links to /world
-│    Scenes                        │  ← Indented, links to /scenes
 │    Storyboard                    │  ← Indented, links to /storyboard
 │    Video                         │  ← Indented, links to /video
 │                                  │
@@ -88,12 +87,6 @@ The sidebar is collapsible. When collapsed, it is completely hidden.
 │    Concepts                      │  ← Only shows if concepts exist
 │      [🖼][🖼]                     │
 │                                  │
-│  ─────────────────────────────── │  ← Divider (only if content below)
-│                                  │
-│  Scenes                          │  ← Only shows if any scenes exist
-│    [🖼][🖼][🖼][🖼][🖼][🖼]       │  ← Active poster images, horizontal
-│                                  │      row (one per scene)
-│                                  │
 │  ─────────────────────────────── │
 │                                  │
 │  ┌────────────────────────────┐  │
@@ -108,8 +101,7 @@ The sidebar is collapsible. When collapsed, it is completely hidden.
 | Element | Behavior |
 |---------|----------|
 | **Navigation links** | Click to navigate; **bold** indicates current page |
-| **World Element thumbnails** | Show active image; draggable to Scenes on `/` or `/scenes` |
-| **Scene thumbnails** | Show active poster image; draggable to Storyboard on `/` or `/storyboard` |
+| **World Element thumbnails** | Show active image; draggable to Storyboard on `/` or `/storyboard` |
 | **Sidebar width** | Fixed width |
 
 ### Drag and Drop
@@ -123,12 +115,11 @@ The sidebar is collapsible. When collapsed, it is completely hidden.
 
 **Context-Aware Dragging:**
 
-| Current Page | World Elements Draggable To | Scenes Draggable To |
-|--------------|----------------------------|---------------------|
-| `/` (Dashboard) | Scenes section | Storyboard section |
-| `/scenes` | Scenes section | Not applicable |
-| `/storyboard` | Not applicable | Storyboard section |
-| Other pages | Not draggable | Not draggable |
+| Current Page | World Elements Draggable To |
+|--------------|----------------------------|
+| `/` (Dashboard) | Storyboard section |
+| `/storyboard` | Storyboard section |
+| Other pages | Not draggable |
 
 ### Mobile Behavior
 
@@ -142,11 +133,10 @@ On mobile/small screens:
 
 | Route | Content |
 |-------|---------|
-| `/` | Dashboard - all 6 sections stacked vertically |
+| `/` | Dashboard - all 5 sections stacked vertically |
 | `/project` | Project section + list of all projects with pencil/trash icons |
 | `/story` | Story section only |
 | `/world` | World section only |
-| `/scenes` | Scenes section only |
 | `/storyboard` | Storyboard section only |
 | `/video` | Video section only |
 
@@ -208,7 +198,7 @@ Users can start at **any stage**, not just Story. The workflow is flexible:
 
 ### Example Flows
 
-**Traditional flow:** Story → World → Scenes → Storyboard → Video
+**Traditional flow:** Story → World → Storyboard → Video
 
 **Character-first flow:** Create "Alice" and "Bob" in World → Generate story about them → Story references Alice and Bob, may add new elements → Scenes generated
 
@@ -557,18 +547,40 @@ ERROR ──[dismiss]──▸ EMPTY or GENERATED (depending on history)
 
 Note: World elements (characters, locations, objects, concepts) are automatically extracted from the story. See "World Element Auto-Generation" below for details on how this interacts with existing elements.
 
+### Smart Expand Behavior (Story)
+
+| Condition | Action |
+|-----------|--------|
+| **First smart expand** (`!isSmartExpanded`) | Save `narrative` → `preExpansionNarrative`, generate expanded narrative, set `isSmartExpanded = true` |
+| **Subsequent smart expand** (redo) | Regenerate from `preExpansionNarrative` (get different result, NOT longer) |
+| **After manual edit** | If user edits narrative after expansion, the edited content becomes the new source for future expansions |
+
+**Smart Expand AI Prompt Inputs (Story):**
+
+| Input | Source | Purpose |
+|-------|--------|---------|
+| **Narrative to expand** | `preExpansionNarrative` (redo) or `narrative` (first) | Core content to enhance |
+| **Original prompt** | `story.prompt` | User's original intent |
+| **Style** | `story.style` | Tone/aesthetic guidance |
+| **Target duration** | `story.targetDuration` | Pacing context (scene count) |
+| **Existing world elements** | `project.worldElements` (names + types) | Characters/locations to incorporate |
+
+The redo ensures users can get variations without infinite expansion.
+
 ### History Model
 
 All story versions remain visible in the UI. Each version shows its prompt and the resulting story. Each version has action buttons, allowing users to branch from any point. When branching, subsequent versions are discarded and the user continues from the selected version.
 
 ### Scene Display in Story
 
-When viewing a generated story, scenes are displayed with their titles:
-- Display format: "Scene [x]: [title]" (e.g., "Scene 1: Castle Approach")
-- If no title exists: "Scene [x]"
+When viewing a generated story, scenes are displayed with badges:
+- First line: "Scene [x]" badge + "[y]s" duration badge
+- Second line: "[title]" badge (if title exists)
+- Example: [Scene 1] [5s] then [Castle Approach] on next line
 
 **In Manual Edit mode**, scene cards show:
-- Header: "Scene [x]: [editable text input with current title]"
+- Header: [Scene [x]] [5s] badges (not editable in header)
+- Title field: editable text input with current title
 - Editable fields for description, dialog, and action
 
 ## Stage 3: World
@@ -670,6 +682,26 @@ ERROR ──[retry]──▸ ENHANCING or GENERATING_IMAGE
 7. **Edit Manually** - Edit description text
 8. **Remove** - Delete element (see Cascade Deletion below)
 
+### Enhance Description Behavior (World Elements)
+
+| Condition | Action |
+|-----------|--------|
+| **First enhance** (`!isEnhanced`) | Save `description` → `preEnhancementDescription`, generate enhanced description, set `isEnhanced = true` |
+| **Subsequent enhance** (redo) | Regenerate `enhancedDescription` from `preEnhancementDescription` (get different result, NOT longer) |
+| **After manual edit of description** | Clear `isEnhanced`, edited `description` becomes new source for future enhancements |
+
+**Enhance AI Prompt Inputs (World Element):**
+
+| Input | Source | Purpose |
+|-------|--------|---------|
+| **Description to enhance** | `preEnhancementDescription` (redo) or `description` (first) | Core content to expand |
+| **Element name** | `element.name` | Identity context |
+| **Element type** | `element.type` | character/location/object/concept - guides detail focus |
+| **Project style** | `project.currentStory.style` | Tone/aesthetic guidance |
+| **Story context** | `project.currentStory.title` + brief narrative summary (if exists) | How element fits in story |
+
+The redo ensures users can get variations without infinite enhancement.
+
 ### Cascade Deletion (World Elements)
 
 When deleting a world element that is assigned to scenes:
@@ -679,7 +711,6 @@ When deleting a world element that is assigned to scenes:
 3. **Cascade behavior**:
    - Element removed from all scenes' `assignedElements` arrays
    - Scenes remain (just with fewer elements)
-   - Storyboard entries unaffected (they reference scenes, not elements directly)
    - Scene poster images NOT auto-regenerated (user can manually regenerate if desired)
 
 ### UI Filtering
@@ -695,19 +726,19 @@ World elements appear as **thumbnails in the left sidebar** (see UI Layout secti
 - Shows the element's **active image** (or placeholder if none)
 - Thumbnails display in horizontal rows, wrapping if needed
 - Hover shows element name in tooltip
-- **Thumbnails are draggable** onto scenes (on Dashboard or `/scenes` page only)
+- **Thumbnails are draggable** onto scenes (on Dashboard or `/storyboard` page only)
 - Elements in the main World section are NOT directly draggable (only sidebar thumbnails)
 
-## Stage 4: Scenes
+## Stage 4: Storyboard
 
-Scenes are slots where world elements are assembled. Each scene generates a "poster image" used in the Storyboard.
+The Storyboard is where scenes are created, arranged, and prepared for video generation. Each scene generates a "poster image" that serves as the visual for that segment of the video.
 
 ### Section Header
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  SCENES                                                          │
-│  Generate scene images                                           │
+│  STORYBOARD                                                      │
+│  Create and arrange your scenes                                  │
 ├─────────────────────────────────────────────────────────────────┤
 ```
 
@@ -781,7 +812,8 @@ Each scene has a short descriptive title:
 
 ```
 ┌───────────────────────────────────────┐
-│ [Scene 1: Castle Approach] [×]        │  ← Blue badge + red delete X
+│ [Scene 1] [5s]           [⧉] [📦] [×]│  ← Scene # + duration badges + icons
+│ [Castle Approach]                     │  ← Title badge (2nd line)
 │                                       │
 │ Alice approaches the ancient castle   │  ← Description (2 lines max,
 │ gates as the sun sets behind...       │     truncated with "...")
@@ -797,7 +829,8 @@ Each scene has a short descriptive title:
 ```
 ┌───────────────────────────────────────┐
 │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│  ← Semi-transparent black overlay
-│▓[Scene 1: Castle Approach] [×]       ▓│  ← Blue badge + red delete X
+│▓[Scene 1] [5s]          [⧉] [📦] [×]▓│  ← Scene # + duration + icons
+│▓[Castle Approach]                    ▓│  ← Title badge (2nd line)
 │▓                                     ▓│
 │▓Alice approaches the ancient castle  ▓│  ← Description (2 lines max)
 │▓gates as the sun sets behind...      ▓│
@@ -838,8 +871,12 @@ Each scene has a short descriptive title:
 
 | Element | Description |
 |---------|-------------|
-| **Blue badge** | "Scene [x]: [title]" if title exists, else "Scene [x]". Rectangular with slightly rounded corners. |
-| **Red X** | To the right of blue badge. Deletes the scene (with confirmation). |
+| **Scene number badge** | "Scene [x]" - blue badge, left side of first line. |
+| **Duration badge** | "[y]s" (e.g., "5s") - blue badge, to right of scene number badge. |
+| **Title badge** | "[title]" - blue badge on second line (only shows if title exists). |
+| **Clone icon (⧉)** | Right side of first line, left of archive icon. Click to clone scene. |
+| **Archive icon (📦)** | Right side of first line, between clone and delete. Click to archive scene. |
+| **Red X** | To the right of archive icon. Deletes the scene (with confirmation). |
 | **Description** | 2 lines max, truncated with "..." |
 | **Element pills** | Colored by type, 2 columns max. Shows "..." pill if overflow. Contains element name (truncated if needed). |
 | **Text toggle** | Bottom left when image exists. Toggles text/overlay visibility. |
@@ -855,10 +892,12 @@ Each scene has a short descriptive title:
 
 | Click Target | Action |
 |--------------|--------|
-| **Blue badge / description / pills** | Opens scene edit modal |
+| **Scene/duration/title badges / description / pills** | Opens scene edit modal |
+| **Clone icon (⧉)** | Clones scene (inserts copy immediately after, see Clone Scene Behavior) |
+| **Archive icon (📦)** | Archives scene (moves to Archived Scenes section) |
 | **Red X** | Deletes the scene (with confirmation) |
 | **Text toggle icon** | Toggles text/overlay visibility |
-| **Scene card body** (when dragging) | Drag to Storyboard or reorder within Scenes |
+| **Scene card body** (when dragging) | Drag to reorder within Storyboard |
 | **New Scene button (+)** | Creates new blank scene |
 
 ### Scene Edit Modal
@@ -868,7 +907,7 @@ Single-clicking a scene card opens a centered modal with semi-transparent black 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                  │
-│  Scene 3: Castle Approach                                        │
+│  [Scene 3] [5s]                                                  │
 │  ─────────────────────────────────────────────────────────────── │
 │                                                                  │
 │  Title                                                           │
@@ -914,20 +953,51 @@ Single-clicking a scene card opens a centered modal with semi-transparent black 
 - Pills are colored by type (same colors as scene card)
 - Pills are **not clickable** (display only)
 
+### Archived Scenes Section
+
+At the bottom of the Storyboard section, below all active scenes and the New Scene button:
+
+**When no archived scenes exist:**
+```
+───────────────────────────────────────────────────────────────
+
+Archived Scenes
+
+You have no archived scenes                    ← Small gray text
+```
+
+**When archived scenes exist:**
+```
+───────────────────────────────────────────────────────────────
+
+Archived Scenes
+
+[🖼] [🖼] [🖼]                                  ← Small thumbnails (poster images)
+```
+
+**Archived Scene Behavior:**
+- Thumbnails show the scene's active poster image (or placeholder if none)
+- Click thumbnail → opens same scene edit modal as active scenes
+- In modal, archive icon shows as "unarchive" action (📤 or similar)
+- Clicking unarchive moves scene back to active scenes (appended to end)
+- **Drag-to-unarchive**: Drag archived thumbnail to a position in the active scenes area → unarchives AND inserts at that position
+- Archived scenes do NOT count toward scene numbering (Scene 1, 2, 3... only counts active)
+- Archived scenes can still be edited, regenerated, etc. via modal
+
 ### UI Visual States
 
-| Visual State | Border | Draggable to Storyboard |
-|--------------|--------|-------------------------|
-| Scene (any state) | Solid, rounded | Yes |
-| New Scene button | Dashed, rounded | No |
+| Visual State | Border |
+|--------------|--------|
+| Scene (any state) | Solid, rounded |
+| New Scene button | Dashed, rounded |
 
 ### World Element Sidebar (UI)
 
-See UI Layout section for full sidebar specification. When on the Dashboard (`/`) or Scenes page (`/scenes`), world element thumbnails in the sidebar can be dragged onto scenes:
+See UI Layout section for full sidebar specification. When on the Dashboard (`/`) or Storyboard page (`/storyboard`), world element thumbnails in the sidebar can be dragged onto scenes:
 
 ```
 ┌──────────┬──────────────────────────────────────────────┐
-│ SIDEBAR  │  SCENES                                      │
+│ SIDEBAR  │  STORYBOARD                                  │
 ├──────────┤                                              │
 │Characters│  ┌───────────────┐  ┌ ─ ─ ─ ─ ─ ─ ┐        │
 │ [🖼][🖼] │  │ Alice, Castle │  │              │        │
@@ -966,190 +1036,121 @@ COMPLETE ──[remove scene]──▸ COMPLETE or PARTIAL
 2. **Generate Single Scene** - Generate poster image for one scene
 3. **Regenerate Scene** - Generate new poster image for completed scene (adds to image versions)
 4. **Add Scene** - Create new empty scene
-5. **Clone Scene** - Create a copy of an existing scene (new ID, copies description/elements/images)
-6. **Remove Scene** - Delete a scene (see Cascade Deletion below)
-7. **Reorder Scenes** - Drag and drop to reorder within Scenes section
-8. **Assign Element** - Add world element via + dropdown or sidebar drag
-9. **Unassign Element** - Remove world element from scene
-10. **Set Custom Description** - Override scene description
-11. **Edit with Prompt** - Send edit instruction to ChatGPT
-12. **Smart Expand** - AI automatically expands scene description
-13. **Select Active Image** - Choose which image version to use
-14. **Delete Image Version** - Remove a non-active image (trashcan icon)
-15. **Drag to Storyboard** - Click and drag scene to add to Storyboard
+5. **Clone Scene** - Create a copy of an existing scene (see Clone Scene Behavior below)
+6. **Remove Scene** - Delete a scene (with confirmation)
+7. **Archive Scene** - Move scene to Archived Scenes section
+8. **Unarchive Scene** - Restore archived scene to active scenes
+9. **Reorder Scenes** - Drag and drop to reorder within Storyboard
+10. **Assign Element** - Add world element via + dropdown or sidebar drag
+11. **Unassign Element** - Remove world element from scene
+12. **Set Custom Description** - Override scene description
+13. **Edit with Prompt** - Send edit instruction to ChatGPT
+14. **Smart Expand** - AI automatically expands scene description
+15. **Select Active Image** - Choose which image version to use
+16. **Delete Image Version** - Remove a non-active image (trashcan icon)
+
+### Clone Scene Behavior
+
+When cloning a scene:
+
+| Property | Behavior |
+|----------|----------|
+| **New ID** | Clone gets a new unique ID |
+| **Title** | Original title + " (1)", or " (2)" if "(1)" exists, etc. |
+| **Position** | Inserted immediately after the original scene |
+| **isArchived** | Always `false` (clone as active, even if original was archived) |
+| **All other fields** | Copied from original (description, customDescription, enhancedDescription, isSmartExpanded, preExpansionDescription, dialog, action, assignedElements, images, duration, status) |
+| **Timestamps** | `createdAt` and `updatedAt` set to current time |
+
+**Example:** Cloning "Castle Approach" (Scene 2) creates "Castle Approach (1)" as new Scene 3, shifting subsequent scenes.
+
+### Smart Expand Behavior (Scenes)
+
+| Condition | Action |
+|-----------|--------|
+| **First smart expand** (`!isSmartExpanded`) | Save `customDescription ?? description` → `preExpansionDescription`, generate enhanced, set `isSmartExpanded = true` |
+| **Subsequent smart expand** (redo) | Regenerate `enhancedDescription` from `preExpansionDescription` with full context (get different result, NOT longer) |
+| **After manual edit** | If user edits description after expansion, clear `isSmartExpanded`, edited content becomes new source |
+
+**Smart Expand AI Prompt Inputs (Scene):**
+
+| Input | Source | Purpose |
+|-------|--------|---------|
+| **Description to expand** | `preExpansionDescription` (redo) or `customDescription ?? description` (first) | Core content to enhance |
+| **Scene title** | `scene.title` | Context for what scene is about |
+| **Scene dialog** | `scene.dialog` (if any) | Spoken lines to incorporate |
+| **Scene action** | `scene.action` (if any) | Physical actions to describe |
+| **Assigned world elements** | Lookup by `scene.assignedElements` IDs → names + brief descriptions | Who/what to describe in detail |
+| **Project style** | `project.currentStory.style` | Tone/aesthetic guidance (anime, photorealistic, etc.) |
+| **Other scenes context** | Other scenes' `title` + `description` (brief) | Narrative flow and coherence |
+
+This ensures the AI has sufficient context to generate a rich, coherent scene description that fits the overall story and visual style.
 
 ### Cascade Deletion (Scenes)
 
-When deleting a scene that is used in the storyboard:
+When deleting a scene:
 
-1. **Warning dialog** - "This scene is used in the storyboard. Deleting it will remove it from the storyboard."
+1. **Warning dialog** - "Are you sure you want to delete this scene? This action cannot be undone."
 2. **User confirms** - Scene is deleted
 3. **Cascade behavior**:
    - Scene removed from project's `scenes` array
-   - All storyboard entries referencing this scene are removed
-   - Storyboard reorders remaining entries automatically
+   - Remaining scenes automatically renumber
    - World elements are NOT affected (they exist independently)
-
-### CLI Commands
-
-```bash
-# List all scenes
-sidvid scene list
-
-# Show scene details (metadata)
-sidvid scene show <scene-id>
-
-# Add element to scene
-sidvid scene add-element <scene-id> <element-id>
-
-# Remove element from scene
-sidvid scene remove-element <scene-id> <element-id>
-
-# Generate poster image for scene
-sidvid scene generate <scene-id>
-
-# Generate all pending scenes
-sidvid scene generate-all
-
-# Clone scene (creates new scene with copied content)
-sidvid scene clone <scene-id>
-```
-
-## Stage 5: Storyboard
-
-The Storyboard arranges scenes into a timeline.
 
 ### Auto-Population
 
-When a story is generated, the storyboard is **automatically populated** with all scenes in order (see Story Creation Pipeline). Each entry gets:
-- Duration: 5 seconds (matches scene duration)
+When a story is generated, the storyboard is **automatically populated** with all scenes in order (see Story Creation Pipeline). Each scene gets:
+- Duration: 5 seconds (default)
 
-Users can then reorder, remove, or add additional scenes. Manual scene additions are still supported via drag-and-drop from the Scenes section.
-
-### States
-
-| State | Description |
-|-------|-------------|
-| `EMPTY` | No storyboard (only if user clears it or starts without story) |
-| `EDITING` | User can drag/drop, reorder, edit timing |
-| `PREVIEWING` | Playing slideshow preview (poster images with timing, not video) |
-
-### Storyboard Entry Properties
-
-Each entry in the storyboard tracks:
-- `id` - Unique identifier
-- `sceneId` - Reference to source scene
-- `duration` - How long this scene plays (seconds)
-- `order` - Position in storyboard sequence
-
-### UI Layout
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  STORYBOARD                                                      │
-│  Order your scenes                                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌ ─ ─ ─ ─ ┐      │
-│  │ Scene 1:  │──│ Scene 2:  │──│ Scene 3:  │  │  drop   │      │
-│  │ Castle    │  │ Forest    │  │ Battle    │  │  here   │      │
-│  │  (5s)     │  │  (5s)     │  │  (5s)     │  └ ─ ─ ─ ─ ┘      │
-│  │   [×]     │  │   [×]     │  │   [×]     │                    │
-│  └───────────┘  └───────────┘  └───────────┘                    │
-│       ↑              ↑              ↑                            │
-│  [drag to reorder within storyboard]                            │
-│                                                                  │
-│  ◂──── Scenes dragged here from Scenes section ────▸            │
-│                                                                  │
-│                              [Preview]  [Generate Video]         │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Storyboard Entry Display:**
-- Shows "Scene [x]: [title]" if title exists, else "Scene [x]"
-- Shows poster image thumbnail
-- Shows duration (e.g., "(5s)")
-- Shows [×] to remove from storyboard
+Users can then reorder, edit, clone, archive, or add new scenes.
 
 ### Storyboard Actions
 
 | Element | Action |
 |---------|--------|
-| **Preview** | Play slideshow of poster images with timing |
-| **Generate Video** | Proceed to Stage 6 (Video Generation) |
-| **× on entry** | Remove scene from storyboard (doesn't delete original scene) |
-| **Drag entry** | Reorder within storyboard |
-| **Drop zone** | Drag scene from Scenes section to add |
-
-### UI Behavior
-
-- **Auto-populated**: Storyboard starts with all story scenes in order (after story generation)
-- **Add scene**: Drag scene from Scenes section OR from sidebar scene thumbnails into Storyboard (on Dashboard or `/storyboard` page)
-- **Reorder**: Drag storyboard entries to reorder
-- **Remove**: Click × on entry or drag out of storyboard
-- **Scene shows**: Poster image from the scene, with duration indicator
-- **Auto-updates**: When a scene is edited in Scenes section, storyboard entries referencing it update automatically
-- **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 6
-
-### Sidebar Scene Thumbnails
-
-See UI Layout section for full sidebar specification. The Scenes section in the sidebar shows:
-- One horizontal row of **active poster images** (one thumbnail per scene)
-- Only visible if any scenes exist
-- Thumbnails are draggable to Storyboard (on Dashboard or `/storyboard` page only)
-
-### Metadata Display
-
-Each storyboard entry shows on hover (UI) or via CLI:
-- Scene description
-- Assigned world elements
-- Duration
-- Poster image URL
-
-### Transitions
-
-```
-EMPTY ──[drag scene in]──▸ EDITING
-EMPTY ──[initialize from scenes]──▸ EDITING
-EDITING ──[preview]──▸ PREVIEWING
-PREVIEWING ──[stop]──▸ EDITING
-EDITING ──[generate video]──▸ VIDEO stage
-```
-
-### User Actions at EDITING State
-
-1. **Add Scene** - Drag scene from Scenes section into Storyboard
-2. **Reorder Scenes** - Drag storyboard entries to reorder
-3. **Remove Scene** - Remove scene from storyboard (doesn't delete original scene)
-4. **Preview** - Play storyboard preview
-5. **Generate Video** - Proceed to video generation (Stage 6)
+| **Generate Video** | Proceed to Stage 5 (Video Generation) |
+| **Scene card** | Click to open scene edit modal |
+| **Clone icon (⧉)** | Clone scene (insert copy after original) |
+| **Archive icon (📦)** | Archive scene (move to Archived Scenes section) |
+| **Red X** | Delete scene (with confirmation) |
+| **Drag scene** | Reorder within storyboard |
+| **New Scene (+)** | Create new blank scene |
 
 ### CLI Commands
 
 ```bash
-# List storyboard entries
+# List all scenes in storyboard
 sidvid storyboard list
 
-# Show storyboard entry details
-sidvid storyboard show <entry-id>
+# Show scene details (metadata)
+sidvid storyboard show <scene-id>
 
-# Add scene to storyboard
-sidvid storyboard add-scene <scene-id> [--position <index>]
+# Add element to scene
+sidvid storyboard add-element <scene-id> <element-id>
 
-# Remove scene from storyboard
-sidvid storyboard remove <entry-id>
+# Remove element from scene
+sidvid storyboard remove-element <scene-id> <element-id>
 
-# Set duration
-sidvid storyboard set-duration <entry-id> <seconds>
+# Generate poster image for scene
+sidvid storyboard generate <scene-id>
 
-# Reorder
-sidvid storyboard move <entry-id> --to <index>
+# Generate all pending scenes
+sidvid storyboard generate-all
 
-# Preview (opens in default video player or outputs URL)
-sidvid storyboard preview
+# Clone scene (creates new scene with copied content)
+sidvid storyboard clone <scene-id>
+
+# Archive scene
+sidvid storyboard archive <scene-id>
+
+# Unarchive scene
+sidvid storyboard unarchive <scene-id>
+
+# Reorder scene
+sidvid storyboard move <scene-id> --to <index>
 ```
 
-## Stage 6: Video
+## Stage 5: Video
 
 ### States
 
@@ -1181,7 +1182,7 @@ sidvid storyboard preview
 │  Video versions: [v1] [v2•] [v3]                                │
 │                       [🗑]                                       │
 │                                                                  │
-│                    [Regenerate]  [Download]                     │
+│            [Preview]  [Generate Video]  [Download]              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1190,7 +1191,8 @@ sidvid storyboard preview
 | Element | Action |
 |---------|--------|
 | **Video Player** | Play/pause the active video version |
-| **Regenerate** | Generate new video version (becomes active, previous retained) |
+| **Preview** | Play slideshow of poster images with timing (before video generation) |
+| **Generate Video** | Generate video from storyboard scenes |
 | **Download** | Download the active video file |
 | **Version selector** | Click to make that version active |
 | **Trashcan (🗑)** | Delete non-active video version |
@@ -1215,9 +1217,14 @@ COMPLETED ──[regenerate]──▸ GENERATING
 FAILED ──[retry]──▸ GENERATING
 ```
 
-### User Actions at COMPLETED State
+### User Actions
 
-1. **Preview** - Watch generated video in player
+**Before video generation (NOT_STARTED):**
+1. **Preview** - Play slideshow of poster images with timing (animatic preview)
+2. **Generate Video** - Start video generation from storyboard scenes
+
+**After video generation (COMPLETED):**
+1. **Play Video** - Watch generated video in player
 2. **Download** - Download active video file
 3. **Regenerate** - Generate new video version (adds to versions, becomes active)
 4. **Select Active Version** - Choose which video version to display
@@ -1250,11 +1257,8 @@ interface Project {
   // World Elements
   worldElements: Map<string, WorldElement>;
 
-  // Scenes
+  // Storyboard (scenes array IS the storyboard - scene order = storyboard order)
   scenes: Scene[];
-
-  // Storyboard
-  storyboard: Storyboard | null;
 
   // Video
   video: Video | null;

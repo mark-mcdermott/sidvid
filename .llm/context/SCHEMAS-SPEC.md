@@ -43,8 +43,16 @@ interface Story {
   locations: StoryLocation[];        // Locations mentioned in story
   objects: StoryObject[];            // Objects mentioned in story
   concepts: StoryConcept[];          // Concepts mentioned in story
+  isSmartExpanded?: boolean;         // True after first smart expand
+  preExpansionNarrative?: string;    // Narrative before expansion (used for redo)
   createdAt: Date;
 }
+
+// Smart Expand behavior:
+// - First click: save narrative → preExpansionNarrative, generate expanded narrative, set isSmartExpanded = true
+// - Subsequent clicks (redo): regenerate from preExpansionNarrative (different result, not longer)
+// - AI prompt includes: original prompt, style, target duration, existing world elements
+// - See STATE-WORKFLOW-SPEC.md "Smart Expand AI Prompt Inputs (Story)" for full input table
 
 interface StoryScene {
   number: number;                    // Scene sequence (1-indexed)
@@ -103,12 +111,21 @@ interface WorldElement {
   type: ElementType;
   description: string;
   enhancedDescription?: string;      // ChatGPT-enhanced (optional)
+  isEnhanced?: boolean;              // True after first enhance
+  preEnhancementDescription?: string; // Description before enhancement (used for redo)
   images: ElementImage[];            // Multiple versions supported
   historyIndex: number;
   history: WorldElementVersion[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Enhance behavior:
+// - First click: save description → preEnhancementDescription, generate enhanced, set isEnhanced = true
+// - Subsequent clicks (redo): regenerate enhancedDescription from preEnhancementDescription (different result)
+// - If user manually edits description after enhancement: clear isEnhanced, description becomes new source
+// - AI prompt includes: element name, element type, project style, story context
+// - See STATE-WORKFLOW-SPEC.md "Enhance AI Prompt Inputs (World Element)" for full input table
 
 interface ElementImage {
   id: string;
@@ -121,6 +138,8 @@ interface ElementImage {
 interface WorldElementVersion {
   description: string;
   enhancedDescription?: string;
+  isEnhanced?: boolean;
+  preEnhancementDescription?: string;
   images: ElementImage[];
   createdAt: Date;
 }
@@ -138,7 +157,7 @@ interface WorldElementVersion {
 
 ## Scene
 
-Created in **Stage 4 (Scenes)** by composing world elements. Each scene generates "poster images" (supports versioning like world elements).
+Created in **Stage 4 (Storyboard)** by composing world elements. Each scene generates "poster images" (supports versioning like world elements). The scenes array order determines the video sequence.
 
 ```typescript
 type SceneStatus = 'empty' | 'pending' | 'generating' | 'completed' | 'failed';
@@ -149,6 +168,9 @@ interface Scene {
   description: string;               // From story or custom
   customDescription?: string;        // User override
   enhancedDescription?: string;      // ChatGPT-enhanced (optional)
+  isSmartExpanded?: boolean;         // True after first smart expand
+  preExpansionDescription?: string;  // Description before expansion (used for redo)
+  isArchived?: boolean;              // True if excluded from storyboard (default: false)
   dialog?: string;                   // Scene dialog (optional)
   action?: string;                   // Scene action notes (optional)
   assignedElements: string[];        // World element IDs
@@ -159,6 +181,27 @@ interface Scene {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Archive behavior:
+// - Archived scenes appear in "Archived Scenes" section at bottom of Storyboard
+// - Click archive icon (📦) to archive; click unarchive (📤) to restore
+// - Drag archived thumbnail to active area to unarchive at specific position
+// - Archived scenes can still be edited via modal
+
+// Clone behavior:
+// - Click clone icon (⧉) to create a copy of the scene
+// - Clone gets new ID, title becomes "Original Title (1)" etc.
+// - Clone inserted immediately after original scene
+// - Clone is always active (isArchived = false), even if original was archived
+// - All other fields copied (description, images, elements, etc.)
+
+// Smart Expand behavior:
+// - Source: customDescription ?? description
+// - First click: save source → preExpansionDescription, generate enhanced, set isSmartExpanded = true
+// - Subsequent clicks (redo): regenerate from preExpansionDescription with full context (different result)
+// - AI prompt includes: scene title, dialog, action, assigned world elements (names + descriptions),
+//   project style, and other scenes' titles/descriptions for narrative coherence
+// - See STATE-WORKFLOW-SPEC.md "Smart Expand AI Prompt Inputs (Scene)" for full input table
 
 // Scene title guidelines:
 // - 3 words preferred, 5 words max
@@ -184,39 +227,16 @@ interface SceneImage {
 
 ### Scene Visual States (UI)
 
-| State | Border | Has + Icon | Has Trash Icon | Draggable to Storyboard |
-|-------|--------|------------|----------------|-------------------------|
-| Empty (no elements) | Dashed, rounded | Yes | No | No |
-| Has elements | Solid, rounded | Yes | Yes (red) | Yes |
-
----
-
-## Storyboard Entry
-
-Created in **Stage 5 (Storyboard)** by dragging scenes from the Scenes section.
-
-```typescript
-interface StoryboardEntry {
-  id: string;
-  sceneId: string;                   // Reference to source Scene
-  duration: number;                  // Seconds
-  order: number;                     // Position in sequence
-}
-
-interface Storyboard {
-  id: string;
-  entries: StoryboardEntry[];
-  status: 'empty' | 'editing' | 'previewing';
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
+| State | Border | Has + Icon | Has Trash Icon |
+|-------|--------|------------|----------------|
+| Scene (any state) | Solid, rounded | N/A | Yes (red) |
+| New Scene button | Dashed, rounded | Yes | No |
 
 ---
 
 ## Video
 
-Generated in **Stage 6 (Video)** from the storyboard.
+Generated in **Stage 5 (Video)** from the storyboard scenes.
 
 ```typescript
 type VideoStatus = 'not_started' | 'generating' | 'polling' | 'completed' | 'failed';
@@ -232,7 +252,7 @@ interface VideoVersion {
 
 interface Video {
   id: string;
-  storyboardId: string;
+  projectId: string;                 // Reference to project this video belongs to
   status: VideoStatus;
   versions: VideoVersion[];          // Multiple versions supported
   error?: string;
@@ -273,11 +293,8 @@ interface Project {
   // World Elements
   worldElements: Map<string, WorldElement>;
 
-  // Scenes
+  // Storyboard (scenes array IS the storyboard - scene order = video sequence)
   scenes: Scene[];
-
-  // Storyboard
-  storyboard: Storyboard | null;
 
   // Video
   video: Video | null;
@@ -517,22 +534,16 @@ User Prompt (or existing World Elements)
     │  WorldElement[]
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 4: Scenes                        │
-│  Elements composed into scenes          │
+│  Stage 4: Storyboard                    │
+│  Scenes created and arranged            │
 │  Poster images generated                │
+│  (scene order = video sequence)         │
 └─────────────────────────────────────────┘
     │
     │  Scene[]
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 5: Storyboard                    │
-│  Scenes arranged in sequence            │
-└─────────────────────────────────────────┘
-    │
-    │  Storyboard
-    ▼
-┌─────────────────────────────────────────┐
-│  Stage 6: Video                         │
+│  Stage 5: Video                         │
 │  Final video generated                  │
 └─────────────────────────────────────────┘
 ```
@@ -558,7 +569,7 @@ interface VideoClip {
 
 interface Video {
   id: string;
-  storyboardId: string;
+  projectId: string;                 // Reference to project this video belongs to
   clips: VideoClip[];                // Individual clips per scene
   assembledUrl?: string;             // Final stitched video (if assembled)
   totalDuration: number;             // Sum of clip durations
