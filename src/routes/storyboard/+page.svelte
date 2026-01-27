@@ -267,7 +267,7 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold">STORYBOARD</h1>
+			<h1 class="text-3xl font-bold">Storyboard</h1>
 			<p class="text-muted-foreground">Create and arrange your scenes</p>
 		</div>
 		<div class="flex gap-2">

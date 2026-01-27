@@ -465,7 +465,7 @@
 <div class="flex flex-col gap-4">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold">Video Generation</h1>
+			<h1 class="text-3xl font-bold">Video</h1>
 			<p class="text-muted-foreground">
 				Generate {sceneVideos.length} video clip{sceneVideos.length !== 1 ? 's' : ''} ({totalDuration}s total) using {selectedProvider === 'kling' ? 'Kling AI (with audio)' : 'Mock (for testing)'}
 			</p>

@@ -5,7 +5,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2 } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download } from '@lucide/svelte';
 	import { ProgressBar } from '$lib/components/ui/progress-bar';
 	import { createTimingContext } from '$lib/utils/apiTiming';
 	import type { ApiCallType } from '$lib/sidvid/types';
@@ -64,14 +64,13 @@
 	}
 
 	// ========== Active Section State ==========
-	type Section = 'story' | 'world' | 'scenes' | 'storyboard' | 'video';
+	type Section = 'story' | 'world' | 'storyboard' | 'video';
 	let activeSection = $state<Section>('story');
 
 	// Section refs for scrolling
 	let sectionRefs: Record<Section, HTMLElement | undefined> = {
 		story: undefined,
 		world: undefined,
-		scenes: undefined,
 		storyboard: undefined,
 		video: undefined
 	};
@@ -693,6 +692,18 @@
 			videoElement?.play();
 			isPlaying = true;
 		}, 100);
+	}
+
+	function downloadVideo() {
+		const completedVideo = sceneVideos.find(sv => sv.videoUrl);
+		if (completedVideo?.videoUrl) {
+			const link = document.createElement('a');
+			link.href = completedVideo.videoUrl;
+			link.download = `sidvid-video-${Date.now()}.mp4`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		}
 	}
 
 	function loadTestVideos() {
@@ -1996,9 +2007,7 @@
 			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
 					<h1 class="text-3xl font-bold mb-3">World</h1>
-					<p class="text-muted-foreground">
-						Create world elements (characters, locations, objects, concepts)
-					</p>
+					<p class="text-muted-foreground">Create world elements</p>
 				</div>
 				{#if testingMode}
 					<Button variant="outline" size="sm" onclick={loadTestCharacters} title="Load test data">
@@ -2342,183 +2351,6 @@
 		</div>
 	</section>
 
-	<!-- ========== SCENES SECTION ========== -->
-	<section
-		id="scenes"
-		bind:this={sectionRefs.scenes}
-		class="scroll-mt-16 border-b pb-8"
-	>
-		<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
-			<div class="flex items-center justify-between sm:flex-col sm:items-start sm:gap-2">
-				<div>
-					<h1 class="text-3xl font-bold mb-3">Scenes</h1>
-					<p class="text-muted-foreground">Generate scene images using DALL-E</p>
-				</div>
-				<div class="flex items-center gap-2 sm:flex-col sm:items-start">
-					{#if slots.length > 0}
-						<div class="text-sm text-muted-foreground">
-							{completedCount}/{slots.length} generated
-							{#if generatingCount > 0}
-								<span class="text-blue-600">({generatingCount} in progress)</span>
-							{/if}
-						</div>
-					{/if}
-					{#if testingMode}
-						<Button variant="outline" size="sm" onclick={loadTestScenes} title="Load test data">
-							<FlaskConical class="!mr-0 h-4 w-4" />
-						</Button>
-					{/if}
-				</div>
-			</div>
-
-			<div class="flex flex-col gap-4">
-			<div class="flex flex-wrap gap-4 items-start" data-wireframes-container>
-				{#each slots as slot, index (slot.id)}
-					<div>
-						<div
-							data-scene-wireframe={index}
-							data-scene-number={slot.storyScene.number}
-							class="wireframe relative flex flex-col w-64 border border-dashed rounded-lg p-2 transition-colors {dragOverIndex === index ? 'border-primary bg-primary/10 border-solid' : slot.status === 'completed' ? 'border-green-500 border-solid' : slot.status === 'generating' || generatingSlots.has(slot.id) ? 'border-blue-500 border-solid animate-pulse' : slot.status === 'failed' ? 'border-red-500 border-solid' : 'border-white'}"
-							style="aspect-ratio: 16/9;"
-						>
-							{#if slot.generatedScene?.imageUrl}
-								<img
-									src={slot.generatedScene.imageUrl}
-									alt="Scene {slot.storyScene.number}"
-									class="absolute inset-0 w-full h-full object-cover rounded-lg"
-								/>
-								<div class="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-									<form
-										method="POST"
-										action="?/regenerateSlotImage"
-										use:enhance={() => {
-											generatingSlots = new Set([...generatingSlots, slot.id]);
-											return async ({ update }) => {
-												await update();
-												generatingSlots = new Set([...generatingSlots].filter(id => id !== slot.id));
-											};
-										}}
-									>
-										<input type="hidden" name="slotId" value={slot.id} />
-										<input type="hidden" name="description" value={slot.customDescription || slot.storyScene.description} />
-										<input type="hidden" name="characterDescriptions" value={getCharacterDescriptions(slot)} />
-										<Button type="submit" size="sm" variant="secondary" disabled={isAnyGenerating}>
-											{#if generatingSlots.has(slot.id)}
-												<Loader2 class="h-4 w-4 animate-spin" data-spinner />
-												Regenerating...
-											{:else}
-												Regenerate
-											{/if}
-										</Button>
-									</form>
-								</div>
-							{:else}
-								<div class="flex flex-col gap-1 h-full">
-									<div class="flex items-start justify-between">
-										<div class="text-xs font-medium text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded">
-											Scene {slot.storyScene.number}
-										</div>
-										<button
-											type="button"
-											class="text-xs text-red-500 hover:text-red-700"
-											onclick={() => removeSlot(slot.id)}
-										>
-											×
-										</button>
-									</div>
-
-									<div class="flex-1 overflow-hidden">
-										<p class="text-[10px] text-muted-foreground line-clamp-2">
-											{slot.customDescription || slot.storyScene.description}
-										</p>
-									</div>
-
-									{#if slot.status === 'generating' || generatingSlots.has(slot.id)}
-										<div class="text-[10px] text-blue-600 flex items-center gap-1">
-											<Loader2 class="h-3 w-3 animate-spin" data-spinner />
-											Generating...
-										</div>
-									{:else if slot.status === 'failed'}
-										<div class="text-[10px] text-red-600">{slot.error || 'Failed'}</div>
-									{/if}
-								</div>
-							{/if}
-						</div>
-
-						{#if !slot.generatedScene?.imageUrl && (slot.storyScene.description || slot.customDescription)}
-							<form
-								method="POST"
-								action="?/generateSlotImage"
-								class="mt-2"
-								use:enhance={() => {
-									const timing = createTimingContext('generateScene');
-									timing.start();
-									generatingSlots = new Set([...generatingSlots, slot.id]);
-									const session = $sessionStore.activeSession;
-									if (session) {
-										const pipeline = session.getScenePipeline();
-										if (pipeline) {
-											const slotIndex = pipeline.slots.findIndex(s => s.id === slot.id);
-											if (slotIndex !== -1) {
-												pipeline.slots[slotIndex] = { ...pipeline.slots[slotIndex], status: 'generating' };
-												sessionStore.update(s => ({ ...s }));
-											}
-										}
-									}
-									return async ({ result, update }) => {
-										timing.complete(result.type === 'success');
-										await update();
-										generatingSlots = new Set([...generatingSlots].filter(id => id !== slot.id));
-									};
-								}}
-							>
-								<input type="hidden" name="slotId" value={slot.id} />
-								<input type="hidden" name="description" value={slot.customDescription || slot.storyScene.description} />
-								<input type="hidden" name="characterDescriptions" value={getCharacterDescriptions(slot)} />
-								<Button
-									type="submit"
-									size="sm"
-									class="w-full"
-									data-generate-slot={slot.id}
-									disabled={isAnyGenerating}
-								>
-									{#if generatingSlots.has(slot.id) || slot.status === 'generating'}
-										<Loader2 class="h-4 w-4 animate-spin" data-spinner />
-										Generating...
-									{:else}
-										Generate
-									{/if}
-								</Button>
-								{#if generatingSlots.has(slot.id) || slot.status === 'generating'}
-									<ProgressBar type="generateScene" isActive={true} class="mt-2" />
-								{/if}
-							</form>
-						{/if}
-					</div>
-				{/each}
-
-				<div>
-					<button
-						type="button"
-						data-add-wireframe
-						class="wireframe flex items-center justify-center w-64 border border-dashed border-white rounded-lg cursor-pointer hover:bg-muted/50 bg-transparent"
-						style="aspect-ratio: 16/9;"
-						onclick={addSlot}
-					>
-						<span class="text-4xl text-muted-foreground">+</span>
-					</button>
-				</div>
-			</div>
-
-			{#if hasGeneratedImages}
-				<div class="flex gap-2">
-					<Button onclick={goToStoryboard}>Send to Storyboard</Button>
-				</div>
-			{/if}
-			</div>
-		</div>
-	</section>
-
 	<!-- ========== STORYBOARD SECTION ========== -->
 	<section
 		id="storyboard"
@@ -2529,8 +2361,8 @@
 			<div class="flex flex-1 flex-col gap-4">
 				<div class="flex items-center justify-between">
 					<div>
-						<h1 class="text-3xl font-bold">Storyboard Editor</h1>
-						<p class="text-muted-foreground">Arrange your scenes and edit with prompts</p>
+						<h1 class="text-3xl font-bold">Storyboard</h1>
+						<p class="text-muted-foreground">Create and arrange your scenes</p>
 					</div>
 					<div class="flex gap-2">
 						{#if testingMode}
@@ -2750,9 +2582,9 @@
 		<div class="flex flex-col gap-4">
 			<div class="flex items-center justify-between">
 				<div>
-					<h1 class="text-3xl font-bold">Video Generation</h1>
+					<h1 class="text-3xl font-bold">Video</h1>
 					<p class="text-muted-foreground">
-						Generate {sceneVideos.length} video clip{sceneVideos.length !== 1 ? 's' : ''} ({totalVideoDuration}s total) using {selectedProvider === 'kling' ? 'Kling AI (with audio)' : 'Mock (for testing)'}
+						Generate video clips from your scenes
 					</p>
 				</div>
 				<div class="flex gap-2">
@@ -2901,20 +2733,29 @@
 				</div>
 			{/each}
 
-			{#if !allCompleted}
-				<Button
-					onclick={startGeneratingAllScenes}
-					disabled={isVideoGenerating || !hasScenes}
-					data-generate-video
-				>
-					{#if isVideoGenerating}
-						<Loader2 class="h-4 w-4 animate-spin" data-spinner />
-						Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
-					{:else}
-						Generate All Videos ({sceneVideos.length} clips)
-					{/if}
-				</Button>
-			{/if}
+			<div class="flex items-center gap-2">
+				{#if !allCompleted}
+					<Button
+						onclick={startGeneratingAllScenes}
+						disabled={isVideoGenerating || !hasScenes}
+						data-generate-video
+					>
+						{#if isVideoGenerating}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
+							Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
+						{:else}
+							Generate Video
+						{/if}
+					</Button>
+				{/if}
+
+				{#if allCompleted}
+					<Button onclick={downloadVideo}>
+						<Download class="mr-2 h-4 w-4" />
+						Download
+					</Button>
+				{/if}
+			</div>
 
 			{#each sceneVideos as sceneVideo, index}
 				<form

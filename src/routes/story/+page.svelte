@@ -307,7 +307,7 @@
 	<div class="flex flex-col gap-4">
 		<div class="flex items-center justify-between">
 			<div>
-				<h1 class="text-3xl font-bold">Story Generation</h1>
+				<h1 class="text-3xl font-bold">Story</h1>
 				<p class="text-muted-foreground">Generate a story from your prompt using ChatGPT</p>
 			</div>
 			{#if $sessionStore.activeSession && sessionStoryHistory.length > 0}
