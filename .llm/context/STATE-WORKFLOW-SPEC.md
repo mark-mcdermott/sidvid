@@ -746,9 +746,10 @@ sidvid storyboard preview
 
 ### Video Version Management
 
+- **Version thumbnails visibility**: Only shown when 2+ versions exist. With one version, the video displays in the main player without a version selector.
 - Latest generated video is **active by default**
 - Only one video can be active at a time
-- Non-active videos display a **trashcan icon** for deletion (except when only one exists)
+- Non-active videos display a **trashcan icon** for deletion
 - Non-active videos can be **selected to become active**
 - Active video is shown in the main player
 
