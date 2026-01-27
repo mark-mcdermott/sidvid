@@ -3,8 +3,26 @@
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { sessionStore } from '$lib/stores/sessionStore';
-	import { storyboardStore } from '$lib/stores/storyboardStore';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check } from '@lucide/svelte';
+	import {
+		storyboardStore,
+		getActiveScenes,
+		getActiveSceneImageUrl
+	} from '$lib/stores/storyboardStore';
+	import {
+		videoStore,
+		loadVideoFromStorage,
+		saveVideoToStorage,
+		addVideoVersion,
+		setActiveVersion,
+		deleteVideoVersion,
+		getActiveVersion,
+		startPreview,
+		stopPreview,
+		advancePreviewFrame,
+		setVideoStatus,
+		setGenerationProgress
+	} from '$lib/stores/videoStore';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, Download, Trash2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
@@ -112,7 +130,20 @@
 		sceneVideos.filter(sv => sv.status === 'completed')
 	);
 
+	// Preview state
+	let previewInterval: ReturnType<typeof setInterval> | null = null;
+
+	// Video versions from store
+	let versions = $derived($videoStore.versions);
+	let activeVersion = $derived(getActiveVersion(versions));
+	let hasMultipleVersions = $derived(versions.length > 1);
+
+	// Use storyboard scenes for preview
+	let storyboardScenes = $derived(getActiveScenes($storyboardStore.scenes));
+
 	onMount(() => {
+		loadVideoFromStorage();
+
 		return () => {
 			if (pollInterval) {
 				clearInterval(pollInterval);
@@ -120,7 +151,35 @@
 			if (retryTimeoutId) {
 				clearTimeout(retryTimeoutId);
 			}
+			if (previewInterval) {
+				clearInterval(previewInterval);
+			}
 		};
+	});
+
+	// Save video state when versions change
+	$effect(() => {
+		if (versions) {
+			saveVideoToStorage();
+		}
+	});
+
+	// Handle preview playback
+	$effect(() => {
+		if ($videoStore.isPreviewPlaying && storyboardScenes.length > 0) {
+			const currentScene = storyboardScenes[$videoStore.previewCurrentFrame];
+			const duration = currentScene?.duration || 5;
+
+			previewInterval = setTimeout(() => {
+				advancePreviewFrame(storyboardScenes.length);
+			}, duration * 1000);
+
+			return () => {
+				if (previewInterval) {
+					clearTimeout(previewInterval);
+				}
+			};
+		}
 	});
 
 	// Handle form action results for multi-scene generation
@@ -361,6 +420,44 @@
 		stopPolling();
 	}
 
+	// Preview functionality - slideshow of storyboard poster images
+	function togglePreview() {
+		if ($videoStore.isPreviewPlaying) {
+			stopPreview();
+		} else {
+			startPreview();
+		}
+	}
+
+	// Get current preview image URL
+	let previewImageUrl = $derived(() => {
+		if (!$videoStore.isPreviewPlaying || storyboardScenes.length === 0) return null;
+		const scene = storyboardScenes[$videoStore.previewCurrentFrame];
+		return scene ? getActiveSceneImageUrl(scene) : null;
+	});
+
+	// Download active video
+	function downloadVideo() {
+		if (activeVersion?.videoUrl) {
+			const link = document.createElement('a');
+			link.href = activeVersion.videoUrl;
+			link.download = `sidvid-video-${Date.now()}.mp4`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		}
+	}
+
+	// Handle version selection
+	function selectVersion(versionId: string) {
+		setActiveVersion(versionId);
+	}
+
+	// Handle version deletion
+	function handleDeleteVersion(versionId: string) {
+		deleteVideoVersion(versionId);
+	}
+
 	let hasScenes = $derived(sceneThumbnails.length > 0);
 	let totalDuration = $derived(sceneVideos.length * 5);
 </script>
@@ -480,6 +577,76 @@
 		{/if}
 	</div>
 
+	<!-- Version Thumbnails (only when 2+ versions exist) -->
+	{#if hasMultipleVersions}
+		<div class="flex items-center justify-center gap-2">
+			{#each versions as version}
+				<div class="relative group">
+					<button
+						class="rounded overflow-hidden transition-all {version.isActive ? 'ring-4 ring-gray-300' : 'hover:ring-2 hover:ring-primary'}"
+						onclick={() => selectVersion(version.id)}
+						title={version.isActive ? 'Active version' : 'Click to select'}
+					>
+						<img
+							src={version.thumbnailUrl}
+							alt="Video version"
+							class="w-16 h-10 object-cover"
+						/>
+					</button>
+					{#if !version.isActive}
+						<button
+							class="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
+							onclick={() => handleDeleteVersion(version.id)}
+							title="Delete this version"
+						>
+							<Trash2 class="h-3 w-3" />
+						</button>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- Action Buttons -->
+	<div class="flex items-center justify-center gap-2">
+		<Button variant="outline" onclick={togglePreview} disabled={!hasScenes}>
+			{#if $videoStore.isPreviewPlaying}
+				<Pause class="mr-2 h-4 w-4" />
+				Stop Preview
+			{:else}
+				<Play class="mr-2 h-4 w-4" />
+				Preview
+			{/if}
+		</Button>
+
+		{#if !allCompleted}
+			<Button
+				onclick={startGeneratingAllScenes}
+				disabled={isGenerating || !hasScenes}
+				data-generate-video
+			>
+				{#if isGenerating}
+					<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
+					Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
+				{:else}
+					Generate Video
+				{/if}
+			</Button>
+		{:else}
+			<Button onclick={handleRegenerate} variant="outline">
+				<RotateCcw class="mr-2 h-4 w-4" />
+				Regenerate
+			</Button>
+		{/if}
+
+		{#if allCompleted}
+			<Button onclick={downloadVideo}>
+				<Download class="mr-2 h-4 w-4" />
+				Download
+			</Button>
+		{/if}
+	</div>
+
 	<!-- Scene Video Progress Grid -->
 	{#if isGenerating || completedVideos.length > 0}
 		<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -523,22 +690,6 @@
 			Scene {errorScene.sceneIndex + 1}: {errorScene.error}
 		</div>
 	{/each}
-
-	<!-- Generate Button -->
-	{#if !allCompleted}
-		<Button
-			onclick={startGeneratingAllScenes}
-			disabled={isGenerating || !hasScenes}
-			data-generate-video
-		>
-			{#if isGenerating}
-				<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
-				Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
-			{:else}
-				Generate All Videos ({sceneVideos.length} clips)
-			{/if}
-		</Button>
-	{/if}
 
 	<!-- Hidden forms for each scene -->
 	{#each sceneVideos as sceneVideo, index}
