@@ -24,7 +24,7 @@ export function createProject(overrides: Partial<Project> = {}): Project {
 	const now = new Date();
 	return {
 		id: `proj-${Date.now()}`,
-		name: 'New Project',
+		name: 'My New Project',
 		description: undefined,
 		thumbnail: undefined,
 		createdAt: now,
@@ -184,7 +184,7 @@ export const mockApiResponses = {
 		}
 	],
 
-	createProject: (name: string = 'New Project') => ({
+	createProject: (name: string = 'My New Project') => ({
 		id: `proj-${Date.now()}`,
 		name,
 		description: undefined,
@@ -348,20 +348,154 @@ export async function setupApiMocks(page: Page) {
 }
 
 /**
- * Setup localStorage with initial project data
+ * Setup IndexedDB with initial project data
+ * This matches the BrowserStorageAdapter's storage format
  */
 export async function setupProjectInLocalStorage(page: Page, project: Partial<Project> = {}) {
 	const fullProject = createProject(project);
-	await page.evaluate((proj) => {
-		// Convert Map to object for JSON serialization
-		const serializable = {
-			...proj,
-			worldElements: {}
-		};
-		localStorage.setItem('sidvid-current-project', JSON.stringify(serializable));
-		localStorage.setItem('sidvid-current-project-id', proj.id);
-	}, fullProject);
+
+	// Pre-serialize dates before passing to page.evaluate
+	const now = new Date().toISOString();
+	const serializable = {
+		id: fullProject.id,
+		name: fullProject.name,
+		description: fullProject.description,
+		thumbnail: fullProject.thumbnail,
+		createdAt: now,
+		updatedAt: now,
+		lastOpenedAt: now,
+		storyHistory: [],
+		storyHistoryIndex: -1,
+		currentStory: null,
+		worldElements: {},
+		scenes: [],
+		video: null
+	};
+
+	await page.evaluate(async (proj) => {
+		const dbName = 'sidvid';
+		const storeName = 'sessions';
+
+		return new Promise<void>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				reject(new Error('IndexedDB operation timed out'));
+			}, 10000);
+
+			const request = indexedDB.open(dbName, 1);
+
+			request.onerror = () => {
+				clearTimeout(timeout);
+				reject(request.error);
+			};
+
+			request.onupgradeneeded = (event) => {
+				const db = (event.target as IDBOpenDBRequest).result;
+				if (!db.objectStoreNames.contains(storeName)) {
+					db.createObjectStore(storeName);
+				}
+			};
+
+			request.onsuccess = () => {
+				clearTimeout(timeout);
+				const db = request.result;
+				const transaction = db.transaction([storeName], 'readwrite');
+				const store = transaction.objectStore(storeName);
+
+				const putRequest = store.put(proj, `projects/${proj.id}`);
+
+				putRequest.onerror = () => {
+					db.close();
+					reject(putRequest.error);
+				};
+
+				putRequest.onsuccess = () => {
+					db.close();
+					resolve();
+				};
+			};
+		});
+	}, serializable);
 	return fullProject;
+}
+
+/**
+ * Setup multiple projects in IndexedDB
+ */
+export async function setupMultipleProjects(
+	page: Page,
+	projects: Array<{ id: string; name: string; description?: string }>
+) {
+	await page.evaluate(async (projectData) => {
+		const dbName = 'sidvid';
+		const storeName = 'sessions';
+		const now = new Date().toISOString();
+
+		return new Promise<void>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				reject(new Error('IndexedDB operation timed out'));
+			}, 10000);
+
+			const request = indexedDB.open(dbName, 1);
+
+			request.onerror = () => {
+				clearTimeout(timeout);
+				reject(request.error);
+			};
+
+			request.onupgradeneeded = (event) => {
+				const db = (event.target as IDBOpenDBRequest).result;
+				if (!db.objectStoreNames.contains(storeName)) {
+					db.createObjectStore(storeName);
+				}
+			};
+
+			request.onsuccess = () => {
+				clearTimeout(timeout);
+				const db = request.result;
+				const transaction = db.transaction([storeName], 'readwrite');
+				const store = transaction.objectStore(storeName);
+
+				let completed = 0;
+				const total = projectData.length;
+
+				if (total === 0) {
+					db.close();
+					resolve();
+					return;
+				}
+
+				for (const proj of projectData) {
+					const fullProject = {
+						id: proj.id,
+						name: proj.name,
+						description: proj.description,
+						createdAt: now,
+						updatedAt: now,
+						lastOpenedAt: now,
+						storyHistory: [],
+						storyHistoryIndex: -1,
+						currentStory: null,
+						worldElements: {},
+						scenes: [],
+						video: null
+					};
+
+					const putRequest = store.put(fullProject, `projects/${proj.id}`);
+					putRequest.onerror = () => {
+						db.close();
+						reject(putRequest.error);
+					};
+					putRequest.onsuccess = () => {
+						completed++;
+						if (completed === total) {
+							db.close();
+							resolve();
+						}
+					};
+				}
+			};
+		});
+	}, projects);
 }
 
 // =============================================================================

@@ -12,12 +12,21 @@ export async function waitForNetworkIdle(page: Page, timeout = 2000) {
 }
 
 /**
- * Clear all data stores (conversation history, etc.)
+ * Clear all data stores (localStorage, sessionStorage, IndexedDB)
  */
 export async function clearAllData(page: Page) {
-	await page.evaluate(() => {
+	await page.evaluate(async () => {
+		// Clear localStorage and sessionStorage
 		localStorage.clear();
 		sessionStorage.clear();
+
+		// Clear IndexedDB databases
+		const databases = await indexedDB.databases();
+		for (const db of databases) {
+			if (db.name) {
+				indexedDB.deleteDatabase(db.name);
+			}
+		}
 	});
 }
 

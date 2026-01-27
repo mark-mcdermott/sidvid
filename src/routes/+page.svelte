@@ -12,6 +12,9 @@
 
 	// Stores
 	import { storyStore } from '$lib/stores/storyStore';
+
+	// Components
+	import ProjectSection from '$lib/components/project/ProjectSection.svelte';
 	import { characterStore, loadStoryCharacters, ensureCharacterExpanded, getActiveImageUrl, resetCharacterStore } from '$lib/stores/characterStore';
 	import { sessionStore } from '$lib/stores/sessionStore';
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
@@ -1523,6 +1526,9 @@
 </button>
 
 <div class="flex flex-col gap-8">
+	<!-- ========== PROJECT SECTION ========== -->
+	<ProjectSection />
+
 	<!-- ========== STORY SECTION ========== -->
 	<section
 		id="story"

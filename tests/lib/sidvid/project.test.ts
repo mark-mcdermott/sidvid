@@ -10,164 +10,16 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-// Types based on SCHEMAS-SPEC.md
-interface Project {
-	id: string;
-	name: string;
-	description?: string;
-	thumbnail?: string;
-	createdAt: Date;
-	updatedAt: Date;
-	lastOpenedAt: Date;
-	storyHistory: any[];
-	storyHistoryIndex: number;
-	currentStory: any | null;
-	worldElements: Map<string, any>;
-	scenes: any[];
-	video: any | null;
-}
-
-interface ProjectSummary {
-	id: string;
-	name: string;
-	description?: string;
-	thumbnail?: string;
-	updatedAt: Date;
-	lastOpenedAt: Date;
-}
-
-// Mock implementation of what the library should provide
-class ProjectManager {
-	private projects: Map<string, Project> = new Map();
-	private currentProjectId: string | null = null;
-
-	async createProject(name: string = 'New Project'): Promise<Project> {
-		// Generate unique name if needed
-		const uniqueName = this.generateUniqueName(name);
-
-		const project: Project = {
-			id: `proj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-			name: uniqueName,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			lastOpenedAt: new Date(),
-			storyHistory: [],
-			storyHistoryIndex: -1,
-			currentStory: null,
-			worldElements: new Map(),
-			scenes: [],
-			video: null
-		};
-
-		this.projects.set(project.id, project);
-		this.currentProjectId = project.id;
-
-		return project;
-	}
-
-	async getProject(id: string): Promise<Project | null> {
-		return this.projects.get(id) || null;
-	}
-
-	async listProjects(): Promise<ProjectSummary[]> {
-		return Array.from(this.projects.values()).map((p) => ({
-			id: p.id,
-			name: p.name,
-			description: p.description,
-			thumbnail: p.thumbnail,
-			updatedAt: p.updatedAt,
-			lastOpenedAt: p.lastOpenedAt
-		}));
-	}
-
-	async updateProject(project: Project): Promise<void> {
-		if (!this.projects.has(project.id)) {
-			throw new Error(`Project ${project.id} not found`);
-		}
-		project.updatedAt = new Date();
-		this.projects.set(project.id, project);
-	}
-
-	async deleteProject(id: string): Promise<void> {
-		if (!this.projects.has(id)) {
-			throw new Error(`Project ${id} not found`);
-		}
-		this.projects.delete(id);
-
-		// If deleted project was current, clear current
-		if (this.currentProjectId === id) {
-			this.currentProjectId = null;
-		}
-	}
-
-	async renameProject(id: string, newName: string): Promise<Project> {
-		const project = await this.getProject(id);
-		if (!project) {
-			throw new Error(`Project ${id} not found`);
-		}
-
-		// Check for name uniqueness (excluding self)
-		const existingNames = Array.from(this.projects.values())
-			.filter((p) => p.id !== id)
-			.map((p) => p.name);
-
-		if (existingNames.includes(newName)) {
-			throw new Error(`Project name "${newName}" already exists`);
-		}
-
-		project.name = newName;
-		await this.updateProject(project);
-		return project;
-	}
-
-	async switchProject(id: string): Promise<Project> {
-		const project = await this.getProject(id);
-		if (!project) {
-			throw new Error(`Project ${id} not found`);
-		}
-
-		project.lastOpenedAt = new Date();
-		await this.updateProject(project);
-		this.currentProjectId = id;
-
-		return project;
-	}
-
-	getCurrentProjectId(): string | null {
-		return this.currentProjectId;
-	}
-
-	async getCurrentProject(): Promise<Project | null> {
-		if (!this.currentProjectId) return null;
-		return this.getProject(this.currentProjectId);
-	}
-
-	private generateUniqueName(baseName: string): string {
-		const existingNames = Array.from(this.projects.values()).map((p) => p.name);
-
-		if (!existingNames.includes(baseName)) {
-			return baseName;
-		}
-
-		// Find next available number
-		let counter = 1;
-		let candidateName = `${baseName} (${counter})`;
-
-		while (existingNames.includes(candidateName)) {
-			counter++;
-			candidateName = `${baseName} (${counter})`;
-		}
-
-		return candidateName;
-	}
-}
+import { ProjectManager, MemoryStorageAdapter } from '$lib/sidvid';
+import type { Project, ProjectSummary } from '$lib/sidvid';
 
 describe('Stage 1: Project - Unit Tests', () => {
 	let manager: ProjectManager;
+	let storage: MemoryStorageAdapter;
 
 	beforeEach(() => {
-		manager = new ProjectManager();
+		storage = new MemoryStorageAdapter();
+		manager = new ProjectManager(storage);
 	});
 
 	// ===========================================================================
@@ -175,10 +27,10 @@ describe('Stage 1: Project - Unit Tests', () => {
 	// ===========================================================================
 
 	describe('createProject', () => {
-		it('creates a project with default name "New Project"', async () => {
+		it('creates a project with default name "My New Project"', async () => {
 			const project = await manager.createProject();
 
-			expect(project.name).toBe('New Project');
+			expect(project.name).toBe('My New Project');
 		});
 
 		it('creates a project with specified name', async () => {
@@ -198,7 +50,7 @@ describe('Stage 1: Project - Unit Tests', () => {
 			const project = await manager.createProject();
 
 			expect(project).toMatchObject({
-				name: 'New Project',
+				name: 'My New Project',
 				storyHistory: [],
 				storyHistoryIndex: -1,
 				currentStory: null,
@@ -232,36 +84,36 @@ describe('Stage 1: Project - Unit Tests', () => {
 	// ===========================================================================
 
 	describe('Default Naming', () => {
-		it('generates "New Project (1)" if "New Project" exists', async () => {
-			await manager.createProject('New Project');
-			const project2 = await manager.createProject('New Project');
+		it('generates "My New Project (1)" if "My New Project" exists', async () => {
+			await manager.createProject('My New Project');
+			const project2 = await manager.createProject('My New Project');
 
-			expect(project2.name).toBe('New Project (1)');
+			expect(project2.name).toBe('My New Project (1)');
 		});
 
-		it('generates "New Project (2)" if (1) also exists', async () => {
-			await manager.createProject('New Project');
-			await manager.createProject('New Project');
-			const project3 = await manager.createProject('New Project');
+		it('generates "My New Project (2)" if (1) also exists', async () => {
+			await manager.createProject('My New Project');
+			await manager.createProject('My New Project');
+			const project3 = await manager.createProject('My New Project');
 
-			expect(project3.name).toBe('New Project (2)');
+			expect(project3.name).toBe('My New Project (2)');
 		});
 
 		it('handles gaps in numbering correctly', async () => {
-			await manager.createProject('New Project');
-			await manager.createProject('New Project'); // (1)
-			await manager.createProject('New Project'); // (2)
+			await manager.createProject('My New Project');
+			await manager.createProject('My New Project'); // (1)
+			await manager.createProject('My New Project'); // (2)
 
 			// Delete (1)
 			const projects = await manager.listProjects();
-			const proj1 = projects.find((p) => p.name === 'New Project (1)');
+			const proj1 = projects.find((p) => p.name === 'My New Project (1)');
 			if (proj1) {
 				await manager.deleteProject(proj1.id);
 			}
 
 			// Next should be (1) again since it's free
-			const newProject = await manager.createProject('New Project');
-			expect(newProject.name).toBe('New Project (1)');
+			const newProject = await manager.createProject('My New Project');
+			expect(newProject.name).toBe('My New Project (1)');
 		});
 
 		it('applies uniqueness to custom names too', async () => {

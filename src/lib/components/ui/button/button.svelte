@@ -20,9 +20,9 @@
 				default: "h-9 px-4 py-2 has-[>svg]:pl-4 has-[>svg]:pr-4",
 				sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:pl-3 has-[>svg]:pr-3",
 				lg: "h-10 rounded-md px-6 has-[>svg]:pl-5 has-[>svg]:pr-6",
-				icon: "size-9",
-				"icon-sm": "size-8",
-				"icon-lg": "size-10",
+				icon: "size-9 [&_svg]:mr-0",
+				"icon-sm": "size-8 [&_svg]:mr-0",
+				"icon-lg": "size-10 [&_svg]:mr-0",
 			},
 		},
 		defaultVariants: {

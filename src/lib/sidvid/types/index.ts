@@ -6,6 +6,173 @@ export interface SidVidConfig {
   defaultVideoModel?: string;
 }
 
+// ===== Project Types (per SCHEMAS-SPEC.md) =====
+
+export type StylePreset = 'anime' | 'photorealistic' | '3d-animated' | 'watercolor' | 'comic' | 'custom';
+
+export interface Style {
+  preset: StylePreset;
+  customPrompt?: string;
+}
+
+export type ElementType = 'character' | 'location' | 'object' | 'concept';
+
+export interface ElementImage {
+  id: string;
+  imageUrl: string;
+  revisedPrompt: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface WorldElementVersion {
+  description: string;
+  enhancedDescription?: string;
+  isEnhanced?: boolean;
+  preEnhancementDescription?: string;
+  images: ElementImage[];
+  createdAt: Date;
+}
+
+export interface WorldElement {
+  id: string;
+  name: string;
+  type: ElementType;
+  description: string;
+  enhancedDescription?: string;
+  isEnhanced?: boolean;
+  preEnhancementDescription?: string;
+  images: ElementImage[];
+  historyIndex: number;
+  history: WorldElementVersion[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StoryLocation {
+  name: string;
+  description: string;
+}
+
+export interface StoryObject {
+  name: string;
+  description: string;
+}
+
+export interface StoryConcept {
+  name: string;
+  description: string;
+}
+
+export interface ProjectStoryScene {
+  number: number;
+  title: string;
+  description: string;
+  dialogue: string;
+  action: string;
+  elementsPresent: string[];
+  duration: number;
+}
+
+export interface ProjectStoryCharacter {
+  name: string;
+  description: string;
+  physical: string;
+  profile: string;
+}
+
+export interface ProjectStory {
+  id: string;
+  title: string;
+  prompt: string;
+  style: Style;
+  targetDuration: number;
+  narrative: string;
+  scenes: ProjectStoryScene[];
+  characters: ProjectStoryCharacter[];
+  locations: StoryLocation[];
+  objects: StoryObject[];
+  concepts: StoryConcept[];
+  isSmartExpanded?: boolean;
+  preExpansionNarrative?: string;
+  createdAt: Date;
+}
+
+export type SceneStatus = 'empty' | 'pending' | 'generating' | 'completed' | 'failed';
+
+export interface SceneImage {
+  id: string;
+  imageUrl: string;
+  revisedPrompt: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface ProjectScene {
+  id: string;
+  title: string;
+  description: string;
+  customDescription?: string;
+  enhancedDescription?: string;
+  isSmartExpanded?: boolean;
+  preExpansionDescription?: string;
+  isArchived?: boolean;
+  dialog?: string;
+  action?: string;
+  assignedElements: string[];
+  images: SceneImage[];
+  duration: number;
+  status: SceneStatus;
+  error?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type VideoStatus = 'not_started' | 'generating' | 'polling' | 'completed' | 'failed';
+
+export interface VideoVersion {
+  id: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  duration: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface ProjectVideo {
+  id: string;
+  projectId: string;
+  status: VideoStatus;
+  versions: VideoVersion[];
+  error?: string;
+  createdAt: Date;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnail?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastOpenedAt: Date;
+  storyHistory: ProjectStory[];
+  storyHistoryIndex: number;
+  currentStory: ProjectStory | null;
+  worldElements: Map<string, WorldElement>;
+  scenes: ProjectScene[];
+  video: ProjectVideo | null;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnail?: string;
+  updatedAt: Date;
+  lastOpenedAt: Date;
+}
+
 export interface StoryOptions {
   prompt: string;
   scenes?: number;
