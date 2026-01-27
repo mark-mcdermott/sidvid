@@ -68,12 +68,12 @@ The sidebar is collapsible. When collapsed, it is completely hidden.
 │  │                            │  │    logo-no-ice-white.png (dark mode)
 │  └────────────────────────────┘  │
 │                                  │
-│  Dashboard                       │  ← Links to / (bold if current page)
-│    Project                       │  ← Indented, links to /project
-│    Story                         │  ← Indented, links to /story
-│    World                         │  ← Indented, links to /world
-│    Storyboard                    │  ← Indented, links to /storyboard
-│    Video                         │  ← Indented, links to /video
+│  Dashboard                       │  ← Links to / (bold only on /)
+│  Project                         │  ← Links to /project (bold only on /project)
+│  Story                           │  ← Links to /story (bold only on /story)
+│  World                           │  ← Links to /world (bold only on /world)
+│  Storyboard                      │  ← Links to /storyboard (bold only on /storyboard)
+│  Video                           │  ← Links to /video (bold only on /video)
 │                                  │
 │  ─────────────────────────────── │  ← Divider (only if content below)
 │                                  │
@@ -100,7 +100,7 @@ The sidebar is collapsible. When collapsed, it is completely hidden.
 
 | Element | Behavior |
 |---------|----------|
-| **Navigation links** | Click to navigate; **bold** indicates current page |
+| **Navigation links** | Click to navigate; **bold** indicates current page (each link bold only on its own route) |
 | **World Element thumbnails** | Show active image; draggable to Storyboard on `/` or `/storyboard` |
 | **Sidebar width** | Fixed width |
 
