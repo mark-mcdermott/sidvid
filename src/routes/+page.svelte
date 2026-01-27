@@ -16,6 +16,7 @@
 	// Components
 	import ProjectSection from '$lib/components/project/ProjectSection.svelte';
 	import { characterStore, loadStoryCharacters, ensureCharacterExpanded, getActiveImageUrl, resetCharacterStore } from '$lib/stores/characterStore';
+	import { worldStore, loadElementsFromStory, getElementsByType, ELEMENT_TYPE_COLORS, getActiveElementImageUrl } from '$lib/stores/worldStore';
 	import { sessionStore } from '$lib/stores/sessionStore';
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import {
@@ -63,13 +64,13 @@
 	}
 
 	// ========== Active Section State ==========
-	type Section = 'story' | 'characters' | 'scenes' | 'storyboard' | 'video';
+	type Section = 'story' | 'world' | 'scenes' | 'storyboard' | 'video';
 	let activeSection = $state<Section>('story');
 
 	// Section refs for scrolling
 	let sectionRefs: Record<Section, HTMLElement | undefined> = {
 		story: undefined,
-		characters: undefined,
+		world: undefined,
 		scenes: undefined,
 		storyboard: undefined,
 		video: undefined
@@ -1044,7 +1045,7 @@
 					if (shouldNavigateToCharactersAfterStory) {
 						shouldNavigateToCharactersAfterStory = false;
 						// Scroll to characters section after a small delay to allow DOM update
-						setTimeout(() => scrollToSection('characters'), 100);
+						setTimeout(() => scrollToSection('world'), 100);
 					}
 				});
 			}
@@ -1455,7 +1456,7 @@
 		if (latestStory?.story.characters && latestStory.story.characters.length > 0) {
 			loadStoryCharacters(latestStory.story.characters);
 		}
-		scrollToSection('characters');
+		scrollToSection('world');
 	}
 
 	function goToScenes() {
@@ -1985,22 +1986,18 @@
 		</form>
 	</section>
 
-	<!-- ========== CHARACTERS SECTION ========== -->
+	<!-- ========== WORLD SECTION ========== -->
 	<section
-		id="characters"
-		bind:this={sectionRefs.characters}
+		id="world"
+		bind:this={sectionRefs.world}
 		class="scroll-mt-16 border-b pb-8"
 	>
 		<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
 			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
-					<h1 class="text-3xl font-bold mb-3">Characters</h1>
+					<h1 class="text-3xl font-bold mb-3">World</h1>
 					<p class="text-muted-foreground">
-						{#if $characterStore.storyCharacters.length > 0}
-							Generate character images from your story, or add custom characters
-						{:else}
-							Create and generate character images
-						{/if}
+						Create world elements (characters, locations, objects, concepts)
 					</p>
 				</div>
 				{#if testingMode}

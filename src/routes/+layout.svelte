@@ -21,9 +21,14 @@
 		useSidebar
 	} from '$lib/components/ui/sidebar';
 	import { conversationStore, loadConversations } from '$lib/stores/conversationStore';
-	import { characterStore, getActiveImageUrl } from '$lib/stores/characterStore';
 	import { storyStore } from '$lib/stores/storyStore';
-	import { sessionStore, refreshSessions, createNewSession } from '$lib/stores/sessionStore';
+	import {
+		worldStore,
+		getActiveElementImageUrl,
+		getElementsByType,
+		ELEMENT_TYPE_COLORS
+	} from '$lib/stores/worldStore';
+	import { sessionStore, refreshSessions } from '$lib/stores/sessionStore';
 	import { apiTimingStore } from '$lib/stores/apiTimingStore';
 	import { SessionList, SessionDialog } from '$lib/components/sessions';
 	import { ChevronDown, ChevronUp, Sun, Moon } from '@lucide/svelte';
@@ -50,66 +55,17 @@
 	// Sidebar open state: closed by default in testing mode
 	let sidebarOpen = $state(!testingMode);
 
-	// Active section for homepage single-page nav
-	let activeSection = $state<string>('story');
-
 	const menuItems = [
-		{ title: 'Story', href: '/', section: 'story' },
-		{ title: 'Characters', href: '/', section: 'characters' },
-		{ title: 'Scenes', href: '/', section: 'scenes' },
-		{ title: 'Storyboard', href: '/', section: 'storyboard' },
-		{ title: 'Video', href: '/', section: 'video' }
+		{ title: 'Dashboard', href: '/' },
+		{ title: 'Project', href: '/project' },
+		{ title: 'Story', href: '/story' },
+		{ title: 'World', href: '/world' },
+		{ title: 'Storyboard', href: '/storyboard' },
+		{ title: 'Video', href: '/video' }
 	];
 
 	async function handleNewSession() {
 		showNewSessionDialog = true;
-	}
-
-	function scrollToSection(section: string) {
-		if (!browser) return;
-
-		const element = document.getElementById(section);
-		if (element) {
-			element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			activeSection = section;
-		}
-	}
-
-	function handleSectionClick(e: Event, section: string) {
-		// Only handle section scrolling on homepage
-		if ($page.url.pathname === '/') {
-			e.preventDefault();
-			scrollToSection(section);
-		}
-	}
-
-	// Set up intersection observer to detect which section is in view
-	function setupScrollObserver() {
-		if (!browser) return;
-
-		const sections = ['story', 'characters', 'scenes', 'storyboard', 'video'];
-		const observerOptions = {
-			root: null,
-			rootMargin: '-20% 0px -70% 0px',
-			threshold: 0
-		};
-
-		const observer = new IntersectionObserver((entries) => {
-			entries.forEach((entry) => {
-				if (entry.isIntersecting) {
-					activeSection = entry.target.id;
-				}
-			});
-		}, observerOptions);
-
-		sections.forEach((section) => {
-			const element = document.getElementById(section);
-			if (element) {
-				observer.observe(element);
-			}
-		});
-
-		return () => observer.disconnect();
 	}
 
 	onMount(async () => {
@@ -119,23 +75,6 @@
 		await loadConversations();
 		await refreshSessions();
 		await apiTimingStore.load();
-
-		// Set up scroll observer for homepage
-		let cleanup: (() => void) | undefined;
-		if ($page.url.pathname === '/') {
-			cleanup = setupScrollObserver();
-		}
-
-		return () => {
-			if (cleanup) cleanup();
-		};
-	});
-
-	// Re-setup observer when navigating to homepage
-	$effect(() => {
-		if (browser && $page.url.pathname === '/') {
-			setupScrollObserver();
-		}
 	});
 </script>
 
@@ -160,8 +99,7 @@
 							<SidebarMenuItem>
 								<SidebarMenuButton
 									href={item.href}
-									class={($page.url.pathname === '/' && activeSection === item.section) ? 'font-bold' : ''}
-									onclick={(e) => handleSectionClick(e, item.section)}
+									class={$page.url.pathname === item.href ? 'font-bold' : ''}
 								>
 									{item.title}
 								</SidebarMenuButton>
@@ -177,75 +115,160 @@
 				</SidebarGroupContent>
 			</SidebarGroup>
 
-			{#if $page.url.pathname === '/' && (activeSection === 'scenes' || activeSection === 'storyboard')}
-				<!-- Story section for scenes/storyboard sections -->
-				{#if $storyStore.stories.length > 0}
-					<SidebarGroup data-sidebar-section="story">
-						<SidebarGroupLabel>Story</SidebarGroupLabel>
-						<SidebarGroupContent>
-							<div class="px-2">
-								{#each $storyStore.stories as story, index}
-									<div
-										data-story-draggable
-										class="p-2 cursor-move hover:bg-muted rounded"
-										draggable="true"
-										ondragstart={(e) => {
-											e.dataTransfer?.setData('application/json', JSON.stringify({
-												type: 'story',
-												index,
-												title: story.story.title,
-												scenes: story.story.scenes
-											}));
-										}}
-									>
-										<div class="text-sm font-medium">{story.story.title || 'Untitled Story'}</div>
-										<div class="text-xs text-muted-foreground">{story.story.scenes.length} scenes</div>
-									</div>
-								{/each}
-							</div>
-						</SidebarGroupContent>
-					</SidebarGroup>
-				{/if}
+			{#if $page.url.pathname === '/' || $page.url.pathname === '/storyboard'}
+				<!-- World Elements section for dashboard/storyboard pages -->
+				{@const characters = getElementsByType($worldStore.elements, 'character')}
+				{@const locations = getElementsByType($worldStore.elements, 'location')}
+				{@const objects = getElementsByType($worldStore.elements, 'object')}
+				{@const concepts = getElementsByType($worldStore.elements, 'concept')}
 
-				<!-- Characters section for scenes/storyboard sections -->
-				{#if $characterStore.characters.length > 0}
-					<SidebarGroup data-sidebar-section="characters">
-						<SidebarGroupLabel>Characters</SidebarGroupLabel>
+				{#if $worldStore.elements.length > 0}
+					<SidebarGroup data-sidebar-section="world-elements">
+						<SidebarGroupLabel>World Elements</SidebarGroupLabel>
 						<SidebarGroupContent>
-							<div class="px-2 flex flex-col gap-2">
-								{#each $characterStore.characters as char, index}
-									<div
-										data-character-thumbnail
-										class="flex items-center gap-2 p-2 cursor-move hover:bg-muted rounded"
-										draggable="true"
-										ondragstart={(e) => {
-											e.dataTransfer?.setData('application/json', JSON.stringify({
-												type: 'character',
-												index,
-												name: char.slug,
-												imageUrl: getActiveImageUrl(char)
-											}));
-										}}
-									>
-										{#if getActiveImageUrl(char)}
-											<img src={getActiveImageUrl(char)} alt={char.slug} class="w-12 h-12 rounded object-cover" />
-										{:else}
-											<div class="w-12 h-12 rounded bg-muted flex items-center justify-center text-xs">
-												{char.slug.charAt(0)}
-											</div>
-										{/if}
-										<div class="flex-1 min-w-0">
-											<div class="text-sm font-medium truncate">{char.slug}</div>
+							<div class="px-2 flex flex-col gap-3">
+								{#if characters.length > 0}
+									<div>
+										<div class="text-xs font-medium text-muted-foreground mb-1">Characters</div>
+										<div class="flex flex-wrap gap-1">
+											{#each characters as element}
+												<div
+													data-element-thumbnail
+													class="w-8 h-8 rounded cursor-move hover:ring-2 hover:ring-primary"
+													style="border: 2px solid {ELEMENT_TYPE_COLORS.character};"
+													draggable="true"
+													title={element.name}
+													ondragstart={(e) => {
+														e.dataTransfer?.setData('application/json', JSON.stringify({
+															type: 'world-element',
+															elementType: 'character',
+															id: element.id,
+															name: element.name,
+															imageUrl: getActiveElementImageUrl(element)
+														}));
+													}}
+												>
+													{#if getActiveElementImageUrl(element)}
+														<img src={getActiveElementImageUrl(element)} alt={element.name} class="w-full h-full rounded object-cover" />
+													{:else}
+														<div class="w-full h-full rounded bg-muted flex items-center justify-center text-xs">
+															{element.name.charAt(0)}
+														</div>
+													{/if}
+												</div>
+											{/each}
 										</div>
 									</div>
-								{/each}
+								{/if}
+
+								{#if locations.length > 0}
+									<div>
+										<div class="text-xs font-medium text-muted-foreground mb-1">Locations</div>
+										<div class="flex flex-wrap gap-1">
+											{#each locations as element}
+												<div
+													data-element-thumbnail
+													class="w-8 h-8 rounded cursor-move hover:ring-2 hover:ring-primary"
+													style="border: 2px solid {ELEMENT_TYPE_COLORS.location};"
+													draggable="true"
+													title={element.name}
+													ondragstart={(e) => {
+														e.dataTransfer?.setData('application/json', JSON.stringify({
+															type: 'world-element',
+															elementType: 'location',
+															id: element.id,
+															name: element.name,
+															imageUrl: getActiveElementImageUrl(element)
+														}));
+													}}
+												>
+													{#if getActiveElementImageUrl(element)}
+														<img src={getActiveElementImageUrl(element)} alt={element.name} class="w-full h-full rounded object-cover" />
+													{:else}
+														<div class="w-full h-full rounded bg-muted flex items-center justify-center text-xs">
+															{element.name.charAt(0)}
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								{#if objects.length > 0}
+									<div>
+										<div class="text-xs font-medium text-muted-foreground mb-1">Objects</div>
+										<div class="flex flex-wrap gap-1">
+											{#each objects as element}
+												<div
+													data-element-thumbnail
+													class="w-8 h-8 rounded cursor-move hover:ring-2 hover:ring-primary"
+													style="border: 2px solid {ELEMENT_TYPE_COLORS.object};"
+													draggable="true"
+													title={element.name}
+													ondragstart={(e) => {
+														e.dataTransfer?.setData('application/json', JSON.stringify({
+															type: 'world-element',
+															elementType: 'object',
+															id: element.id,
+															name: element.name,
+															imageUrl: getActiveElementImageUrl(element)
+														}));
+													}}
+												>
+													{#if getActiveElementImageUrl(element)}
+														<img src={getActiveElementImageUrl(element)} alt={element.name} class="w-full h-full rounded object-cover" />
+													{:else}
+														<div class="w-full h-full rounded bg-muted flex items-center justify-center text-xs">
+															{element.name.charAt(0)}
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								{#if concepts.length > 0}
+									<div>
+										<div class="text-xs font-medium text-muted-foreground mb-1">Concepts</div>
+										<div class="flex flex-wrap gap-1">
+											{#each concepts as element}
+												<div
+													data-element-thumbnail
+													class="w-8 h-8 rounded cursor-move hover:ring-2 hover:ring-primary"
+													style="border: 2px solid {ELEMENT_TYPE_COLORS.concept};"
+													draggable="true"
+													title={element.name}
+													ondragstart={(e) => {
+														e.dataTransfer?.setData('application/json', JSON.stringify({
+															type: 'world-element',
+															elementType: 'concept',
+															id: element.id,
+															name: element.name,
+															imageUrl: getActiveElementImageUrl(element)
+														}));
+													}}
+												>
+													{#if getActiveElementImageUrl(element)}
+														<img src={getActiveElementImageUrl(element)} alt={element.name} class="w-full h-full rounded object-cover" />
+													{:else}
+														<div class="w-full h-full rounded bg-muted flex items-center justify-center text-xs">
+															{element.name.charAt(0)}
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
 							</div>
 						</SidebarGroupContent>
 					</SidebarGroup>
 				{/if}
 			{/if}
 
-			{#if $page.url.pathname === '/' && activeSection === 'video'}
+			{#if $page.url.pathname === '/video'}
 				<SidebarGroup data-sidebar-section="video">
 					<SidebarGroupLabel>Video</SidebarGroupLabel>
 					<SidebarGroupContent>
