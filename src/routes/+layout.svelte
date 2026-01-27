@@ -336,20 +336,20 @@
 	</Sidebar>
 	<SidebarInset>
 		{@const sidebar = useSidebar()}
-		<header class="flex h-12 items-center justify-between border-b px-4">
+		<header class="relative flex h-16 items-center justify-between border-b px-4">
 			<div class="flex items-center">
 				<SidebarTrigger />
-				{#if !sidebar.open}
-					<a href="/" class="hover:opacity-80 transition-opacity">
-						<img src={darkMode ? "/logo-white.png" : "/logo.png"} alt="SidVid" class="h-12" />
-					</a>
-				{/if}
 				{#if $sessionStore.activeSession}
 					<span class="text-sm text-muted-foreground">
 						Session: {$sessionStore.activeSession.getName() || 'Untitled'}
 					</span>
 				{/if}
 			</div>
+			{#if !sidebar.open}
+				<a href="/" class="absolute left-1/2 -translate-x-1/2 hover:opacity-80 transition-opacity">
+					<img src={darkMode ? "/logo-white.png" : "/logo.png"} alt="SidVid" class="h-14" />
+				</a>
+			{/if}
 			<button
 				onclick={toggleDarkMode}
 				class="flex cursor-pointer items-center rounded-full p-2 text-muted-foreground hover:text-foreground transition-colors"
