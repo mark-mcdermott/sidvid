@@ -179,133 +179,137 @@
 	}
 </script>
 
-<div class="flex flex-col gap-8">
-	<section id="project" class="scroll-mt-16 border-b pb-8">
-		<!-- Section Header -->
-		<div class="mb-4">
+<section id="project" class="scroll-mt-16">
+	<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
+		<!-- Left Column: Section Header -->
+		<div>
 			<h1 class="text-3xl font-bold mb-3">Project</h1>
 			<p class="text-muted-foreground">Name your project</p>
 		</div>
 
-		<!-- Project Name Row -->
-		<div class="flex items-center gap-3">
-			{#if isEditing}
-				<input
-					bind:this={nameInputElement}
-					bind:value={editName}
-					onkeydown={handleEditKeydown}
-					onblur={handleEditBlur}
-					aria-label="project name"
-					class="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-lg font-medium outline-none focus:ring-2 focus:ring-ring"
-				/>
-			{:else}
-				<h2 class="text-lg font-medium">
-					{currentProject?.name ?? 'My New Project'}
-				</h2>
-			{/if}
+		<!-- Right Column: Content -->
+		<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
+			<!-- Project Name Row -->
+			<div class="flex items-center gap-3">
+				{#if isEditing}
+					<input
+						bind:this={nameInputElement}
+						bind:value={editName}
+						onkeydown={handleEditKeydown}
+						onblur={handleEditBlur}
+						aria-label="project name"
+						class="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-lg font-medium outline-none focus:ring-2 focus:ring-ring"
+					/>
+				{:else}
+					<h2 class="text-lg font-medium">
+						{currentProject?.name ?? 'My New Project'}
+					</h2>
+				{/if}
 
-			<!-- Edit Button -->
-			<Button
-				variant="ghost"
-				size="icon"
-				class="h-8 w-8"
-				onclick={startEditing}
-				aria-label="edit project name"
-			>
-				<Pencil class="h-4 w-4" />
-			</Button>
-
-			<!-- Delete Button -->
-			<Button
-				variant="ghost"
-				size="icon"
-				class="h-8 w-8 text-destructive hover:text-destructive"
-				onclick={openDeleteModal}
-				aria-label="delete project"
-			>
-				<Trash2 class="h-4 w-4" />
-			</Button>
-
-			<!-- Project Dropdown (only shown when 2+ projects) -->
-			{#if hasMultipleProjects}
-				<select
-					class="ml-4 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-					onchange={handleProjectSwitch}
-					value={currentProject?.id ?? ''}
-					aria-label="select project"
+				<!-- Edit Button -->
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					onclick={startEditing}
+					aria-label="edit project name"
 				>
-					{#each projects as project}
-						<option value={project.id}>{project.name}</option>
-					{/each}
-				</select>
-			{/if}
+					<Pencil class="h-4 w-4" />
+				</Button>
 
-			<!-- New Project Button -->
-			<Button variant="outline" size="sm" class="ml-auto" onclick={handleNewProject}>
-				<Plus class="mr-1 h-4 w-4" />
-				New Project
-			</Button>
-		</div>
-	</section>
-
-	<!-- All Projects List Section -->
-	<section class="pb-8">
-		<h2 class="mb-4 text-lg font-semibold">All Projects</h2>
-
-		<div class="flex flex-col gap-2">
-			{#each projects as project}
-				<div
-					data-testid="project-list-item"
-					data-current={project.id === currentProject?.id ? 'true' : 'false'}
-					class="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 {project.id ===
-					currentProject?.id
-						? 'border-primary bg-primary/5'
-						: 'border-border'}"
+				<!-- Delete Button -->
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8 text-destructive hover:text-destructive"
+					onclick={openDeleteModal}
+					aria-label="delete project"
 				>
-					<!-- Project Name (clickable) -->
-					{#if editingListProjectId === project.id}
-						<input
-							bind:this={listNameInputElement}
-							bind:value={editingListName}
-							onkeydown={handleListEditKeydown}
-							onblur={handleListEditBlur}
-							aria-label="project name"
-							class="h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 outline-none focus:ring-2 focus:ring-ring"
-						/>
-					{:else}
-						<button
-							class="flex-1 text-left font-medium"
-							onclick={() => handleProjectClick(project.id)}
+					<Trash2 class="h-4 w-4" />
+				</Button>
+
+				<!-- Project Dropdown (only shown when 2+ projects) -->
+				{#if hasMultipleProjects}
+					<select
+						class="ml-4 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+						onchange={handleProjectSwitch}
+						value={currentProject?.id ?? ''}
+						aria-label="select project"
+					>
+						{#each projects as project}
+							<option value={project.id}>{project.name}</option>
+						{/each}
+					</select>
+				{/if}
+
+				<!-- New Project Button -->
+				<Button variant="outline" size="sm" onclick={handleNewProject}>
+					<Plus class="mr-1 h-4 w-4" />
+					New Project
+				</Button>
+			</div>
+
+			<!-- Divider -->
+			<hr class="border-border" />
+
+			<!-- All Projects List -->
+			<div class="flex flex-col gap-2">
+				<h2 class="text-lg font-semibold">All Projects</h2>
+				{#each projects as project}
+					<div
+						data-testid="project-list-item"
+						data-current={project.id === currentProject?.id ? 'true' : 'false'}
+						class="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 {project.id ===
+						currentProject?.id
+							? 'border-primary bg-primary/5'
+							: 'border-border'}"
+					>
+						<!-- Project Name (clickable) -->
+						{#if editingListProjectId === project.id}
+							<input
+								bind:this={listNameInputElement}
+								bind:value={editingListName}
+								onkeydown={handleListEditKeydown}
+								onblur={handleListEditBlur}
+								aria-label="project name"
+								class="h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 outline-none focus:ring-2 focus:ring-ring"
+							/>
+						{:else}
+							<button
+								class="flex-1 text-left font-medium"
+								onclick={() => handleProjectClick(project.id)}
+							>
+								{project.name}
+							</button>
+						{/if}
+
+						<!-- Edit Button -->
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-8 w-8"
+							onclick={() => startListEditing(project)}
+							aria-label="edit project"
 						>
-							{project.name}
-						</button>
-					{/if}
+							<Pencil class="h-4 w-4" />
+						</Button>
 
-					<!-- Edit Button -->
-					<Button
-						variant="ghost"
-						size="icon"
-						class="h-8 w-8"
-						onclick={() => startListEditing(project)}
-						aria-label="edit project"
-					>
-						<Pencil class="h-4 w-4" />
-					</Button>
-
-					<!-- Delete Button -->
-					<Button
-						variant="ghost"
-						size="icon"
-						class="h-8 w-8 text-destructive hover:text-destructive"
-						onclick={() => openDeleteModalForProject(project.id)}
-						aria-label="delete project"
-					>
-						<Trash2 class="h-4 w-4" />
-					</Button>
-				</div>
-			{/each}
+						<!-- Delete Button -->
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-8 w-8 text-destructive hover:text-destructive"
+							onclick={() => openDeleteModalForProject(project.id)}
+							aria-label="delete project"
+						>
+							<Trash2 class="h-4 w-4" />
+						</Button>
+					</div>
+				{/each}
+			</div>
 		</div>
-	</section>
+	</div>
+</section>
 
 	<!-- Delete Confirmation Modal -->
 	{#if showDeleteModal}
@@ -327,4 +331,3 @@
 			</div>
 		</div>
 	{/if}
-</div>

@@ -31,7 +31,7 @@ test.describe('Stage 3: World @world', () => {
 			await navigateAndWait(page, '/');
 
 			await expect(page.getByRole('heading', { name: 'WORLD' })).toBeVisible();
-			await expect(page.getByText('Create world elements')).toBeVisible();
+			await expect(page.getByText('Create characters, locations, etc')).toBeVisible();
 		});
 
 		test('/world route shows world section', async ({ page }) => {

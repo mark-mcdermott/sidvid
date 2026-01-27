@@ -20,7 +20,6 @@
 		SidebarTrigger,
 		useSidebar
 	} from '$lib/components/ui/sidebar';
-	import { conversationStore, loadConversations } from '$lib/stores/conversationStore';
 	import { storyStore } from '$lib/stores/storyStore';
 	import {
 		worldStore,
@@ -28,15 +27,10 @@
 		getElementsByType,
 		ELEMENT_TYPE_COLORS
 	} from '$lib/stores/worldStore';
-	import { sessionStore, refreshSessions } from '$lib/stores/sessionStore';
 	import { apiTimingStore } from '$lib/stores/apiTimingStore';
-	import { SessionList, SessionDialog } from '$lib/components/sessions';
-	import { ChevronDown, ChevronUp, Sun, Moon } from '@lucide/svelte';
+	import { Sun, Moon } from '@lucide/svelte';
 
 	let { children } = $props();
-
-	let showNewSessionDialog = $state(false);
-	let showAllConversations = $state(false);
 
 	// Dark mode: default true, sync with localStorage (FOUC prevented in app.html)
 	let darkMode = $state(browser ? localStorage.getItem('sidvid-dark-mode') !== 'false' : true);
@@ -64,16 +58,10 @@
 		{ title: 'Video', href: '/video' }
 	];
 
-	async function handleNewSession() {
-		showNewSessionDialog = true;
-	}
-
 	onMount(async () => {
 		// Remove sidebar FOUC prevention class now that Svelte has hydrated
 		document.documentElement.classList.remove('sidebar-closed-initial');
 
-		await loadConversations();
-		await refreshSessions();
 		await apiTimingStore.load();
 	});
 </script>
@@ -106,12 +94,6 @@
 							</SidebarMenuItem>
 						{/each}
 					</SidebarMenu>
-				</SidebarGroupContent>
-			</SidebarGroup>
-
-			<SidebarGroup data-sidebar-section="sessions">
-				<SidebarGroupContent>
-					<SessionList onNewSession={handleNewSession} />
 				</SidebarGroupContent>
 			</SidebarGroup>
 
@@ -278,55 +260,6 @@
 					</SidebarGroupContent>
 				</SidebarGroup>
 			{/if}
-
-			<SidebarGroup>
-				<SidebarGroupLabel>Conversations</SidebarGroupLabel>
-				<SidebarGroupContent>
-					<SidebarMenu>
-						{#each $conversationStore.conversations.slice(0, 2) as conv}
-							<SidebarMenuItem>
-								<SidebarMenuButton
-									href="/conversation/{conv.id}"
-									class={$page.url.pathname === `/conversation/${conv.id}` ? 'font-bold' : ''}
-									title={conv.title}
-								>
-									{conv.title}
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						{/each}
-						{#if $conversationStore.conversations.length > 2}
-							<SidebarMenuItem>
-								<div class="flex w-full justify-start px-2 py-1">
-									<button
-										onclick={() => showAllConversations = !showAllConversations}
-										class="flex cursor-pointer items-center gap-2 rounded-full border px-2 py-1 text-sm font-medium transition-colors border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80"
-										title={showAllConversations ? 'Show fewer conversations' : 'Show more conversations'}
-									>
-										{#if showAllConversations}
-											<ChevronDown class="h-4 w-4" />
-										{:else}
-											<ChevronUp class="h-4 w-4" />
-										{/if}
-									</button>
-								</div>
-							</SidebarMenuItem>
-							{#if showAllConversations}
-								{#each $conversationStore.conversations.slice(2) as conv}
-									<SidebarMenuItem>
-										<SidebarMenuButton
-											href="/conversation/{conv.id}"
-											class={$page.url.pathname === `/conversation/${conv.id}` ? 'font-bold' : ''}
-											title={conv.title}
-										>
-											{conv.title}
-										</SidebarMenuButton>
-									</SidebarMenuItem>
-								{/each}
-							{/if}
-						{/if}
-					</SidebarMenu>
-				</SidebarGroupContent>
-			</SidebarGroup>
 		</SidebarContent>
 		<SidebarFooter>
 			<div class="py-4 pr-4">
@@ -339,11 +272,6 @@
 		<header class="relative flex h-16 items-center justify-between border-b px-4">
 			<div class="flex items-center">
 				<SidebarTrigger />
-				{#if $sessionStore.activeSession}
-					<span class="text-sm text-muted-foreground">
-						Session: {$sessionStore.activeSession.getName() || 'Untitled'}
-					</span>
-				{/if}
 			</div>
 			{#if !sidebar.open}
 				<a href="/" class="absolute left-1/2 -translate-x-1/2 hover:opacity-80 transition-opacity">
@@ -367,5 +295,3 @@
 		</main>
 	</SidebarInset>
 </SidebarProvider>
-
-<SessionDialog bind:open={showNewSessionDialog} mode="create" />

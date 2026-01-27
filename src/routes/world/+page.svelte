@@ -214,7 +214,7 @@
 			<!-- Left Column: Section Header -->
 			<div>
 				<h1 class="text-3xl font-bold mb-3">World</h1>
-				<p class="text-muted-foreground">Create world elements</p>
+				<p class="text-muted-foreground">Create characters, locations, etc</p>
 			</div>
 
 			<!-- Right Column: Content -->

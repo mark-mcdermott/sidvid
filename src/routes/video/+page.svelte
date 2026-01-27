@@ -462,282 +462,286 @@
 	let totalDuration = $derived(sceneVideos.length * 5);
 </script>
 
-<div class="flex flex-col gap-4">
-	<div class="flex items-center justify-between">
+<section id="video" class="scroll-mt-16">
+	<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
+		<!-- Left Column: Section Header -->
 		<div>
-			<h1 class="text-3xl font-bold">Video</h1>
+			<h1 class="text-3xl font-bold mb-3">Video</h1>
 			<p class="text-muted-foreground">
 				Generate {sceneVideos.length} video clip{sceneVideos.length !== 1 ? 's' : ''} ({totalDuration}s total) using {selectedProvider === 'kling' ? 'Kling AI (with audio)' : 'Mock (for testing)'}
 			</p>
-		</div>
-		{#if allCompleted}
-			<Button variant="outline" onclick={handleRegenerate}>
-				<RotateCcw class="mr-2 h-4 w-4" />
-				Regenerate All
-			</Button>
-		{/if}
-	</div>
-
-	<!-- Provider Selection -->
-	{#if !allCompleted && !isGenerating}
-		<div class="flex items-center gap-4">
-			<div class="flex items-center gap-2">
-				<span class="text-sm font-medium">Provider:</span>
-				<select
-					bind:value={selectedProvider}
-					class="rounded border px-2 py-1 text-sm"
-				>
-					<option value="mock">Mock (Testing)</option>
-					<option value="kling">Kling AI (Real Video + Audio)</option>
-				</select>
-			</div>
-
-			{#if selectedProvider === 'kling'}
-				<button
-					type="button"
-					class="flex items-center gap-1 text-sm"
-					onclick={() => enableSound = !enableSound}
-				>
-					{#if enableSound}
-						<Volume2 class="h-4 w-4" />
-						<span>Audio On</span>
-					{:else}
-						<VolumeX class="h-4 w-4" />
-						<span>Audio Off</span>
-					{/if}
-				</button>
+			{#if allCompleted}
+				<Button variant="outline" class="mt-4" onclick={handleRegenerate}>
+					<RotateCcw class="mr-2 h-4 w-4" />
+					Regenerate All
+				</Button>
 			{/if}
-
-			<!-- Test button to load previously generated videos -->
-			<Button variant="outline" size="sm" onclick={loadTestVideos}>
-				Load Test Videos
-			</Button>
 		</div>
-	{/if}
 
-	<!-- Video Container -->
-	<div
-		data-video-container
-		class="relative rounded-lg border border-black overflow-hidden bg-black"
-		style="width: 800px; max-width: 100%; aspect-ratio: 16/9;"
-	>
-		{#if currentVideoUrl}
-			<!-- Video Player -->
-			<video
-				bind:this={videoElement}
-				src={currentVideoUrl}
-				class="w-full h-full object-contain"
-				data-video-player
-				onended={handleVideoEnded}
-				controls
-			>
-				<track kind="captions" />
-			</video>
-		{:else if isGenerating}
-			<!-- Generating State -->
-			<div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-				<Loader2 class="h-12 w-12 animate-spin text-white mb-4" data-spinner />
-				<p class="text-white text-sm">
-					Generating scene {currentGeneratingIndex + 1} of {sceneVideos.length}
-				</p>
-				<div class="w-48 h-2 bg-gray-700 rounded-full mt-2">
-					<div
-						class="h-full bg-primary rounded-full transition-all"
-						style="width: {Math.max(5, overallProgress)}%"
-					></div>
-				</div>
-				<p class="text-white/70 text-xs mt-1">
-					Overall: {overallProgress}%
-				</p>
-			</div>
-		{:else}
-			<!-- Scene Thumbnails Preview -->
-			{#if sceneThumbnails.length > 0}
-				<div class="absolute inset-0 flex items-center justify-center p-4" data-video-placeholder>
-					<div class="flex gap-2 overflow-x-auto">
-						{#each sceneThumbnails as thumbnail, index}
-							<div
-								class="flex-shrink-0 rounded border-2 border-white/50 overflow-hidden"
-								data-scene-thumbnail={index}
-							>
-								<img
-									src={thumbnail.imageUrl}
-									alt={thumbnail.name}
-									class="h-32 w-auto object-cover"
-								/>
-							</div>
-						{/each}
-					</div>
-				</div>
-			{:else}
-				<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
-					<p class="text-white/50">No scenes available. Generate scenes first.</p>
-				</div>
-			{/if}
-		{/if}
-	</div>
-
-	<!-- Version Thumbnails (only when 2+ versions exist) -->
-	{#if hasMultipleVersions}
-		<div class="flex items-center justify-center gap-2">
-			{#each versions as version}
-				<div class="relative group">
-					<button
-						class="rounded overflow-hidden transition-all {version.isActive ? 'ring-4 ring-gray-300' : 'hover:ring-2 hover:ring-primary'}"
-						onclick={() => selectVersion(version.id)}
-						title={version.isActive ? 'Active version' : 'Click to select'}
-					>
-						<img
-							src={version.thumbnailUrl}
-							alt="Video version"
-							class="w-16 h-10 object-cover"
-						/>
-					</button>
-					{#if !version.isActive}
-						<button
-							class="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
-							onclick={() => handleDeleteVersion(version.id)}
-							title="Delete this version"
+		<!-- Right Column: Content -->
+		<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
+			<!-- Provider Selection -->
+			{#if !allCompleted && !isGenerating}
+				<div class="flex items-center gap-4">
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-medium">Provider:</span>
+						<select
+							bind:value={selectedProvider}
+							class="rounded border px-2 py-1 text-sm"
 						>
-							<Trash2 class="h-3 w-3" />
+							<option value="mock">Mock (Testing)</option>
+							<option value="kling">Kling AI (Real Video + Audio)</option>
+						</select>
+					</div>
+
+					{#if selectedProvider === 'kling'}
+						<button
+							type="button"
+							class="flex items-center gap-1 text-sm"
+							onclick={() => enableSound = !enableSound}
+						>
+							{#if enableSound}
+								<Volume2 class="h-4 w-4" />
+								<span>Audio On</span>
+							{:else}
+								<VolumeX class="h-4 w-4" />
+								<span>Audio Off</span>
+							{/if}
 						</button>
 					{/if}
-				</div>
-			{/each}
-		</div>
-	{/if}
 
-	<!-- Action Buttons -->
-	<div class="flex items-center justify-center gap-2">
-		<Button variant="outline" onclick={togglePreview} disabled={!hasScenes}>
-			{#if $videoStore.isPreviewPlaying}
-				<Pause class="mr-2 h-4 w-4" />
-				Stop Preview
-			{:else}
-				<Play class="mr-2 h-4 w-4" />
-				Preview
+					<!-- Test button to load previously generated videos -->
+					<Button variant="outline" size="sm" onclick={loadTestVideos}>
+						Load Test Videos
+					</Button>
+				</div>
 			{/if}
-		</Button>
 
-		{#if !allCompleted}
-			<Button
-				onclick={startGeneratingAllScenes}
-				disabled={isGenerating || !hasScenes}
-				data-generate-video
+			<!-- Video Container -->
+			<div
+				data-video-container
+				class="relative rounded-lg border border-black overflow-hidden bg-black"
+				style="width: 800px; max-width: 100%; aspect-ratio: 16/9;"
 			>
-				{#if isGenerating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
-					Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
+				{#if currentVideoUrl}
+					<!-- Video Player -->
+					<video
+						bind:this={videoElement}
+						src={currentVideoUrl}
+						class="w-full h-full object-contain"
+						data-video-player
+						onended={handleVideoEnded}
+						controls
+					>
+						<track kind="captions" />
+					</video>
+				{:else if isGenerating}
+					<!-- Generating State -->
+					<div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+						<Loader2 class="h-12 w-12 animate-spin text-white mb-4" data-spinner />
+						<p class="text-white text-sm">
+							Generating scene {currentGeneratingIndex + 1} of {sceneVideos.length}
+						</p>
+						<div class="w-48 h-2 bg-gray-700 rounded-full mt-2">
+							<div
+								class="h-full bg-primary rounded-full transition-all"
+								style="width: {Math.max(5, overallProgress)}%"
+							></div>
+						</div>
+						<p class="text-white/70 text-xs mt-1">
+							Overall: {overallProgress}%
+						</p>
+					</div>
 				{:else}
-					Generate Video
-				{/if}
-			</Button>
-		{:else}
-			<Button onclick={handleRegenerate} variant="outline">
-				<RotateCcw class="mr-2 h-4 w-4" />
-				Regenerate
-			</Button>
-		{/if}
-
-		{#if allCompleted}
-			<Button onclick={downloadVideo}>
-				<Download class="mr-2 h-4 w-4" />
-				Download
-			</Button>
-		{/if}
-	</div>
-
-	<!-- Scene Video Progress Grid -->
-	{#if isGenerating || completedVideos.length > 0}
-		<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-			{#each sceneVideos as sceneVideo, index}
-				<div
-					class="relative rounded border overflow-hidden cursor-pointer transition-all {sceneVideo.status === 'completed' ? 'border-green-500' : sceneVideo.status === 'failed' ? 'border-red-500' : 'border-gray-300'}"
-					onclick={() => sceneVideo.videoUrl && playFromScene(index)}
-				>
-					<img
-						src={sceneVideo.sceneImageUrl}
-						alt={sceneVideo.sceneName}
-						class="w-full aspect-video object-cover"
-					/>
-					<div class="absolute inset-0 flex items-center justify-center bg-black/50">
-						{#if sceneVideo.status === 'completed'}
-							<div class="bg-green-500 rounded-full p-1">
-								<Check class="h-4 w-4 text-white" />
+					<!-- Scene Thumbnails Preview -->
+					{#if sceneThumbnails.length > 0}
+						<div class="absolute inset-0 flex items-center justify-center p-4" data-video-placeholder>
+							<div class="flex gap-2 overflow-x-auto">
+								{#each sceneThumbnails as thumbnail, index}
+									<div
+										class="flex-shrink-0 rounded border-2 border-white/50 overflow-hidden"
+										data-scene-thumbnail={index}
+									>
+										<img
+											src={thumbnail.imageUrl}
+											alt={thumbnail.name}
+											class="h-32 w-auto object-cover"
+										/>
+									</div>
+								{/each}
 							</div>
-						{:else if sceneVideo.status === 'queued' || sceneVideo.status === 'generating'}
-							<Loader2 class="h-6 w-6 animate-spin text-white" />
-						{:else if sceneVideo.status === 'failed'}
-							<span class="text-red-500 text-xs">Failed</span>
+						</div>
+					{:else}
+						<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
+							<p class="text-white/50">No scenes available. Generate scenes first.</p>
+						</div>
+					{/if}
+				{/if}
+			</div>
+
+			<!-- Version Thumbnails (only when 2+ versions exist) -->
+			{#if hasMultipleVersions}
+				<div class="flex items-center justify-center gap-2">
+					{#each versions as version}
+						<div class="relative group">
+							<button
+								class="rounded overflow-hidden transition-all {version.isActive ? 'ring-4 ring-gray-300' : 'hover:ring-2 hover:ring-primary'}"
+								onclick={() => selectVersion(version.id)}
+								title={version.isActive ? 'Active version' : 'Click to select'}
+							>
+								<img
+									src={version.thumbnailUrl}
+									alt="Video version"
+									class="w-16 h-10 object-cover"
+								/>
+							</button>
+							{#if !version.isActive}
+								<button
+									class="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
+									onclick={() => handleDeleteVersion(version.id)}
+									title="Delete this version"
+								>
+									<Trash2 class="h-3 w-3" />
+								</button>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<!-- Action Buttons -->
+			<div class="flex items-center justify-center gap-2">
+				<Button variant="outline" onclick={togglePreview} disabled={!hasScenes}>
+					{#if $videoStore.isPreviewPlaying}
+						<Pause class="mr-2 h-4 w-4" />
+						Stop Preview
+					{:else}
+						<Play class="mr-2 h-4 w-4" />
+					Preview
+				{/if}
+				</Button>
+
+				{#if !allCompleted}
+					<Button
+						onclick={startGeneratingAllScenes}
+						disabled={isGenerating || !hasScenes}
+						data-generate-video
+					>
+						{#if isGenerating}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
+							Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
 						{:else}
-							<span class="text-white/50 text-xs">Pending</span>
+							Generate Video
 						{/if}
-					</div>
-					<div class="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 text-center">
-						Scene {index + 1} • 5s
-						{#if sceneVideo.status === 'generating'}
-							({sceneVideo.progress}%)
-						{/if}
-					</div>
+					</Button>
+				{:else}
+					<Button onclick={handleRegenerate} variant="outline">
+						<RotateCcw class="mr-2 h-4 w-4" />
+						Regenerate
+					</Button>
+				{/if}
+
+				{#if allCompleted}
+					<Button onclick={downloadVideo}>
+						<Download class="mr-2 h-4 w-4" />
+						Download
+					</Button>
+				{/if}
+			</div>
+
+			<!-- Scene Video Progress Grid -->
+			{#if isGenerating || completedVideos.length > 0}
+				<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+					{#each sceneVideos as sceneVideo, index}
+						<div
+							class="relative rounded border overflow-hidden cursor-pointer transition-all {sceneVideo.status === 'completed' ? 'border-green-500' : sceneVideo.status === 'failed' ? 'border-red-500' : 'border-gray-300'}"
+							onclick={() => sceneVideo.videoUrl && playFromScene(index)}
+						>
+							<img
+								src={sceneVideo.sceneImageUrl}
+								alt={sceneVideo.sceneName}
+								class="w-full aspect-video object-cover"
+							/>
+							<div class="absolute inset-0 flex items-center justify-center bg-black/50">
+								{#if sceneVideo.status === 'completed'}
+									<div class="bg-green-500 rounded-full p-1">
+										<Check class="h-4 w-4 text-white" />
+									</div>
+								{:else if sceneVideo.status === 'queued' || sceneVideo.status === 'generating'}
+									<Loader2 class="h-6 w-6 animate-spin text-white" />
+								{:else if sceneVideo.status === 'failed'}
+									<span class="text-red-500 text-xs">Failed</span>
+								{:else}
+									<span class="text-white/50 text-xs">Pending</span>
+								{/if}
+							</div>
+							<div class="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 text-center">
+								Scene {index + 1} • 5s
+								{#if sceneVideo.status === 'generating'}
+									({sceneVideo.progress}%)
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<!-- Error Display -->
+			{#each sceneVideos.filter(sv => sv.error) as errorScene}
+				<div class="text-red-500 text-sm">
+					Scene {errorScene.sceneIndex + 1}: {errorScene.error}
 				</div>
 			{/each}
+
+			<!-- Hidden forms for each scene -->
+			{#each sceneVideos as sceneVideo, index}
+				<form
+					id="generate-form-{index}"
+					method="POST"
+					action="?/generateSceneVideo"
+					class="hidden"
+					use:enhance={() => {
+						return async ({ update }) => {
+							await update();
+						};
+					}}
+				>
+					<input type="hidden" name="sceneIndex" value={index} />
+					<input type="hidden" name="sceneDescription" value={sceneVideo.sceneName} />
+					<input type="hidden" name="sceneImageUrl" value={sceneVideo.sceneImageUrl} />
+					<input type="hidden" name="provider" value={selectedProvider} />
+					<input type="hidden" name="sound" value={enableSound.toString()} />
+				</form>
+
+				{#if sceneVideo.videoId}
+					<form
+						id="status-check-form-{index}"
+						method="POST"
+						action="?/checkSceneVideoStatus"
+						class="hidden"
+						use:enhance
+					>
+						<input type="hidden" name="sceneIndex" value={index} />
+						<input type="hidden" name="videoId" value={sceneVideo.videoId} />
+					</form>
+				{/if}
+			{/each}
+
+			<!-- Scene Info -->
+			{#if sceneThumbnails.length > 0 && !isGenerating && !allCompleted}
+				<div class="text-sm text-muted-foreground">
+					{sceneThumbnails.length} scene{sceneThumbnails.length !== 1 ? 's' : ''} ready • {totalDuration}s total duration
+				</div>
+			{/if}
+
+			<!-- Kling Info -->
+			{#if selectedProvider === 'kling' && !allCompleted && !isGenerating}
+				<div class="text-xs text-muted-foreground border rounded p-2 bg-muted/50">
+					<strong>Kling AI 2.6:</strong> Generates 5-second video clips with native audio from each scene image.
+					Cost: ~$0.35-0.70 per clip ({enableSound ? 'with' : 'without'} audio).
+					<strong>Total estimate: ~${(sceneVideos.length * 0.5).toFixed(2)}</strong>
+				</div>
+			{/if}
 		</div>
-	{/if}
-
-	<!-- Error Display -->
-	{#each sceneVideos.filter(sv => sv.error) as errorScene}
-		<div class="text-red-500 text-sm">
-			Scene {errorScene.sceneIndex + 1}: {errorScene.error}
-		</div>
-	{/each}
-
-	<!-- Hidden forms for each scene -->
-	{#each sceneVideos as sceneVideo, index}
-		<form
-			id="generate-form-{index}"
-			method="POST"
-			action="?/generateSceneVideo"
-			class="hidden"
-			use:enhance={() => {
-				return async ({ update }) => {
-					await update();
-				};
-			}}
-		>
-			<input type="hidden" name="sceneIndex" value={index} />
-			<input type="hidden" name="sceneDescription" value={sceneVideo.sceneName} />
-			<input type="hidden" name="sceneImageUrl" value={sceneVideo.sceneImageUrl} />
-			<input type="hidden" name="provider" value={selectedProvider} />
-			<input type="hidden" name="sound" value={enableSound.toString()} />
-		</form>
-
-		{#if sceneVideo.videoId}
-			<form
-				id="status-check-form-{index}"
-				method="POST"
-				action="?/checkSceneVideoStatus"
-				class="hidden"
-				use:enhance
-			>
-				<input type="hidden" name="sceneIndex" value={index} />
-				<input type="hidden" name="videoId" value={sceneVideo.videoId} />
-			</form>
-		{/if}
-	{/each}
-
-	<!-- Scene Info -->
-	{#if sceneThumbnails.length > 0 && !isGenerating && !allCompleted}
-		<div class="text-sm text-muted-foreground">
-			{sceneThumbnails.length} scene{sceneThumbnails.length !== 1 ? 's' : ''} ready • {totalDuration}s total duration
-		</div>
-	{/if}
-
-	<!-- Kling Info -->
-	{#if selectedProvider === 'kling' && !allCompleted && !isGenerating}
-		<div class="text-xs text-muted-foreground border rounded p-2 bg-muted/50">
-			<strong>Kling AI 2.6:</strong> Generates 5-second video clips with native audio from each scene image.
-			Cost: ~$0.35-0.70 per clip ({enableSound ? 'with' : 'without'} audio).
-			<strong>Total estimate: ~${(sceneVideos.length * 0.5).toFixed(2)}</strong>
-		</div>
-	{/if}
-</div>
+	</div>
+</section>
