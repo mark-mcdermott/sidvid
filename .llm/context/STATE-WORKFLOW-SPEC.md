@@ -1164,6 +1164,69 @@ sidvid storyboard move <scene-id> --to <index>
 
 ### UI Layout
 
+**Video Area Styling:**
+- White border, no background fill
+- No rounded corners (square)
+- Horizontally centered
+
+**NOT_STARTED state:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  VIDEO                                                           │
+│  Generate your video                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                            │  │
+│  │                                                            │  │
+│  │                    No video yet                            │  │
+│  │                                                            │  │
+│  │                                                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│                    [Preview]  [Generate Video]                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**GENERATING/POLLING state:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  VIDEO                                                           │
+│  Generate your video                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                            │  │
+│  │                                                            │  │
+│  │                       [spinner]                            │  │
+│  │                                                            │  │
+│  │                                                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│                    [Preview]  [Generate Video]                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**COMPLETED state (single version):**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  VIDEO                                                           │
+│  Generate your video                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                            │  │
+│  │                    [Video Player]                          │  │
+│  │                                                            │  │
+│  │                         [▶]                                │  │
+│  │                                                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│               [Preview]  [Generate Video]  [Download]            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**COMPLETED state (multiple versions):**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  VIDEO                                                           │
@@ -1179,10 +1242,31 @@ sidvid storyboard move <scene-id> --to <index>
 │  │                                                            │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                  │
-│  Video versions: [v1] [v2•] [v3]                                │
-│                       [🗑]                                       │
+│                      [🖼] [🖼•] [🖼]                              │  ← Version thumbnails
+│                      [🗑]      [🗑]                              │  ← Trash on non-active
 │                                                                  │
-│            [Preview]  [Generate Video]  [Download]              │
+│               [Preview]  [Generate Video]  [Download]            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**FAILED state:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  VIDEO                                                           │
+│  Generate your video                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                            │  │
+│  │                                                            │  │
+│  │                    No video yet                            │  │
+│  │                                                            │  │
+│  │                                                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Error: Video generation failed. Please try again.              │
+│                                                                  │
+│                    [Preview]  [Generate Video]                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1191,20 +1275,24 @@ sidvid storyboard move <scene-id> --to <index>
 | Element | Action |
 |---------|--------|
 | **Video Player** | Play/pause the active video version |
-| **Preview** | Play slideshow of poster images with timing (before video generation) |
-| **Generate Video** | Generate video from storyboard scenes |
-| **Download** | Download the active video file |
-| **Version selector** | Click to make that version active |
+| **Preview** | Always visible; plays slideshow of storyboard poster images (each shown for scene duration) |
+| **Generate Video** | Always visible; generate video from storyboard scenes |
+| **Download** | Only visible after COMPLETED; download the active video file |
+| **Version thumbnail** | Click to make that version active |
 | **Trashcan (🗑)** | Delete non-active video version |
 
 ### Video Version Management
 
-- **Version thumbnails visibility**: Only shown when 2+ versions exist. With one version, the video displays in the main player without a version selector.
+- **Version thumbnails**: Tiny thumbnails below video area, using scene poster images
+- **Visibility**: Only shown when 2+ versions exist
+- **Active version**: Large light gray border; shown in main player
+- **Non-active versions**: Clickable to select; displays trashcan icon for deletion
+- **Single version**: No version thumbnails shown, no trash icon (can't delete last version)
 - Latest generated video is **active by default**
-- Only one video can be active at a time
-- Non-active videos display a **trashcan icon** for deletion
-- Non-active videos can be **selected to become active**
-- Active video is shown in the main player
+
+### Implementation Note
+
+Video provider selection and cost estimates may be included in the implementation but are not part of the core spec. If implemented, they should be commented out or feature-flagged for future use.
 
 ### Transitions
 
@@ -1219,16 +1307,18 @@ FAILED ──[retry]──▸ GENERATING
 
 ### User Actions
 
-**Before video generation (NOT_STARTED):**
-1. **Preview** - Play slideshow of poster images with timing (animatic preview)
+**All states:**
+1. **Preview** - Play slideshow of storyboard poster images (each shown for its scene duration, no slide transitions)
+
+**NOT_STARTED / FAILED:**
 2. **Generate Video** - Start video generation from storyboard scenes
 
-**After video generation (COMPLETED):**
-1. **Play Video** - Watch generated video in player
-2. **Download** - Download active video file
-3. **Regenerate** - Generate new video version (adds to versions, becomes active)
-4. **Select Active Version** - Choose which video version to display
-5. **Delete Version** - Remove a non-active video (trashcan icon)
+**COMPLETED:**
+2. **Play Video** - Watch generated video in player
+3. **Download** - Download active video file
+4. **Regenerate** - Click "Generate Video" again to create new version (adds to versions, becomes active)
+5. **Select Active Version** - Click version thumbnail to make it active (only when 2+ versions)
+6. **Delete Version** - Click trashcan on non-active version (only when 2+ versions)
 
 ---
 
