@@ -26,6 +26,167 @@ See [SCHEMAS-SPEC.md](./SCHEMAS-SPEC.md) for JSON structures produced at each st
 
 **6 Stages:** Project → Story → World → Scenes → Storyboard → Video
 
+---
+
+## UI Layout
+
+### Top Bar
+
+The top bar changes based on sidebar state:
+
+**Sidebar Open:**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  [☰]                                                         [🌙/☀️]         │
+└──────────────────────────────────────────────────────────────────────────────┘
+     ↑                                                              ↑
+  Collapse                                                    Light/Dark
+  sidebar                                                       toggle
+```
+
+**Sidebar Collapsed:**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  [☰]                        [SidVid logo small]                [🌙/☀️]       │
+└──────────────────────────────────────────────────────────────────────────────┘
+     ↑                              ↑                               ↑
+  Expand                     Centered logo                    Light/Dark
+  sidebar                    (horizontal)                       toggle
+```
+
+### Left Sidebar
+
+The sidebar is collapsible. When collapsed, it is completely hidden.
+
+**Sidebar Layout (when open):**
+
+```
+┌──────────────────────────────────┐
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │  [SidVid Graffiti Logo]    │  │  ← logo-no-ice.png (light mode)
+│  │                            │  │    logo-no-ice-white.png (dark mode)
+│  └────────────────────────────┘  │
+│                                  │
+│  Dashboard                       │  ← Links to / (bold if current page)
+│    Project                       │  ← Indented, links to /project
+│    Story                         │  ← Indented, links to /story
+│    World                         │  ← Indented, links to /world
+│    Scenes                        │  ← Indented, links to /scenes
+│    Storyboard                    │  ← Indented, links to /storyboard
+│    Video                         │  ← Indented, links to /video
+│                                  │
+│  ─────────────────────────────── │  ← Divider (only if content below)
+│                                  │
+│  World Elements                  │  ← Only shows if any exist
+│    Characters                    │  ← Only shows if characters exist
+│      [🖼][🖼][🖼]                 │  ← Tiny thumbnails, horizontal row
+│    Locations                     │  ← Only shows if locations exist
+│      [🖼][🖼]                     │
+│    Objects                       │  ← Only shows if objects exist
+│      [🖼]                         │
+│    Concepts                      │  ← Only shows if concepts exist
+│      [🖼][🖼]                     │
+│                                  │
+│  ─────────────────────────────── │  ← Divider (only if content below)
+│                                  │
+│  Scenes                          │  ← Only shows if any scenes exist
+│    [🖼][🖼][🖼][🖼][🖼][🖼]       │  ← Active poster images, horizontal
+│                                  │      row (one per scene)
+│                                  │
+│  ─────────────────────────────── │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │   [Sid mascot image]       │  │  ← Punk rock character at bottom
+│  └────────────────────────────┘  │
+│                                  │
+└──────────────────────────────────┘
+```
+
+### Sidebar Behavior
+
+| Element | Behavior |
+|---------|----------|
+| **Navigation links** | Click to navigate; **bold** indicates current page |
+| **World Element thumbnails** | Show active image; draggable to Scenes on `/` or `/scenes` |
+| **Scene thumbnails** | Show active poster image; draggable to Storyboard on `/` or `/storyboard` |
+| **Sidebar width** | Fixed width |
+
+### Drag and Drop
+
+**Visual Feedback:**
+- Semi-transparent ghost of dragged thumbnail follows cursor
+- Original thumbnail stays in place, slightly dimmed
+- Valid drop zones get highlighted border (e.g., dashed blue)
+- Invalid areas show "no-drop" cursor
+- On drop, brief settle animation
+
+**Context-Aware Dragging:**
+
+| Current Page | World Elements Draggable To | Scenes Draggable To |
+|--------------|----------------------------|---------------------|
+| `/` (Dashboard) | Scenes section | Storyboard section |
+| `/scenes` | Scenes section | Not applicable |
+| `/storyboard` | Not applicable | Storyboard section |
+| Other pages | Not draggable | Not draggable |
+
+### Mobile Behavior
+
+On mobile/small screens:
+- Sidebar replaced by hamburger menu icon
+- Menu opens as overlay/drawer
+- Same content as desktop sidebar
+- Drag and drop not supported on mobile
+
+### Routes
+
+| Route | Content |
+|-------|---------|
+| `/` | Dashboard - all 6 sections stacked vertically |
+| `/project` | Project section + list of all projects with pencil/trash icons |
+| `/story` | Story section only |
+| `/world` | World section only |
+| `/scenes` | Scenes section only |
+| `/storyboard` | Storyboard section only |
+| `/video` | Video section only |
+
+**Route-specific behavior:**
+- Each route shows same content as its section on dashboard
+- Exception: `/project` includes a full project list (see below)
+
+### Project Page (`/project`)
+
+The `/project` page extends the dashboard Project section with a full list:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PROJECT                                                         │
+│  Name your project here so you can refer back to it later.      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  New Project [✏️] [🗑️]                                           │
+│                                                                  │
+│  (when 2+ projects exist:)                                      │
+│  [Select project... ▼]                                          │
+│                                                                  │
+│  [+ New Project]                                                │
+│                                                                  │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  All Projects:                                                   │
+│                                                                  │
+│  My First Video [✏️] [🗑️]                                        │
+│  Anime Short [✏️] [🗑️]                                           │
+│  New Project [✏️] [🗑️]    ← current project highlighted         │
+│  Test Project [✏️] [🗑️]                                          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Each project in the list has pencil (rename) and trash (delete) icons that behave identically to those next to the current project name.
+
+---
+
 ## Non-Linear Workflow
 
 Users can start at **any stage**, not just Story. The workflow is flexible:
@@ -500,13 +661,14 @@ The World section can display filter tabs or tags:
 
 ### Sidebar Thumbnails
 
-World elements appear as **thumbnails in the left sidebar** (when open):
-- Shows the element's active image (or placeholder if none)
+World elements appear as **thumbnails in the left sidebar** (see UI Layout section for full sidebar spec):
+- Grouped by type: Characters, Locations, Objects, Concepts
+- Each category only shows if elements of that type exist
+- Shows the element's **active image** (or placeholder if none)
+- Thumbnails display in horizontal rows, wrapping if needed
 - Hover shows element name in tooltip
-- **Thumbnails are draggable** onto scenes in the Scenes section
+- **Thumbnails are draggable** onto scenes (on Dashboard or `/scenes` page only)
 - Elements in the main World section are NOT directly draggable (only sidebar thumbnails)
-
-This separation keeps the World section for element management while enabling quick drag-and-drop scene composition via the sidebar.
 
 ## Stage 4: Scenes
 
@@ -634,20 +796,16 @@ Each scene displays as a card with the following layout:
 
 ### World Element Sidebar (UI)
 
-When the left sidebar is open, world elements appear as **thumbnails**:
-- Thumbnail shows the element's active image (or placeholder if none)
-- **Hover**: Shows element name in tooltip
-- **Drag**: Thumbnail can be dragged onto a scene in the Scenes section
-- Elements in the main World section are NOT directly draggable
+See UI Layout section for full sidebar specification. When on the Dashboard (`/`) or Scenes page (`/scenes`), world element thumbnails in the sidebar can be dragged onto scenes:
 
 ```
 ┌──────────┬──────────────────────────────────────────────┐
 │ SIDEBAR  │  SCENES                                      │
 ├──────────┤                                              │
-│ [Alice]  │  ┌───────────────┐  ┌ ─ ─ ─ ─ ─ ─ ┐        │
-│ [Bob]    │  │ Alice, Castle │  │              │        │
-│ [Castle] │  │               │  │              │        │
-│ [Gem]    │  │ [+]      [🗑] │  │  [+]         │        │
+│Characters│  ┌───────────────┐  ┌ ─ ─ ─ ─ ─ ─ ┐        │
+│ [🖼][🖼] │  │ Alice, Castle │  │              │        │
+│Locations │  │               │  │              │        │
+│ [🖼]     │  │ [+]      [🗑] │  │  [+]         │        │
 │          │  └───────────────┘  └ ─ ─ ─ ─ ─ ─ ┘        │
 │  drag ─────────────▶                                   │
 └──────────┴──────────────────────────────────────────────┘
@@ -791,12 +949,19 @@ Each entry in the storyboard tracks:
 ### UI Behavior
 
 - **Auto-populated**: Storyboard starts with all story scenes in order (after story generation)
-- **Add scene**: Drag scene from Scenes section into Storyboard (or drop zone)
+- **Add scene**: Drag scene from Scenes section OR from sidebar scene thumbnails into Storyboard (on Dashboard or `/storyboard` page)
 - **Reorder**: Drag storyboard entries to reorder
 - **Remove**: Click × on entry or drag out of storyboard
 - **Scene shows**: Poster image from the scene, with duration indicator
 - **Auto-updates**: When a scene is edited in Scenes section, storyboard entries referencing it update automatically
 - **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 6
+
+### Sidebar Scene Thumbnails
+
+See UI Layout section for full sidebar specification. The Scenes section in the sidebar shows:
+- One horizontal row of **active poster images** (one thumbnail per scene)
+- Only visible if any scenes exist
+- Thumbnails are draggable to Storyboard (on Dashboard or `/storyboard` page only)
 
 ### Metadata Display
 
