@@ -58,3 +58,27 @@ export const storyStore = writable<StoryState>(initialState);
 export function resetStoryStore() {
 	storyStore.set(initialState);
 }
+
+/**
+ * Get current state for persistence
+ */
+export function getStoryStoreState(): StoryState {
+	let state: StoryState = initialState;
+	storyStore.subscribe((s) => (state = s))();
+	return state;
+}
+
+/**
+ * Load state from persisted data
+ */
+export function loadStoryStoreState(state: Partial<StoryState>) {
+	storyStore.update((s) => ({
+		...s,
+		...state,
+		// Reset transient UI state
+		isGenerating: false,
+		isEditingManually: false,
+		isEditingWithPrompt: false,
+		isTryingAgain: false
+	}));
+}

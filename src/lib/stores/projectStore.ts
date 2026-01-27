@@ -2,12 +2,65 @@ import { writable, get } from 'svelte/store';
 import { ProjectManager, MemoryStorageAdapter, BrowserStorageAdapter } from '$lib/sidvid';
 import type { Project, ProjectSummary } from '$lib/sidvid';
 import { browser } from '$app/environment';
-import { resetStoryStore } from './storyStore';
-import { resetWorldStore } from './worldStore';
+import { resetStoryStore, getStoryStoreState, loadStoryStoreState } from './storyStore';
+import { resetWorldStore, getWorldStoreState, loadWorldStoreState } from './worldStore';
 import { resetStoryboardStore } from './storyboardStore';
 import { resetVideoStore } from './videoStore';
-import { resetCharacterStore } from './characterStore';
+import { resetCharacterStore, getCharacterStoreState, loadCharacterStoreState } from './characterStore';
 import { resetConversationStore } from './conversationStore';
+
+const UI_STATE_KEY_PREFIX = 'sidvid-ui-state-';
+
+/**
+ * Save current UI state for a project to localStorage
+ */
+function saveUIStateForProject(projectId: string): void {
+	if (!browser) return;
+
+	const uiState = {
+		story: getStoryStoreState(),
+		world: getWorldStoreState(),
+		character: getCharacterStoreState()
+	};
+
+	try {
+		localStorage.setItem(UI_STATE_KEY_PREFIX + projectId, JSON.stringify(uiState));
+	} catch (error) {
+		console.error('Failed to save UI state:', error);
+	}
+}
+
+/**
+ * Load UI state for a project from localStorage
+ */
+function loadUIStateForProject(projectId: string): void {
+	if (!browser) return;
+
+	try {
+		const saved = localStorage.getItem(UI_STATE_KEY_PREFIX + projectId);
+		if (saved) {
+			const uiState = JSON.parse(saved);
+			if (uiState.story) loadStoryStoreState(uiState.story);
+			if (uiState.world) loadWorldStoreState(uiState.world);
+			if (uiState.character) loadCharacterStoreState(uiState.character);
+		}
+	} catch (error) {
+		console.error('Failed to load UI state:', error);
+	}
+}
+
+/**
+ * Delete UI state for a project from localStorage
+ */
+function deleteUIStateForProject(projectId: string): void {
+	if (!browser) return;
+
+	try {
+		localStorage.removeItem(UI_STATE_KEY_PREFIX + projectId);
+	} catch (error) {
+		console.error('Failed to delete UI state:', error);
+	}
+}
 
 export interface ProjectState {
 	manager: ProjectManager;
@@ -53,6 +106,12 @@ export async function createNewProject(name?: string): Promise<Project> {
 	projectStore.update((s) => ({ ...s, isLoading: true, error: null }));
 
 	try {
+		// Save current project's UI state before switching
+		const currentState = get(projectStore);
+		if (currentState.currentProject) {
+			saveUIStateForProject(currentState.currentProject.id);
+		}
+
 		// Reset all content stores for the new project
 		resetAllContentStores();
 
@@ -81,10 +140,19 @@ export async function loadProject(id: string): Promise<Project> {
 	projectStore.update((s) => ({ ...s, isLoading: true, error: null }));
 
 	try {
+		// Save current project's UI state before switching
+		const currentState = get(projectStore);
+		if (currentState.currentProject && currentState.currentProject.id !== id) {
+			saveUIStateForProject(currentState.currentProject.id);
+		}
+
 		// Reset all content stores when switching projects
 		resetAllContentStores();
 
 		const project = await manager.switchProject(id);
+
+		// Load UI state for the new project
+		loadUIStateForProject(id);
 
 		projectStore.update((s) => ({
 			...s,
@@ -138,6 +206,8 @@ export async function deleteProject(id: string): Promise<void> {
 
 	try {
 		await manager.deleteProject(id);
+		// Also delete the UI state for this project
+		deleteUIStateForProject(id);
 
 		projectStore.update((s) => ({
 			...s,
@@ -222,6 +292,16 @@ export function getCurrentProject(): Project | null {
 }
 
 /**
+ * Save current UI state (call this when content changes)
+ */
+export function saveCurrentUIState(): void {
+	const state = get(projectStore);
+	if (state.currentProject) {
+		saveUIStateForProject(state.currentProject.id);
+	}
+}
+
+/**
  * Initialize the project store (load projects list)
  */
 export async function initializeProjectStore(): Promise<void> {
@@ -234,5 +314,20 @@ export async function initializeProjectStore(): Promise<void> {
 	} else if (!state.currentProject) {
 		// Load the most recently opened project
 		await loadProject(state.projects[0].id);
+	} else {
+		// Current project exists (e.g., from SSR), load its UI state
+		loadUIStateForProject(state.currentProject.id);
+	}
+
+	// Set up auto-save on page unload and periodic save
+	if (browser) {
+		window.addEventListener('beforeunload', () => {
+			saveCurrentUIState();
+		});
+
+		// Periodic auto-save every 5 seconds
+		setInterval(() => {
+			saveCurrentUIState();
+		}, 5000);
 	}
 }

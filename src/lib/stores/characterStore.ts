@@ -55,6 +55,33 @@ export function resetCharacterStore() {
 	characterStore.set({ ...initialState, expandedCharacterIndices: new Set() });
 }
 
+/**
+ * Get current state for persistence (converts Set to Array for JSON serialization)
+ */
+export function getCharacterStoreState(): CharacterState & { expandedCharacterIndices: number[] } {
+	let state: CharacterState = initialState;
+	characterStore.subscribe((s) => (state = s))();
+	return {
+		...state,
+		expandedCharacterIndices: [...state.expandedCharacterIndices]
+	};
+}
+
+/**
+ * Load state from persisted data (converts Array back to Set)
+ */
+export function loadCharacterStoreState(
+	state: Partial<CharacterState & { expandedCharacterIndices: number[] }>
+) {
+	characterStore.update((s) => ({
+		...s,
+		...state,
+		expandedCharacterIndices: new Set(state.expandedCharacterIndices || []),
+		// Reset transient UI state
+		isGenerating: false
+	}));
+}
+
 export function loadStoryCharacters(characters: StoryCharacter[]) {
 	characterStore.update(state => ({
 		...state,

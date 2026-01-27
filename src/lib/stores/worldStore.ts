@@ -77,6 +77,34 @@ export function resetWorldStore() {
 	worldStore.set({ ...initialState, expandedElementIds: new Set() });
 }
 
+/**
+ * Get current state for persistence (converts Set to Array for JSON serialization)
+ */
+export function getWorldStoreState(): WorldState & { expandedElementIds: string[] } {
+	let state: WorldState = initialState;
+	worldStore.subscribe((s) => (state = s))();
+	return {
+		...state,
+		expandedElementIds: [...state.expandedElementIds]
+	};
+}
+
+/**
+ * Load state from persisted data (converts Array back to Set)
+ */
+export function loadWorldStoreState(
+	state: Partial<WorldState & { expandedElementIds: string[] }>
+) {
+	worldStore.update((s) => ({
+		...s,
+		...state,
+		expandedElementIds: new Set(state.expandedElementIds || []),
+		// Reset transient UI state
+		isGenerating: false,
+		generatingElementId: null
+	}));
+}
+
 // Helper to get active image URL for an element
 export function getActiveElementImageUrl(element: WorldElement): string | undefined {
 	if (!element.images || element.images.length === 0) return undefined;
@@ -265,12 +293,15 @@ export function ensureElementExpanded(elementId: string): void {
 }
 
 // Load elements from story (auto-extraction)
+// Returns the IDs of newly added elements for auto image generation
 export function loadElementsFromStory(
 	characters: Array<{ name: string; description: string }>,
 	locations?: Array<{ name: string; description: string }>,
 	objects?: Array<{ name: string; description: string }>,
 	concepts?: Array<{ name: string; description: string }>
-): void {
+): WorldElement[] {
+	let newlyAddedElements: WorldElement[] = [];
+
 	worldStore.update((state) => {
 		const existingNames = new Set(state.elements.map((el) => el.name.toLowerCase()));
 		const newElements: WorldElement[] = [];
@@ -315,11 +346,15 @@ export function loadElementsFromStory(
 		createElements(objects, 'object');
 		createElements(concepts, 'concept');
 
+		newlyAddedElements = newElements;
+
 		return {
 			...state,
 			elements: [...state.elements, ...newElements]
 		};
 	});
+
+	return newlyAddedElements;
 }
 
 // Set filter type

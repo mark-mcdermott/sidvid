@@ -1224,6 +1224,13 @@
 						loadStoryCharacters(form.story!.characters);
 						// Auto-generate character images after loading
 						autoGenerateCharacterImages = true;
+
+						// Also populate World section with characters
+						const worldCharacters = form.story!.characters.map((c: { name: string; description: string; physical?: string }) => ({
+							name: c.name,
+							description: c.physical || c.description
+						}));
+						loadElementsFromStory(worldCharacters);
 					}
 					if (form.story!.scenes && form.story!.scenes.length > 0) {
 						localSlots = form.story!.scenes.map((scene, index) => ({
@@ -1589,6 +1596,12 @@
 			if (updatedCharacters.length > 0) {
 				loadStoryCharacters(updatedCharacters);
 				autoGenerateCharacterImages = true;
+				// Also populate World section
+				const worldCharacters = updatedCharacters.map((c: { name: string; description: string; physical?: string }) => ({
+					name: c.name,
+					description: c.physical || c.description
+				}));
+				loadElementsFromStory(worldCharacters);
 			}
 
 			// Reload scenes from updated story
@@ -1649,6 +1662,12 @@
 		const latestStory = $storyStore.stories[$storyStore.stories.length - 1];
 		if (latestStory?.story.characters && latestStory.story.characters.length > 0) {
 			loadStoryCharacters(latestStory.story.characters);
+			// Also populate World section
+			const worldCharacters = latestStory.story.characters.map((c: { name: string; description: string; physical?: string }) => ({
+				name: c.name,
+				description: c.physical || c.description
+			}));
+			loadElementsFromStory(worldCharacters);
 		}
 		scrollToSection('world');
 	}

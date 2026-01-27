@@ -7,12 +7,13 @@
 	import { storyStore, STYLE_OPTIONS, type StylePreset } from '$lib/stores/storyStore';
 	import { Input } from '$lib/components/ui/input';
 	import { sessionStore } from '$lib/stores/sessionStore';
-	import { conversationStore, createMessage, addMessageToConversation } from '$lib/stores/conversationStore';
+	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
 	import { HistoryViewer } from '$lib/components/sessions';
 	import { Loader2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 	import type { Story } from '$lib/sidvid';
+	import { loadElementsFromStory, addElementImage, type WorldElement } from '$lib/stores/worldStore';
 
 	let { form }: { form: ActionData } = $props();
 
@@ -99,6 +100,74 @@
 							console.error('Error saving conversation:', error);
 						}
 					})();
+
+					// Auto-extract characters to World section and trigger image generation
+					console.log('Story generation complete. Characters:', form.story.characters);
+					if (form.story.characters && form.story.characters.length > 0) {
+						// Map story characters to world elements format
+						// Use physical description for image generation, fall back to description
+						const characters = form.story.characters.map((c: { name: string; description: string; physical?: string }) => ({
+							name: c.name,
+							description: c.physical || c.description
+						}));
+
+						// Add characters to world store and get newly added ones
+						const newElements = loadElementsFromStory(characters);
+						console.log('Added elements to world store:', newElements);
+
+						// Auto-generate images for new characters
+						if (newElements.length > 0) {
+							const currentStyle = $storyStore.selectedStyle;
+							// Map style preset to image generation style
+							const styleMap: Record<string, string> = {
+								anime: 'anime',
+								photorealistic: 'realistic',
+								'3d-animated': 'cartoon',
+								watercolor: 'realistic',
+								comic: 'cartoon',
+								custom: 'realistic'
+							};
+							const imageStyle = styleMap[currentStyle] || 'realistic';
+
+							// Generate images for each new character in parallel
+							console.log('Starting image generation for', newElements.length, 'characters with style:', imageStyle);
+							newElements.forEach(async (element: WorldElement) => {
+								try {
+									console.log('Generating image for:', element.name, 'description:', element.description);
+									const formData = new FormData();
+									formData.append('description', element.description);
+									formData.append('elementType', element.type);
+									formData.append('style', imageStyle);
+
+									const response = await fetch('/world?/generateImage', {
+										method: 'POST',
+										body: formData
+									});
+
+									const result = await response.json();
+									console.log('Image generation result for', element.name, ':', result);
+
+									if (result.type === 'success' && result.data) {
+										// Parse the data array to find the imageUrl
+										const dataArray = JSON.parse(result.data);
+										const successData = dataArray.find((item: { success?: boolean }) => item.success === true);
+
+										if (successData?.imageUrl) {
+											// Download and save image locally
+											const localPath = await downloadAndReplaceImage(
+												successData.imageUrl,
+												$conversationStore.currentConversationId || ''
+											);
+											// Add image to the element
+											addElementImage(element.id, `/data/images/${localPath}`, successData.revisedPrompt);
+										}
+									}
+								} catch (error) {
+									console.error(`Error generating image for ${element.name}:`, error);
+								}
+							});
+						}
+					}
 				});
 			}
 		}
