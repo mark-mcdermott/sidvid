@@ -583,6 +583,34 @@ When viewing a generated story, scenes are displayed with badges:
 - Title field: editable text input with current title
 - Editable fields for description, dialog, and action
 
+### CLI Commands
+
+```bash
+# Generate a new story
+sidvid story generate "<prompt>" --duration <seconds> --style <style>
+# Example: sidvid story generate "A detective solving a mystery" --duration 30 --style anime
+
+# Edit story with AI prompt
+sidvid story edit "<instruction>"
+# Example: sidvid story edit "Add more tension to the climax"
+
+# Smart expand the story
+sidvid story expand
+
+# Show story history
+sidvid story history
+
+# Branch from a specific version
+sidvid story branch <version-index>
+# Example: sidvid story branch 2
+
+# Show current story
+sidvid story show
+
+# Export story to JSON
+sidvid story export --output story.json
+```
+
 ## Stage 3: World
 
 The World section (UI label: "World") contains all reusable story elements. On the backend, these are called "world elements."
@@ -728,6 +756,41 @@ World elements appear as **thumbnails in the left sidebar** (see UI Layout secti
 - Hover shows element name in tooltip
 - **Thumbnails are draggable** onto scenes (on Dashboard or `/storyboard` page only)
 - Elements in the main World section are NOT directly draggable (only sidebar thumbnails)
+
+### CLI Commands
+
+```bash
+# List all world elements
+sidvid world list [--type <character|location|object|concept>]
+
+# Show element details
+sidvid world show <element-id>
+
+# Add a new element manually
+sidvid world add --type <type> --name "<name>" --description "<description>"
+# Example: sidvid world add --type character --name "Alice" --description "A brave detective"
+
+# Edit element description
+sidvid world edit <element-id> --description "<new-description>"
+
+# Delete element (with cascade warning)
+sidvid world delete <element-id> [--force]
+
+# Enhance element description with AI
+sidvid world enhance <element-id> [--prompt "<guidance>"]
+
+# Generate image for element
+sidvid world generate-image <element-id> [--style <style>]
+
+# List image versions for element
+sidvid world images <element-id>
+
+# Set active image
+sidvid world set-active-image <element-id> <image-id>
+
+# Delete non-active image
+sidvid world delete-image <element-id> <image-id>
+```
 
 ## Stage 4: Storyboard
 
@@ -1320,6 +1383,36 @@ FAILED ──[retry]──▸ GENERATING
 5. **Select Active Version** - Click version thumbnail to make it active (only when 2+ versions)
 6. **Delete Version** - Click trashcan on non-active version (only when 2+ versions)
 
+### CLI Commands
+
+```bash
+# Preview (outputs frame sequence info, or opens player in interactive mode)
+sidvid video preview
+
+# Generate video from storyboard
+sidvid video generate [--wait]
+# --wait: Block until generation completes (default: return task ID immediately)
+
+# Check video generation status
+sidvid video status
+
+# Download active video
+sidvid video download --output <filename>
+# Example: sidvid video download --output my-video.mp4
+
+# List video versions
+sidvid video versions
+
+# Set active version
+sidvid video set-active <version-id>
+
+# Delete a non-active version
+sidvid video delete-version <version-id>
+
+# Show video info (duration, status, versions count)
+sidvid video info
+```
+
 ---
 
 ## Session-Level State
@@ -1397,11 +1490,41 @@ For Story and World Elements:
 
 ### CLI Considerations
 
-1. **Interactive Mode** - Prompt for each stage
-2. **Batch Mode** - Run full pipeline with defaults
-3. **Resume** - Load session and continue from any stage
-4. **Progress Output** - Show status during generation
-5. **Error Recovery** - Prompt for retry on failure
+**Execution Modes:**
+- **Interactive Mode** (`sidvid --interactive`) - Prompt for each stage, confirm actions
+- **Batch Mode** (default) - Execute commands directly, suitable for scripting
+- **Verbose Mode** (`-v` or `--verbose`) - Show detailed output including API responses
+
+**Output Formats:**
+- Default: Human-readable text output
+- `--json` flag: JSON output for scripting/piping
+- `--quiet` flag: Minimal output (IDs only)
+
+**Progress & Status:**
+- Spinner animation for long-running operations
+- Progress percentage for multi-step operations (e.g., generating all scene images)
+- Clear error messages with suggested fixes
+
+**Project Context:**
+- Commands operate on the current project (stored in `.sidvid/`)
+- Use `sidvid project use <id>` to switch projects
+- All commands respect project context automatically
+
+**Environment:**
+- `OPENAI_API_KEY` - Required for AI operations
+- `KLING_API_KEY` - Required for video generation
+- Config file: `.sidvid/config.json` for defaults
+
+**Full Pipeline Example:**
+```bash
+# Create project and generate complete video
+sidvid project create "My Video"
+sidvid story generate "A cat's adventure" --duration 15 --style anime
+sidvid world generate-image all        # Generate images for all elements
+sidvid storyboard generate-all         # Generate all scene posters
+sidvid video generate --wait           # Generate and wait for completion
+sidvid video download --output video.mp4
+```
 
 ### Testing Considerations
 
