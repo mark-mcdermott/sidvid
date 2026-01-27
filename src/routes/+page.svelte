@@ -16,7 +16,23 @@
 	// Components
 	import ProjectSection from '$lib/components/project/ProjectSection.svelte';
 	import { characterStore, loadStoryCharacters, ensureCharacterExpanded, getActiveImageUrl, resetCharacterStore } from '$lib/stores/characterStore';
-	import { worldStore, loadElementsFromStory, getElementsByType, ELEMENT_TYPE_COLORS, getActiveElementImageUrl } from '$lib/stores/worldStore';
+	import {
+		worldStore,
+		addElement,
+		deleteElement,
+		toggleElementExpanded,
+		setFilterType,
+		addElementImage,
+		updateElementDescription,
+		setActiveElementImage,
+		deleteElementImage,
+		loadElementsFromStory,
+		getElementsByType,
+		ELEMENT_TYPE_LABELS,
+		ELEMENT_TYPE_COLORS,
+		getActiveElementImageUrl,
+		type ElementType
+	} from '$lib/stores/worldStore';
 	import { sessionStore } from '$lib/stores/sessionStore';
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import {
@@ -434,6 +450,86 @@
 	let pendingCount = $derived(slots.filter(s => s.status === 'pending').length);
 	let completedCount = $derived(slots.filter(s => s.status === 'completed').length);
 	let generatingCount = $derived(slots.filter(s => s.status === 'generating').length + generatingSlots.size);
+
+	// ========== World State ==========
+	let isWorldGenerating = $state(false);
+	let isWorldEnhancing = $state(false);
+	let activeElementId = $state<string | null>(null);
+	let lastProcessedWorldEnhancedText = $state<string>('');
+	let lastProcessedWorldImageUrl = $state<string>('');
+
+	// Track which elements have prompt textarea open
+	let worldShowPromptTextarea = $state<Set<string>>(new Set());
+	let worldUserPrompts = $state<{ [key: string]: string }>({});
+
+	// Custom element form
+	let customElementName = $state('');
+	let customElementDescription = $state('');
+	let customElementType = $state<ElementType>('character');
+
+	// Filter tabs
+	const worldFilterOptions: Array<{ value: ElementType | 'all'; label: string }> = [
+		{ value: 'all', label: 'All' },
+		{ value: 'character', label: 'Characters' },
+		{ value: 'location', label: 'Locations' },
+		{ value: 'object', label: 'Objects' },
+		{ value: 'concept', label: 'Concepts' }
+	];
+
+	// Type select options
+	const worldTypeOptions: Array<{ value: ElementType; label: string }> = [
+		{ value: 'character', label: 'Character' },
+		{ value: 'location', label: 'Location' },
+		{ value: 'object', label: 'Object' },
+		{ value: 'concept', label: 'Concept' }
+	];
+
+	// Get filtered elements
+	let filteredWorldElements = $derived(
+		$worldStore.filterType === 'all'
+			? $worldStore.elements
+			: $worldStore.elements.filter((el) => el.type === $worldStore.filterType)
+	);
+
+	// Get counts by type
+	let characterCount = $derived(getElementsByType($worldStore.elements, 'character').length);
+	let locationCount = $derived(getElementsByType($worldStore.elements, 'location').length);
+	let objectCount = $derived(getElementsByType($worldStore.elements, 'object').length);
+	let conceptCount = $derived(getElementsByType($worldStore.elements, 'concept').length);
+
+	function handleAddWorldElement() {
+		if (customElementName.trim() && customElementDescription.trim()) {
+			addElement(customElementName.trim(), customElementType, customElementDescription.trim());
+			customElementName = '';
+			customElementDescription = '';
+		}
+	}
+
+	function handleWorldKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			handleAddWorldElement();
+		}
+	}
+
+	function getWorldCurrentDescription(element: typeof $worldStore.elements[0]) {
+		return element?.enhancedDescription || element?.description || '';
+	}
+
+	function openWorldPromptTextarea(elementId: string) {
+		worldShowPromptTextarea = new Set([...worldShowPromptTextarea, elementId]);
+	}
+
+	function closeWorldPromptTextarea(elementId: string) {
+		worldShowPromptTextarea = new Set([...worldShowPromptTextarea].filter((id) => id !== elementId));
+		worldUserPrompts[elementId] = '';
+	}
+
+	function handleDeleteWorldElement(elementId: string) {
+		if (confirm('Are you sure you want to delete this element?')) {
+			deleteElement(elementId);
+		}
+	}
 
 	// ========== Storyboard State ==========
 	let editingWireframes = $state<Set<string>>(new Set());
@@ -2004,349 +2100,319 @@
 		class="scroll-mt-16 border-b pb-8"
 	>
 		<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
-			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
-				<div>
-					<h1 class="text-3xl font-bold mb-3">World</h1>
-					<p class="text-muted-foreground">Create world elements</p>
-				</div>
-				{#if testingMode}
-					<Button variant="outline" size="sm" onclick={loadTestCharacters} title="Load test data">
-						<FlaskConical class="!mr-0 h-4 w-4" />
-					</Button>
-				{/if}
+			<!-- Left Column: Section Header -->
+			<div>
+				<h1 class="text-3xl font-bold mb-3">World</h1>
+				<p class="text-muted-foreground">Create world elements</p>
 			</div>
 
-			<div class="flex flex-col gap-4 lg:max-w-[50%]">
-			{#if form?.action?.includes('Description') && form?.error}
-				<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-					{form.error}
-				</div>
-			{/if}
-
-			<!-- Character rows -->
-			{#each $characterStore.characters as char, index}
-				<div
-					bind:this={characterRefs[index]}
-					class="flex flex-col gap-2 py-3"
-					data-character-content={index}
-				>
-					<!-- Character name -->
-					<h3 class="text-2xl font-semibold mb-2">
-						{char.slug}{#if char.name && char.name !== char.slug} <span class="text-muted-foreground font-normal">({char.name})</span>{/if}
-					</h3>
-
-					<!-- Row 1: Character images + Generate/Regenerate button -->
-					<div class="flex items-start gap-2">
-						<!-- Show all character images -->
-						{#each char.images as img, imgIndex}
-							{@const isSelected = char.selectedImageId === img.id || (!char.selectedImageId && imgIndex === char.images.length - 1)}
-							{@const canDelete = !isSelected && char.images.length > 1}
-							<div class="flex flex-col items-center">
-								{#if isSelected}
-									<!-- Active image: not clickable, no trash -->
-									<div
-										class="relative w-12 h-12 rounded overflow-hidden ring-4 ring-gray-400"
-										title="Selected image"
-									>
-										<img src={img.imageUrl} alt={char.slug} class="w-full h-full object-cover" />
-									</div>
-								{:else}
-									<!-- Non-active image: clickable with trash on hover -->
-									<button
-										type="button"
-										class="relative w-12 h-12 rounded overflow-hidden group cursor-pointer"
-										onclick={(e) => {
-											// Check if click was on trash icon area (bottom-right 20x20 px)
-											const rect = e.currentTarget.getBoundingClientRect();
-											const clickX = e.clientX - rect.left;
-											const clickY = e.clientY - rect.top;
-											const isTrashArea = canDelete && clickX > rect.width - 20 && clickY > rect.height - 20;
-
-											if (isTrashArea) {
-												deleteCharacterImage(index, img.id);
-											} else {
-												selectCharacterImage(index, img.id);
-											}
-										}}
-										title="Click to select, trash icon to delete"
-									>
-										<img src={img.imageUrl} alt={char.slug} class="w-full h-full object-cover" />
-										{#if canDelete}
-											<div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-1">
-												<Trash2 class="!mr-0 h-4 w-4 text-red-500" />
-											</div>
-										{/if}
-									</button>
-								{/if}
-								<!-- Reserve space for progress bar to prevent layout shift -->
-								<div class="h-5 w-12"></div>
-							</div>
-						{/each}
-
-						<!-- Loading placeholder when generating -->
-						{#if generatingCharacterImages.has(index)}
-							<div class="flex flex-col items-center">
-								<div class="w-12 h-12 rounded bg-muted flex items-center justify-center">
-									<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-								</div>
-								<ProgressBar type="generateCharacter" isActive={true} class="w-12 mt-1" />
-							</div>
-						{:else if char.images.length === 0}
-							<!-- Placeholder when no images -->
-							<div class="flex flex-col items-center">
-								<div class="w-12 h-12 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
-									{char.slug.charAt(0)}
-								</div>
-								<!-- Reserve space for progress bar to prevent layout shift -->
-								<div class="h-5 w-12"></div>
-							</div>
-						{/if}
-
-						{#if !generatingCharacterImages.has(index)}
-							{#if char.images.length > 0}
-								<!-- New image button for characters with existing images -->
-								<div class="flex flex-col items-center">
-									<Button
-										type="button"
-										variant="outline"
-										class="w-12 h-12 p-0"
-										disabled={isCharacterGenerating || !getCurrentDescription(index)}
-										title="New image"
-										onclick={() => generateCharacterImageForIndex(index, true)}
-									>
-										{#if isCharacterGenerating && activeCharacterIndex === index}
-											<Loader2 class="!mr-0 h-5 w-5 animate-spin" />
-										{:else}
-											<Plus class="!mr-0 h-5 w-5" />
-										{/if}
-									</Button>
-									<!-- Reserve space for progress bar to prevent layout shift -->
-									<div class="h-5 w-12"></div>
-								</div>
-								<!-- Manual Edit button -->
-								<div class="flex flex-col items-center">
-									<Button
-										type="button"
-										variant="outline"
-										class="w-12 h-12 p-0"
-										title="Manual Edit"
-										onclick={() => {
-											// TODO: Implement manual edit for character
-										}}
-									>
-										<Pencil class="!mr-0 h-5 w-5" />
-									</Button>
-									<div class="h-5 w-12"></div>
-								</div>
-								<!-- Prompt Edit button -->
-								<div class="flex flex-col items-center">
-									<Button
-										type="button"
-										variant="outline"
-										class="w-12 h-12 p-0"
-										title="Prompt Edit"
-										onclick={() => {
-											// TODO: Implement prompt edit for character
-										}}
-									>
-										<Sparkles class="!mr-0 h-5 w-5" />
-									</Button>
-									<div class="h-5 w-12"></div>
-								</div>
-							{:else}
-								<!-- Generate button for characters without images -->
-								<form
-									method="POST"
-									action="?/generateImage"
-									use:enhance={() => {
-										const timing = createTimingContext('generateCharacter');
-										timing.start();
-										isCharacterGenerating = true;
-										activeCharacterIndex = index;
-										return async ({ result, update }) => {
-											timing.complete(result.type === 'success');
-											await update();
-											isCharacterGenerating = false;
-										};
-									}}
-								>
-									<input type="hidden" name="description" value={getCurrentDescription(index)} />
-									<Button type="submit" size="sm" disabled={isCharacterGenerating || !getCurrentDescription(index)}>
-										{#if isCharacterGenerating && activeCharacterIndex === index && form?.action === 'generateImage'}
-											<Loader2 class="h-4 w-4 animate-spin" />
-											Generating...
-										{:else}
-											<Sparkles class="h-4 w-4" />
-											Generate Image
-										{/if}
-									</Button>
-								</form>
-							{/if}
-							{#if isCharacterGenerating && activeCharacterIndex === index && form?.action === 'generateImage'}
-								<ProgressBar type="generateCharacter" isActive={true} class="flex-1 max-w-xs" />
-							{/if}
-						{/if}
+			<!-- Right Column: Content -->
+			<div class="flex flex-col gap-4">
+				{#if form?.error}
+					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+						{form.error}
 					</div>
+				{/if}
 
-					<!-- Physical description -->
-					{#if char.physical}
-						<div class="text-sm">
-							<span class="font-medium">Physical description:</span>
-							<span class="text-muted-foreground"> {char.physical}</span>
-						</div>
-					{/if}
+				<!-- Filter Tabs -->
+				<div class="flex flex-wrap gap-2">
+					{#each worldFilterOptions as option}
+						{@const count =
+							option.value === 'all'
+								? $worldStore.elements.length
+								: option.value === 'character'
+									? characterCount
+									: option.value === 'location'
+										? locationCount
+										: option.value === 'object'
+											? objectCount
+											: conceptCount}
+						<Button
+							variant={$worldStore.filterType === option.value ? 'default' : 'outline'}
+							size="sm"
+							onclick={() => setFilterType(option.value)}
+						>
+							{option.label}
+							{#if count > 0}
+								<span class="ml-1 text-xs">({count})</span>
+							{/if}
+						</Button>
+					{/each}
+				</div>
 
-					<!-- Personality & background -->
-					{#if char.profile}
-						<div class="text-sm">
-							<span class="font-medium">Personality & background:</span>
-							<span class="text-muted-foreground"> {char.profile}</span>
-						</div>
-					{/if}
-
-					<!-- Row 2: Description and action buttons -->
-					<div class="flex flex-col gap-3">
-						<div>
-							<span class="text-sm text-muted-foreground">{char.enhancedDescription || char.description}</span>
-						</div>
-						<div class="flex flex-wrap gap-1">
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={() => openPromptTextarea(index)}
-								disabled={isImproving || isCharacterGenerating}
-							>
-								<Pencil class="mr-1 h-3 w-3" />
-								Edit Manually
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={() => openPromptTextarea(index)}
-								disabled={isImproving || isCharacterGenerating}
-							>
-								<Sparkles class="mr-1 h-3 w-3" />
-								Edit With Prompt
-							</Button>
-							<form
-								method="POST"
-								action="?/improveDescription"
-								use:enhance={() => {
-									const timing = createTimingContext('enhanceDescription');
-									timing.start();
-									isImproving = true;
-									improvingType = 'smart';
-									activeCharacterIndex = index;
-									return async ({ result, update }) => {
-										timing.complete(result.type === 'success');
-										await update();
-										isImproving = false;
-										improvingType = null;
-									};
-								}}
-							>
-								<input type="hidden" name="description" value={getCurrentDescription(index)} />
+				<!-- Element Pills/Buttons -->
+				{#if $worldStore.elements.length > 0}
+					<div class="rounded-md border p-4">
+						<div class="flex flex-wrap gap-2">
+							{#each filteredWorldElements as element}
 								<Button
-									type="submit"
-									variant="outline"
+									variant={$worldStore.expandedElementIds.has(element.id) ? 'default' : 'outline'}
 									size="sm"
-									disabled={isImproving || isCharacterGenerating}
+									onclick={() => toggleElementExpanded(element.id)}
+									style="border-color: {ELEMENT_TYPE_COLORS[element.type]}; {$worldStore.expandedElementIds.has(element.id) ? `background-color: ${ELEMENT_TYPE_COLORS[element.type]};` : ''}"
 								>
-									{#if isImproving && activeCharacterIndex === index && improvingType === 'smart'}
-										<Loader2 class="mr-1 h-3 w-3 animate-spin" />
-										Expanding...
-									{:else}
-										<Wand2 class="mr-1 h-3 w-3" />
-										Smart Expand
-									{/if}
+									{element.name}
 								</Button>
-							</form>
+							{/each}
 						</div>
 					</div>
+				{/if}
 
-					<!-- Progress bar for Smart Expand -->
-					{#if isImproving && activeCharacterIndex === index && improvingType === 'smart'}
-						<ProgressBar type="enhanceDescription" isActive={true} class="max-w-xs" />
-					{/if}
-
-					<!-- Edit prompt textarea (shown when Edit With Prompt is clicked) -->
-					{#if showPromptTextarea.has(index)}
-						<div class="flex flex-col gap-2 rounded-md border p-3 mt-2">
-							<Textarea
-								bind:value={userPrompts[index]}
-								placeholder="Describe how you'd like to change the description..."
-								class="min-h-20"
+				<!-- Add Custom Element -->
+				<div class="rounded-md border p-4">
+					<h2 class="mb-3 text-lg font-semibold">Add Element</h2>
+					<div class="flex flex-col gap-3">
+						<div class="flex gap-2">
+							<Input
+								bind:value={customElementName}
+								placeholder="Element name"
+								class="flex-1"
 							/>
-							<div class="flex gap-2">
-								<form
-									method="POST"
-									action="?/improveDescription"
-									use:enhance={() => {
-										const timing = createTimingContext('enhanceDescription');
-										timing.start();
-										isImproving = true;
-										improvingType = 'regenerate';
-										activeCharacterIndex = index;
-										return async ({ result, update }) => {
-											timing.complete(result.type === 'success');
-											await update();
-											isImproving = false;
-											improvingType = null;
-										};
-									}}
+							<Select.Root type="single" bind:value={customElementType}>
+								<Select.Trigger class="w-36">
+									{ELEMENT_TYPE_LABELS[customElementType]}
+								</Select.Trigger>
+								<Select.Content>
+									{#each worldTypeOptions as option}
+										<Select.Item value={option.value} label={option.label}>
+											{option.label}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+						<Textarea
+							bind:value={customElementDescription}
+							placeholder="Describe this element... Press Enter to add, Shift+Enter for new line."
+							class="min-h-24"
+							onkeydown={handleWorldKeydown}
+						/>
+						<Button
+							onclick={handleAddWorldElement}
+							variant="outline"
+							disabled={!customElementName.trim() || !customElementDescription.trim()}
+						>
+							<Plus class="mr-2 h-4 w-4" />
+							Add {ELEMENT_TYPE_LABELS[customElementType]}
+						</Button>
+					</div>
+				</div>
+
+				<!-- Expanded Elements -->
+				{#each filteredWorldElements as element}
+					{#if $worldStore.expandedElementIds.has(element.id)}
+						<div
+							class="flex flex-col gap-4 rounded-md border p-4"
+							style="border-left: 4px solid {ELEMENT_TYPE_COLORS[element.type]};"
+							data-element-content={element.id}
+						>
+							<div class="flex items-start justify-between">
+								<div>
+									<div class="flex items-center gap-2">
+										<h2 class="text-xl font-semibold">{element.name}</h2>
+										<span
+											class="rounded-full px-2 py-0.5 text-xs text-white"
+											style="background-color: {ELEMENT_TYPE_COLORS[element.type]};"
+										>
+											{ELEMENT_TYPE_LABELS[element.type]}
+										</span>
+									</div>
+									<p class="text-sm text-muted-foreground mt-1">{element.description}</p>
+								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									onclick={() => handleDeleteWorldElement(element.id)}
+									class="text-destructive hover:text-destructive"
 								>
-									<input type="hidden" name="description" value={getCurrentDescription(index)} />
-									<input type="hidden" name="userPrompt" value={userPrompts[index] || ''} />
-									<Button
-										type="submit"
-										size="sm"
-										disabled={isImproving || !userPrompts[index]?.trim()}
-									>
-										{#if isImproving && activeCharacterIndex === index && improvingType === 'regenerate'}
-											<Loader2 class="h-4 w-4 animate-spin" />
-											Regenerating...
-										{:else}
-											Apply Changes
-										{/if}
-									</Button>
-									{#if isImproving && activeCharacterIndex === index && improvingType === 'regenerate'}
-										<ProgressBar type="enhanceDescription" isActive={true} class="mt-2" />
-									{/if}
-								</form>
-								<Button variant="outline" size="sm" onclick={() => closePromptTextarea(index)}>
-									Cancel
+									<Trash2 class="h-4 w-4" />
 								</Button>
+							</div>
+
+							{#if element.enhancedDescription && element.enhancedDescription !== element.description}
+								<div class="rounded-md bg-muted/50 p-3">
+									<p class="mb-1 text-xs font-medium uppercase text-muted-foreground">
+										Enhanced Description:
+									</p>
+									<p class="text-sm">{element.enhancedDescription}</p>
+								</div>
+							{/if}
+
+							<!-- Images -->
+							{#if element.images.length > 0}
+								<div class="flex flex-wrap gap-2">
+									{#each element.images as img}
+										<div class="relative">
+											<img
+												src={img.imageUrl}
+												alt={element.name}
+												class="w-32 h-32 rounded-md object-cover cursor-pointer {img.isActive ? 'ring-2 ring-primary' : ''}"
+												onclick={() => setActiveElementImage(element.id, img.id)}
+											/>
+											{#if !img.isActive && element.images.length > 1}
+												<button
+													class="absolute top-1 right-1 rounded-full bg-destructive p-1 text-white hover:bg-destructive/80"
+													onclick={() => deleteElementImage(element.id, img.id)}
+												>
+													<Trash2 class="h-3 w-3" />
+												</button>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
+
+							<!-- Action Buttons -->
+							<div class="flex flex-col gap-3">
+								<div class="flex flex-wrap gap-2">
+									{#if !element.isEnhanced}
+										<!-- Initial Enhance Description button -->
+										<form
+											method="POST"
+											action="?/enhanceDescription"
+											use:enhance={() => {
+												isWorldEnhancing = true;
+												activeElementId = element.id;
+												return async ({ update }) => {
+													await update();
+													isWorldEnhancing = false;
+												};
+											}}
+										>
+											<input type="hidden" name="description" value={getWorldCurrentDescription(element)} />
+											<input type="hidden" name="elementType" value={element.type} />
+											<input type="hidden" name="elementName" value={element.name} />
+											<Button
+												type="submit"
+												variant="outline"
+												disabled={isWorldEnhancing || !element.description}
+											>
+												{#if isWorldEnhancing && activeElementId === element.id}
+													<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+													Enhancing...
+												{:else}
+													Enhance Description
+												{/if}
+											</Button>
+										</form>
+									{:else if !worldShowPromptTextarea.has(element.id)}
+										<!-- Smart Improve and Improve With Prompt buttons -->
+										<form
+											method="POST"
+											action="?/improveDescription"
+											use:enhance={() => {
+												isWorldEnhancing = true;
+												activeElementId = element.id;
+												return async ({ update }) => {
+													await update();
+													isWorldEnhancing = false;
+												};
+											}}
+										>
+											<input type="hidden" name="description" value={getWorldCurrentDescription(element)} />
+											<input type="hidden" name="elementType" value={element.type} />
+											<Button
+												type="submit"
+												variant="outline"
+												disabled={isWorldEnhancing || isWorldGenerating}
+											>
+												{#if isWorldEnhancing && activeElementId === element.id}
+													<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+													Improving...
+												{:else}
+													Re-enhance Description
+												{/if}
+											</Button>
+										</form>
+										<Button
+											variant="outline"
+											onclick={() => openWorldPromptTextarea(element.id)}
+											disabled={isWorldEnhancing || isWorldGenerating}
+										>
+											Enhance With Prompt
+										</Button>
+									{/if}
+
+									<form
+										method="POST"
+										action="?/generateImage"
+										use:enhance={() => {
+											isWorldGenerating = true;
+											activeElementId = element.id;
+											return async ({ update }) => {
+												await update();
+												isWorldGenerating = false;
+											};
+										}}
+									>
+										<input type="hidden" name="description" value={getWorldCurrentDescription(element)} />
+										<input type="hidden" name="elementType" value={element.type} />
+										<Button type="submit" disabled={isWorldGenerating || !getWorldCurrentDescription(element)}>
+											{#if isWorldGenerating && activeElementId === element.id}
+												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+												Generating...
+											{:else}
+												Generate Image
+											{/if}
+										</Button>
+									</form>
+								</div>
+
+								{#if worldShowPromptTextarea.has(element.id)}
+									<!-- Prompt textarea for improving description -->
+									<div class="flex flex-col gap-2 rounded-md border p-3">
+										<Textarea
+											bind:value={worldUserPrompts[element.id]}
+											placeholder="Describe how you'd like to enhance the description..."
+											class="min-h-20"
+										/>
+										<div class="flex gap-2">
+											<form
+												method="POST"
+												action="?/improveDescription"
+												use:enhance={() => {
+													isWorldEnhancing = true;
+													activeElementId = element.id;
+													return async ({ update }) => {
+														await update();
+														isWorldEnhancing = false;
+													};
+												}}
+											>
+												<input type="hidden" name="description" value={getWorldCurrentDescription(element)} />
+												<input type="hidden" name="userPrompt" value={worldUserPrompts[element.id] || ''} />
+												<input type="hidden" name="elementType" value={element.type} />
+												<Button
+													type="submit"
+													disabled={isWorldEnhancing || !worldUserPrompts[element.id]?.trim()}
+												>
+													{#if isWorldEnhancing && activeElementId === element.id}
+														<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+														Enhancing...
+													{:else}
+														Enhance
+													{/if}
+												</Button>
+											</form>
+											<Button variant="outline" onclick={() => closeWorldPromptTextarea(element.id)}>
+												Cancel
+											</Button>
+										</div>
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/if}
-				</div>
-			{/each}
+				{/each}
 
-			<!-- Add Character button -->
-			{#if showAddCharacterForm}
-				<div class="rounded-md border p-4">
-					<h2 class="mb-3 text-lg font-semibold">Add Custom Character</h2>
-					<div class="flex gap-2">
-						<Textarea
-							bind:value={$characterStore.customDescription}
-							placeholder="Enter character description (e.g., 'A brave space captain with short silver hair'). Press Enter to add, Shift+Enter for new line."
-							class="min-h-24 flex-1"
-							onkeydown={handleCharacterKeydown}
-						/>
-						<Button onclick={addCustomCharacter} variant="outline">Add</Button>
+				<!-- Empty State -->
+				{#if $worldStore.elements.length === 0}
+					<div class="rounded-md border border-dashed p-8 text-center">
+						<p class="text-muted-foreground">
+							No world elements yet. Add characters, locations, objects, or concepts to build your story world.
+						</p>
 					</div>
-					<Button onclick={() => showAddCharacterForm = false} variant="ghost" size="sm" class="mt-2">
-						Cancel
-					</Button>
-				</div>
-			{:else}
-				<div>
-					<Button onclick={() => showAddCharacterForm = true} variant="outline">
-						<Plus class="h-4 w-4" />
-						Add Character
-					</Button>
-				</div>
-			{/if}
+				{/if}
 			</div>
 		</div>
 	</section>
