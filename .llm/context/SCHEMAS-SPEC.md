@@ -2,6 +2,30 @@
 
 This document describes the JSON structures created and passed between stages. See STATE-WORKFLOW-SPEC.md for the authoritative workflow specification.
 
+## Style
+
+The style setting controls the visual aesthetic applied to all image and video generation.
+
+```typescript
+type StylePreset = 'anime' | 'photorealistic' | '3d-animated' | 'watercolor' | 'comic' | 'custom';
+
+interface Style {
+  preset: StylePreset;
+  customPrompt?: string;             // Required when preset is 'custom'
+}
+
+// Internal: Style prompts prepended to generation calls
+const STYLE_PROMPTS: Record<Exclude<StylePreset, 'custom'>, string> = {
+  'anime': 'anime style, cel-shaded, 2D animation, vibrant colors, NOT photorealistic, NOT 3D',
+  'photorealistic': 'photorealistic, cinematic lighting, 8K, hyperrealistic, film grain',
+  '3d-animated': '3D animated, Pixar style, stylized characters, soft lighting, NOT photorealistic',
+  'watercolor': 'watercolor painting, soft edges, painterly, artistic, muted colors',
+  'comic': 'comic book style, bold outlines, halftone dots, dynamic poses, vibrant colors',
+};
+```
+
+---
+
 ## Story Object
 
 Generated in **Stage 1 (Story)** from the user's initial prompt via ChatGPT. This single API call produces the complete story structure.
@@ -11,6 +35,7 @@ interface Story {
   id: string;
   title: string;
   prompt: string;                    // Original user prompt
+  style: Style;                      // Visual style for all generations
   targetDuration: number;            // Target video length in seconds (5s increments)
   narrative: string;                 // Full story text
   scenes: StoryScene[];              // Scene descriptions from story

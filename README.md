@@ -638,6 +638,8 @@ sidvid video "$(jq -r '.scenes[0].description' story.json)" > video1.json
 - [ ] **Variable scene durations** - Support 5s or 10s per scene based on content complexity
 - [ ] **Built-in video assembly adapter** - Optional adapter for common platforms (FFmpeg, cloud services)
 - [ ] **Transition effects** - Per-storyboard-scene transition options (fade, dissolve, cut, etc.) applied during video assembly
+- [ ] **Style reference images** - Upload reference images to guide visual style (when video providers expose this API)
+- [ ] **Video provider abstraction** - Support multiple video generation backends beyond Kling (Runway, Pika, etc.)
 
 ## License
 

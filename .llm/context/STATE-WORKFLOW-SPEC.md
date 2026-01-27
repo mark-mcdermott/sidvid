@@ -191,10 +191,44 @@ Manual regeneration adds a new image version (see Image Version Management secti
 |-------|----------|-------------|
 | `prompt` | Yes | Story idea/concept |
 | `targetDuration` | Yes | Total video length in **5-second increments** (5, 10, 15, 20, ...) |
+| `style` | Yes | Visual style preset or custom prompt (see Style System below) |
 
 The AI generates `targetDuration / 5` scenes, each with a fixed 5-second duration.
 
 > **v2 TODO**: Support variable scene durations (5s or 10s) based on scene complexity.
+
+### Style System
+
+The style setting controls the visual aesthetic of all generated images and videos. It is set at story creation and applies project-wide.
+
+**Style Presets:**
+
+| Preset | Description |
+|--------|-------------|
+| `anime` | Anime/cel-shaded, 2D animation style |
+| `photorealistic` | Cinematic, hyperrealistic rendering |
+| `3d-animated` | Pixar/3D animated style |
+| `watercolor` | Soft, painterly watercolor aesthetic |
+| `comic` | Bold lines, comic book style |
+| `custom` | User-defined style prompt |
+
+**UI:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Style: [Anime ▼]                                               │
+│                                                                  │
+│  (or if custom selected:)                                       │
+│  Style: [Custom ▼]                                              │
+│  Custom prompt: [anime style, cel-shaded, studio ghibli...]    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Behavior:**
+- Style prompt is prepended to all DALL-E (world elements, scenes) and video generation calls
+- Presets include optimized prompts with positive and negative terms (e.g., "NOT photorealistic")
+- Custom style allows full control for advanced users
+- Changing style does NOT auto-regenerate existing images (user must manually regenerate)
 
 ### States
 
