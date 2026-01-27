@@ -129,21 +129,21 @@ describe('videoOptionsSchema', () => {
     const result = videoOptionsSchema.parse({
       prompt: 'A video',
     });
-    expect(result.duration).toBe(8);
+    expect(result.duration).toBe(5);
     expect(result.size).toBe('1280x720');
-    expect(result.model).toBe('sora-2');
+    expect(result.model).toBe('kling-2.6');
   });
 
   it('validates duration values', () => {
     const valid = videoOptionsSchema.safeParse({
       prompt: 'Test',
-      duration: 12,
+      duration: 10,
     });
     expect(valid.success).toBe(true);
 
     const invalid = videoOptionsSchema.safeParse({
       prompt: 'Test',
-      duration: 10,
+      duration: 7, // 7 is not a valid duration option
     });
     expect(invalid.success).toBe(false);
   });
