@@ -2,87 +2,92 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import * as Sheet from '$lib/components/ui/sheet';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import {
 		storyboardStore,
-		addSceneToWireframe,
-		addCharacterToWireframe,
-		removeCharacterFromWireframe,
-		setWireframeDuration,
-		selectWireframe,
-		togglePlayback,
-		setCurrentTime,
-		createNewStoryboard,
+		addScene,
+		updateScene,
+		deleteScene,
+		cloneScene,
+		archiveScene,
+		unarchiveScene,
+		reorderScenes,
+		selectScene,
+		assignElementToScene,
+		unassignElementFromScene,
 		loadStoryboardFromStorage,
 		saveStoryboardToStorage,
-		type WireframeScene,
-		type WireframeCharacter
+		getActiveScenes,
+		getArchivedScenes,
+		getActiveSceneImageUrl,
+		getTotalDuration,
+		togglePlayback,
+		setCurrentTime,
+		type Scene
 	} from '$lib/stores/storyboardStore';
-	import { characterStore } from '$lib/stores/characterStore';
+	import {
+		worldStore,
+		ELEMENT_TYPE_COLORS,
+		getActiveElementImageUrl,
+		type WorldElement
+	} from '$lib/stores/worldStore';
 	import { sessionStore } from '$lib/stores/sessionStore';
-	import { Play, Pause, X, Edit, Loader2 } from '@lucide/svelte';
+	import {
+		Play,
+		Pause,
+		X,
+		Copy,
+		Archive,
+		ArchiveRestore,
+		Plus,
+		Eye,
+		Type,
+		Loader2
+	} from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
 
-	// Track which wireframes are being edited with prompt
-	let editingWireframes = $state<Set<string>>(new Set());
-	let editPrompts = $state<Record<string, string>>({});
-	let regeneratingWireframes = $state<Set<string>>(new Set());
+	// Scene edit modal state
+	let editModalOpen = $state(false);
+	let editingScene = $state<Scene | null>(null);
+	let editTitle = $state('');
+	let editDescription = $state('');
+	let editDialog = $state('');
+	let editAction = $state('');
 
-	// Available characters from character store
-	let availableCharacters = $state<WireframeCharacter[]>([]);
+	// Delete confirmation state
+	let deleteConfirmOpen = $state(false);
+	let sceneToDelete = $state<string | null>(null);
+
+	// Text visibility toggle per scene
+	let textVisibility = $state<Record<string, boolean>>({});
+
+	// Drag state
+	let draggedSceneIndex = $state<number | null>(null);
 
 	// Playback interval
 	let playbackInterval: ReturnType<typeof setInterval> | null = null;
 
+	// Derived values
+	let activeScenes = $derived(getActiveScenes($storyboardStore.scenes));
+	let archivedScenes = $derived(getArchivedScenes($storyboardStore.scenes));
+	let totalDuration = $derived(getTotalDuration($storyboardStore.scenes));
+
+	// Get element by ID
+	function getElement(id: string): WorldElement | undefined {
+		return $worldStore.elements.find((el) => el.id === id);
+	}
+
 	onMount(() => {
 		loadStoryboardFromStorage();
 
-		// Load characters from character store
-		const unsubscribe = characterStore.subscribe(charState => {
-			availableCharacters = charState.characters
-				.filter(c => c.imageUrl)
-				.map((c, i) => ({
-					id: `char-${i}`,
-					name: c.name,
-					imageUrl: c.imageUrl!
-				}));
-		});
-
 		return () => {
-			unsubscribe();
 			if (playbackInterval) clearInterval(playbackInterval);
 		};
-	});
-
-	// Handle form action results
-	$effect(() => {
-		if (form?.action === 'editSlotWithPrompt') {
-			if (form.success && form.wireframeId && form.imageUrl) {
-				// Update wireframe with new image
-				storyboardStore.update(state => {
-					const wireframes = state.wireframes.map(wf => {
-						if (wf.id === form.wireframeId && wf.scene) {
-							return {
-								...wf,
-								scene: {
-									...wf.scene,
-									imageUrl: form.imageUrl
-								}
-							};
-						}
-						return wf;
-					});
-					return { ...state, wireframes };
-				});
-				// Clear editing state
-				editingWireframes = new Set([...editingWireframes].filter(id => id !== form.wireframeId));
-				regeneratingWireframes = new Set([...regeneratingWireframes].filter(id => id !== form.wireframeId));
-			}
-		}
 	});
 
 	// Watch for playback state changes
@@ -90,7 +95,7 @@
 		if ($storyboardStore.isPlaying) {
 			playbackInterval = setInterval(() => {
 				const newTime = $storyboardStore.currentTime + 0.1;
-				if (newTime >= $storyboardStore.totalDuration) {
+				if (newTime >= totalDuration) {
 					togglePlayback();
 					setCurrentTime(0);
 				} else {
@@ -105,74 +110,143 @@
 		}
 	});
 
-	// Save state when wireframes change
+	// Save state when scenes change
 	$effect(() => {
-		if ($storyboardStore.wireframes) {
+		if ($storyboardStore.scenes) {
 			saveStoryboardToStorage();
 		}
 	});
 
-	function handleDragStart(e: DragEvent, type: 'scene' | 'character', data: WireframeScene | WireframeCharacter) {
-		e.dataTransfer?.setData('application/json', JSON.stringify({ type, data }));
+	// Initialize text visibility for scenes with images
+	$effect(() => {
+		activeScenes.forEach((scene) => {
+			if (!(scene.id in textVisibility)) {
+				textVisibility[scene.id] = true; // Show text by default
+			}
+		});
+	});
+
+	function openEditModal(scene: Scene) {
+		editingScene = scene;
+		editTitle = scene.title;
+		editDescription = scene.customDescription || scene.description;
+		editDialog = scene.dialog || '';
+		editAction = scene.action || '';
+		editModalOpen = true;
+	}
+
+	function saveSceneEdits() {
+		if (!editingScene) return;
+
+		updateScene(editingScene.id, {
+			title: editTitle,
+			customDescription: editDescription,
+			dialog: editDialog || undefined,
+			action: editAction || undefined
+		});
+
+		editModalOpen = false;
+		editingScene = null;
+	}
+
+	function handleAddScene() {
+		addScene();
+	}
+
+	function handleCloneScene(sceneId: string, e: Event) {
+		e.stopPropagation();
+		cloneScene(sceneId);
+	}
+
+	function handleArchiveScene(sceneId: string, e: Event) {
+		e.stopPropagation();
+		archiveScene(sceneId);
+	}
+
+	function handleUnarchiveScene(sceneId: string) {
+		unarchiveScene(sceneId);
+	}
+
+	function confirmDeleteScene(sceneId: string, e: Event) {
+		e.stopPropagation();
+		sceneToDelete = sceneId;
+		deleteConfirmOpen = true;
+	}
+
+	function handleDeleteScene() {
+		if (sceneToDelete) {
+			deleteScene(sceneToDelete);
+			sceneToDelete = null;
+			deleteConfirmOpen = false;
+		}
+	}
+
+	function toggleTextVisibility(sceneId: string, e: Event) {
+		e.stopPropagation();
+		textVisibility[sceneId] = !textVisibility[sceneId];
+	}
+
+	function handleDragStart(e: DragEvent, index: number) {
+		draggedSceneIndex = index;
+		e.dataTransfer?.setData('text/plain', index.toString());
 	}
 
 	function handleDragOver(e: DragEvent) {
 		e.preventDefault();
 	}
 
-	function handleDrop(e: DragEvent, wireframeId: string) {
+	function handleDrop(e: DragEvent, toIndex: number) {
+		e.preventDefault();
+		if (draggedSceneIndex !== null && draggedSceneIndex !== toIndex) {
+			reorderScenes(draggedSceneIndex, toIndex);
+		}
+		draggedSceneIndex = null;
+	}
+
+	function handleDragEnd() {
+		draggedSceneIndex = null;
+	}
+
+	// Handle world element drop from sidebar
+	function handleElementDrop(e: DragEvent, sceneId: string) {
 		e.preventDefault();
 		const json = e.dataTransfer?.getData('application/json');
 		if (!json) return;
 
 		try {
-			const { type, data } = JSON.parse(json);
-			if (type === 'scene') {
-				addSceneToWireframe(wireframeId, data as WireframeScene);
-			} else if (type === 'character') {
-				addCharacterToWireframe(wireframeId, data as WireframeCharacter);
+			const data = JSON.parse(json);
+			if (data.type === 'world-element') {
+				assignElementToScene(sceneId, data.id);
 			}
 		} catch (error) {
 			console.error('Drop error:', error);
 		}
 	}
 
-	function handleWireframeClick(wireframeId: string) {
-		selectWireframe(wireframeId);
-	}
+	// Handle drop on new scene button
+	function handleNewSceneDrop(e: DragEvent) {
+		e.preventDefault();
+		const json = e.dataTransfer?.getData('application/json');
+		if (!json) return;
 
-	function handleDurationChange(wireframeId: string, value: string) {
-		const duration = parseInt(value, 10);
-		if (!isNaN(duration) && duration > 0) {
-			setWireframeDuration(wireframeId, duration);
-		}
-	}
-
-	function handleRemoveCharacter(wireframeId: string, characterId: string) {
-		removeCharacterFromWireframe(wireframeId, characterId);
-	}
-
-	function handleNewStoryboard() {
-		createNewStoryboard();
-	}
-
-	function toggleEditMode(wireframeId: string) {
-		if (editingWireframes.has(wireframeId)) {
-			editingWireframes = new Set([...editingWireframes].filter(id => id !== wireframeId));
-		} else {
-			editingWireframes = new Set([...editingWireframes, wireframeId]);
+		try {
+			const data = JSON.parse(json);
+			if (data.type === 'world-element') {
+				const newId = addScene();
+				assignElementToScene(newId, data.id);
+			}
+		} catch (error) {
+			console.error('Drop error:', error);
 		}
 	}
 
 	function handleSendToVideo() {
-		// Initialize video pipeline from session if available
 		const session = $sessionStore.activeSession;
 		if (session) {
 			try {
 				session.initializeVideoPipeline();
-				sessionStore.update(s => ({ ...s }));
+				sessionStore.update((s) => ({ ...s }));
 			} catch (e) {
-				// Video pipeline initialization may fail if no scene images
 				console.log('Could not initialize video pipeline:', e);
 			}
 		}
@@ -183,326 +257,458 @@
 		return `${Math.floor(seconds)}s`;
 	}
 
-	// Get scenes from storyboard store (populated by scenes page via setScenes)
-	let availableScenes = $derived(
-		$storyboardStore.wireframes
-			.filter(wf => wf.scene !== null)
-			.map(wf => wf.scene!)
-	);
-
-	// Calculate total duration
-	let totalDuration = $derived(
-		$storyboardStore.timelineItems.reduce((sum, item) => sum + item.duration, 0)
-	);
-
-	// Check if we have any wireframes with content
-	let hasContent = $derived(
-		$storyboardStore.wireframes.some(wf => wf.scene !== null || wf.characters.length > 0)
-	);
+	function truncateText(text: string, maxLength: number): string {
+		if (text.length <= maxLength) return text;
+		return text.slice(0, maxLength) + '...';
+	}
 </script>
 
-<div class="flex h-full gap-4">
-	<!-- Main Content Area -->
-	<div class="flex flex-1 flex-col gap-4">
-		<div class="flex items-center justify-between">
-			<div>
-				<h1 class="text-3xl font-bold">Storyboard Editor</h1>
-				<p class="text-muted-foreground">Arrange your scenes and edit with prompts</p>
-			</div>
-			<div class="flex gap-2">
-				<Button variant="outline" onclick={handleNewStoryboard}>New Storyboard</Button>
-				<Button
-					disabled={!hasContent}
-					onclick={handleSendToVideo}
-					data-send-to-video
-				>
-					Send to Video
-				</Button>
-			</div>
+<div class="flex flex-col gap-6">
+	<!-- Header -->
+	<div class="flex items-center justify-between">
+		<div>
+			<h1 class="text-3xl font-bold">STORYBOARD</h1>
+			<p class="text-muted-foreground">Create and arrange your scenes</p>
 		</div>
+		<div class="flex gap-2">
+			<Button
+				variant="outline"
+				onclick={() => togglePlayback()}
+				disabled={activeScenes.length === 0}
+			>
+				{#if $storyboardStore.isPlaying}
+					<Pause class="mr-2 h-4 w-4" />
+					Pause
+				{:else}
+					<Play class="mr-2 h-4 w-4" />
+					Preview
+				{/if}
+			</Button>
+			<Button disabled={activeScenes.length === 0} onclick={handleSendToVideo}>
+				Generate Video
+			</Button>
+		</div>
+	</div>
 
-		<!-- Wireframe Grid -->
-		<div class="flex flex-wrap gap-4" data-wireframes-container>
-			{#each $storyboardStore.wireframes as wireframe, index}
-				<div class="flex flex-col gap-2">
-					<div
-						data-storyboard-wireframe={wireframe.id}
-						class="relative flex w-64 flex-col items-center justify-center rounded-lg border-2 transition-colors
-							{$storyboardStore.selectedWireframeId === wireframe.id ? 'border-primary' : ''}
-							{wireframe.scene === null && wireframe.characters.length === 0 ? 'border-dashed border-gray-300' : 'border-solid'}
-							{wireframe.scene !== null ? 'border-green-500' : ''}
-							hover:border-gray-400"
-						style="aspect-ratio: 16/9;"
-						ondragover={handleDragOver}
-						ondrop={(e) => handleDrop(e, wireframe.id)}
-						onclick={() => handleWireframeClick(wireframe.id)}
-						role="button"
-						tabindex="0"
-					>
-						{#if regeneratingWireframes.has(wireframe.id)}
-							<!-- Loading state -->
-							<div class="flex items-center justify-center">
-								<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" data-spinner />
-							</div>
-						{:else if wireframe.scene || wireframe.characters.length > 0}
-							<!-- Scene background -->
-							{#if wireframe.scene}
-								<img
-									src={wireframe.scene.imageUrl}
-									alt={wireframe.scene.name}
-									class="absolute inset-0 h-full w-full rounded-lg object-cover"
-									data-scene-image
-								/>
-							{/if}
+	<!-- Timeline info -->
+	{#if activeScenes.length > 0}
+		<div class="flex items-center gap-4 text-sm text-muted-foreground">
+			<span>Total Duration: <span class="font-medium">{formatTime(totalDuration)}</span></span>
+			<span>Scenes: <span class="font-medium">{activeScenes.length}</span></span>
+		</div>
+	{/if}
 
-							<!-- Characters overlay -->
-							{#if wireframe.characters.length > 0}
-								<div class="relative z-10 flex flex-wrap gap-2 p-2">
-									{#each wireframe.characters as character}
-										<div class="group relative">
-											<img
-												src={character.imageUrl}
-												alt={character.name}
-												class="h-12 w-12 rounded-full border-2 border-white object-cover shadow-lg"
-											/>
-											<button
-												class="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-destructive text-white group-hover:flex"
-												onclick={(e) => { e.stopPropagation(); handleRemoveCharacter(wireframe.id, character.id); }}
-												aria-label={`Remove ${character.name}`}
-											>
-												<X class="h-3 w-3" />
-											</button>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						{:else}
-							<span class="text-sm text-muted-foreground">Drop scene or character here</span>
+	<!-- Scene Cards Grid -->
+	<div class="flex flex-wrap gap-4">
+		{#each activeScenes as scene, index}
+			{@const sceneImageUrl = getActiveSceneImageUrl(scene)}
+			{@const showText = textVisibility[scene.id] !== false}
+			<div
+				class="relative w-72 rounded-lg border bg-card overflow-hidden cursor-pointer transition-shadow hover:shadow-lg"
+				draggable="true"
+				ondragstart={(e) => handleDragStart(e, index)}
+				ondragover={handleDragOver}
+				ondrop={(e) => handleDrop(e, index)}
+				ondragend={handleDragEnd}
+				onclick={() => openEditModal(scene)}
+				role="button"
+				tabindex="0"
+				data-scene-card={scene.id}
+			>
+				<!-- Scene image background -->
+				{#if sceneImageUrl}
+					<div class="relative aspect-video">
+						<img
+							src={sceneImageUrl}
+							alt={scene.title}
+							class="absolute inset-0 h-full w-full object-cover"
+						/>
+						<!-- Overlay when showing text -->
+						{#if showText}
+							<div class="absolute inset-0 bg-black/60"></div>
 						{/if}
 					</div>
+				{:else}
+					<div class="aspect-video bg-muted"></div>
+				{/if}
 
-					<!-- Edit With Prompt button/form -->
-					{#if wireframe.scene}
-						{#if editingWireframes.has(wireframe.id)}
-							<form
-								method="POST"
-								action="?/editSlotWithPrompt"
-								class="flex flex-col gap-2"
-								use:enhance={() => {
-									regeneratingWireframes = new Set([...regeneratingWireframes, wireframe.id]);
-									return async ({ update }) => {
-										await update();
-										regeneratingWireframes = new Set([...regeneratingWireframes].filter(id => id !== wireframe.id));
-									};
-								}}
-							>
-								<input type="hidden" name="wireframeId" value={wireframe.id} />
-								<input type="hidden" name="originalDescription" value={wireframe.scene.name} />
-								<Textarea
-									name="editPrompt"
-									placeholder="Describe changes..."
-									class="text-xs h-16"
-									bind:value={editPrompts[wireframe.id]}
-								/>
-								<div class="flex gap-1">
-									<Button type="submit" size="sm" class="flex-1" disabled={regeneratingWireframes.has(wireframe.id)}>
-										{#if regeneratingWireframes.has(wireframe.id)}
-											<Loader2 class="mr-1 h-3 w-3 animate-spin" />
-											Regenerating...
-										{:else}
-											Regenerate
-										{/if}
-									</Button>
-									<Button type="button" size="sm" variant="outline" onclick={() => toggleEditMode(wireframe.id)}>
-										Cancel
-									</Button>
-								</div>
-							</form>
-						{:else}
-							<Button
-								size="sm"
-								variant="outline"
-								class="w-full"
-								onclick={() => toggleEditMode(wireframe.id)}
-								data-edit-with-prompt={wireframe.id}
-							>
-								<Edit class="mr-1 h-3 w-3" />
-								Edit With Prompt
-							</Button>
+				<!-- Content overlay -->
+				<div
+					class="absolute inset-0 p-3 flex flex-col {sceneImageUrl && showText
+						? 'text-white'
+						: ''}"
+					ondragover={handleDragOver}
+					ondrop={(e) => {
+						e.stopPropagation();
+						handleElementDrop(e, scene.id);
+					}}
+				>
+					{#if showText || !sceneImageUrl}
+						<!-- Top row: badges and icons -->
+						<div class="flex items-start justify-between">
+							<div class="flex flex-wrap gap-1">
+								<span
+									class="rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
+								>
+									Scene {index + 1}
+								</span>
+								<span
+									class="rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
+								>
+									{scene.duration}s
+								</span>
+							</div>
+							<div class="flex gap-1">
+								<button
+									class="rounded p-1 hover:bg-white/20 transition-colors"
+									onclick={(e) => handleCloneScene(scene.id, e)}
+									title="Clone scene"
+								>
+									<Copy class="h-4 w-4" />
+								</button>
+								<button
+									class="rounded p-1 hover:bg-white/20 transition-colors"
+									onclick={(e) => handleArchiveScene(scene.id, e)}
+									title="Archive scene"
+								>
+									<Archive class="h-4 w-4" />
+								</button>
+								<button
+									class="rounded p-1 hover:bg-red-500/80 text-red-400 transition-colors"
+									onclick={(e) => confirmDeleteScene(scene.id, e)}
+									title="Delete scene"
+								>
+									<X class="h-4 w-4" />
+								</button>
+							</div>
+						</div>
+
+						<!-- Title badge (second line) -->
+						{#if scene.title && scene.title !== `Scene ${index + 1}`}
+							<div class="mt-1">
+								<span
+									class="rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
+								>
+									{truncateText(scene.title, 25)}
+								</span>
+							</div>
+						{/if}
+
+						<!-- Description (2 lines max) -->
+						<p class="mt-2 text-sm line-clamp-2 flex-1">
+							{scene.customDescription || scene.description || 'No description'}
+						</p>
+
+						<!-- World element pills -->
+						{#if scene.assignedElements.length > 0}
+							<div class="mt-2 flex flex-wrap gap-1">
+								{#each scene.assignedElements.slice(0, 4) as elementId}
+									{@const element = getElement(elementId)}
+									{#if element}
+										<span
+											class="rounded px-2 py-0.5 text-xs font-medium text-white"
+											style="background-color: {ELEMENT_TYPE_COLORS[element.type]}"
+										>
+											{truncateText(element.name, 12)}
+										</span>
+									{/if}
+								{/each}
+								{#if scene.assignedElements.length > 4}
+									<span
+										class="rounded bg-gray-500 px-2 py-0.5 text-xs font-medium text-white"
+									>
+										+{scene.assignedElements.length - 4}
+									</span>
+								{/if}
+							</div>
 						{/if}
 					{/if}
 				</div>
-			{/each}
 
-			<!-- Empty + wireframe for adding more -->
-			<div>
-				<div
-					data-add-wireframe
-					class="flex w-64 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20"
-					style="aspect-ratio: 16/9;"
-					onclick={handleNewStoryboard}
-					role="button"
-					tabindex="0"
-				>
-					<span class="text-4xl text-muted-foreground">+</span>
-				</div>
-			</div>
-		</div>
+				<!-- Text toggle button (only when image exists) -->
+				{#if sceneImageUrl}
+					<button
+						class="absolute bottom-2 left-2 rounded p-1 bg-black/50 text-white hover:bg-black/70 transition-colors"
+						onclick={(e) => toggleTextVisibility(scene.id, e)}
+						title={showText ? 'Hide text' : 'Show text'}
+					>
+						{#if showText}
+							<Type class="h-4 w-4" />
+						{:else}
+							<Eye class="h-4 w-4" />
+						{/if}
+					</button>
+				{/if}
 
-		<!-- Timeline Section -->
-		<div class="mt-4 rounded-lg border p-4">
-			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-lg font-semibold">Timeline</h2>
-				<div class="flex items-center gap-4">
-					<span class="text-sm text-muted-foreground">
-						Total Duration: <span class="font-medium">{formatTime(totalDuration)}</span>
-					</span>
-					<span class="text-sm text-muted-foreground" data-current-time>
-						Current Time: <span class="font-medium">{formatTime($storyboardStore.currentTime)}</span>
-					</span>
-				</div>
-			</div>
-
-			<!-- Playback Controls -->
-			<div class="mb-4 flex items-center gap-2">
-				<Button
-					variant="outline"
-					size="icon"
-					onclick={togglePlayback}
-					disabled={$storyboardStore.timelineItems.length === 0}
-				>
-					{#if $storyboardStore.isPlaying}
-						<Pause class="h-4 w-4" />
-					{:else}
-						<Play class="h-4 w-4" />
-					{/if}
-				</Button>
-
-				<!-- Timeline Scrubber -->
-				<div
-					class="relative flex-1 h-2 bg-muted rounded-full cursor-pointer"
-					data-timeline-scrubber
-				>
-					<div
-						class="absolute h-full bg-primary rounded-full"
-						style="width: {totalDuration > 0 ? ($storyboardStore.currentTime / totalDuration) * 100 : 0}%"
-					></div>
-				</div>
-			</div>
-
-			<!-- Timeline Items -->
-			<div class="flex gap-2 overflow-x-auto pb-2" data-scene-timeline>
-				{#if $storyboardStore.timelineItems.length === 0}
-					<p class="text-sm text-muted-foreground">Add scenes to wireframes to build your timeline</p>
-				{:else}
-					{#each $storyboardStore.timelineItems as item, index}
-						<div
-							class="flex min-w-32 flex-col rounded-lg border bg-card p-2"
-							data-scene-timeline-item
-							data-scene-id={item.id}
-						>
-							{#if item.scene}
-								<img
-									src={item.scene.imageUrl}
-									alt={item.scene.name}
-									class="mb-2 h-20 w-full rounded object-cover"
-									data-scene-thumbnail
-								/>
-							{:else if item.characters.length > 0}
-								<div class="mb-2 flex h-20 items-center justify-center bg-muted rounded">
-									<span class="text-xs text-muted-foreground">{item.characters.length} characters</span>
-								</div>
-							{/if}
-							<span class="text-xs font-medium">{item.duration}s</span>
-							{#if item.transition}
-								<span class="text-xs text-muted-foreground" data-transition="{index}-{index+1}">
-									{item.transition}
-								</span>
-							{/if}
-						</div>
-					{/each}
+				<!-- Status indicator -->
+				{#if scene.status === 'generating'}
+					<div class="absolute inset-0 flex items-center justify-center bg-black/50">
+						<Loader2 class="h-8 w-8 animate-spin text-white" />
+					</div>
 				{/if}
 			</div>
-		</div>
+		{/each}
 
-		<!-- Selected Wireframe Controls -->
-		{#if $storyboardStore.selectedWireframeId}
-			{@const selectedWf = $storyboardStore.wireframes.find(w => w.id === $storyboardStore.selectedWireframeId)}
-			{#if selectedWf}
-				<div class="rounded-lg border p-4">
-					<h3 class="mb-4 font-semibold">Wireframe Settings</h3>
-					<div class="flex items-center gap-4">
-						<label class="flex items-center gap-2">
-							<span class="text-sm">Duration (seconds):</span>
-							<Input
-								type="range"
-								min="1"
-								max="30"
-								value={selectedWf.duration.toString()}
-								oninput={(e: Event) => handleDurationChange(selectedWf.id, (e.currentTarget as HTMLInputElement).value)}
-								class="w-32"
-								aria-label="Duration"
+		<!-- New Scene Button -->
+		<div
+			class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
+			onclick={handleAddScene}
+			ondragover={handleDragOver}
+			ondrop={handleNewSceneDrop}
+			role="button"
+			tabindex="0"
+			data-add-scene
+		>
+			<Plus class="h-12 w-12 text-muted-foreground" />
+		</div>
+	</div>
+
+	<!-- Archived Scenes Section -->
+	<div class="border-t pt-6">
+		<h2 class="text-lg font-semibold mb-4">Archived Scenes</h2>
+		{#if archivedScenes.length === 0}
+			<p class="text-sm text-muted-foreground">You have no archived scenes</p>
+		{:else}
+			<div class="flex flex-wrap gap-2">
+				{#each archivedScenes as scene}
+					{@const sceneImageUrl = getActiveSceneImageUrl(scene)}
+					<button
+						class="w-24 h-16 rounded border overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+						onclick={() => openEditModal(scene)}
+						title={scene.title}
+					>
+						{#if sceneImageUrl}
+							<img
+								src={sceneImageUrl}
+								alt={scene.title}
+								class="w-full h-full object-cover"
 							/>
-							<span class="text-sm font-medium">{selectedWf.duration}s</span>
-						</label>
+						{:else}
+							<div class="w-full h-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+								{scene.title.charAt(0)}
+							</div>
+						{/if}
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
+</div>
+
+<!-- Scene Edit Modal -->
+<Sheet.Root bind:open={editModalOpen}>
+	<Sheet.Content side="right" class="w-[600px] overflow-y-auto">
+		<Sheet.Header>
+			<Sheet.Title class="flex items-center gap-2">
+				{#if editingScene}
+					<span class="rounded bg-blue-500 px-2 py-0.5 text-sm font-medium text-white">
+						Scene {activeScenes.findIndex((s) => s.id === editingScene?.id) + 1 ||
+							archivedScenes.findIndex((s) => s.id === editingScene?.id) + 1}
+					</span>
+					<span class="rounded bg-blue-500 px-2 py-0.5 text-sm font-medium text-white">
+						{editingScene.duration}s
+					</span>
+					{#if editingScene.isArchived}
+						<span class="rounded bg-yellow-500 px-2 py-0.5 text-sm font-medium text-white">
+							Archived
+						</span>
+					{/if}
+				{/if}
+			</Sheet.Title>
+		</Sheet.Header>
+
+		<div class="space-y-4 py-4">
+			<div>
+				<label for="scene-title" class="text-sm font-medium">Title</label>
+				<Input id="scene-title" bind:value={editTitle} placeholder="Scene title" />
+			</div>
+
+			<div>
+				<label for="scene-description" class="text-sm font-medium">Description</label>
+				<Textarea
+					id="scene-description"
+					bind:value={editDescription}
+					placeholder="Describe what happens in this scene..."
+					rows={3}
+				/>
+			</div>
+
+			<div>
+				<label for="scene-dialog" class="text-sm font-medium">Dialog</label>
+				<Textarea
+					id="scene-dialog"
+					bind:value={editDialog}
+					placeholder="Character dialog for this scene..."
+					rows={2}
+				/>
+			</div>
+
+			<div>
+				<label for="scene-action" class="text-sm font-medium">Action</label>
+				<Textarea
+					id="scene-action"
+					bind:value={editAction}
+					placeholder="Physical actions in this scene..."
+					rows={2}
+				/>
+			</div>
+
+			<!-- World Elements in Modal -->
+			{#if editingScene && editingScene.assignedElements.length > 0}
+				{@const characters = editingScene.assignedElements
+					.map((id) => getElement(id))
+					.filter((el) => el?.type === 'character')}
+				{@const locations = editingScene.assignedElements
+					.map((id) => getElement(id))
+					.filter((el) => el?.type === 'location')}
+				{@const objects = editingScene.assignedElements
+					.map((id) => getElement(id))
+					.filter((el) => el?.type === 'object')}
+				{@const concepts = editingScene.assignedElements
+					.map((id) => getElement(id))
+					.filter((el) => el?.type === 'concept')}
+				<div class="border-t pt-4">
+					<h4 class="text-sm font-medium mb-3">World Elements</h4>
+					<div class="grid grid-cols-4 gap-4">
+						{#if characters.length > 0}
+							<div>
+								<div class="text-xs font-medium text-muted-foreground mb-1">Characters</div>
+								{#each characters as element}
+									{#if element}
+										<div class="flex items-center gap-1 mb-1">
+											{#if getActiveElementImageUrl(element)}
+												<img
+													src={getActiveElementImageUrl(element)}
+													alt={element.name}
+													class="w-6 h-6 rounded object-cover"
+												/>
+											{/if}
+											<span
+												class="rounded px-1.5 py-0.5 text-xs text-white"
+												style="background-color: {ELEMENT_TYPE_COLORS.character}"
+											>
+												{truncateText(element.name, 10)}
+											</span>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
+
+						{#if locations.length > 0}
+							<div>
+								<div class="text-xs font-medium text-muted-foreground mb-1">Locations</div>
+								{#each locations as element}
+									{#if element}
+										<div class="flex items-center gap-1 mb-1">
+											{#if getActiveElementImageUrl(element)}
+												<img
+													src={getActiveElementImageUrl(element)}
+													alt={element.name}
+													class="w-6 h-6 rounded object-cover"
+												/>
+											{/if}
+											<span
+												class="rounded px-1.5 py-0.5 text-xs text-white"
+												style="background-color: {ELEMENT_TYPE_COLORS.location}"
+											>
+												{truncateText(element.name, 10)}
+											</span>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
+
+						{#if objects.length > 0}
+							<div>
+								<div class="text-xs font-medium text-muted-foreground mb-1">Objects</div>
+								{#each objects as element}
+									{#if element}
+										<div class="flex items-center gap-1 mb-1">
+											{#if getActiveElementImageUrl(element)}
+												<img
+													src={getActiveElementImageUrl(element)}
+													alt={element.name}
+													class="w-6 h-6 rounded object-cover"
+												/>
+											{/if}
+											<span
+												class="rounded px-1.5 py-0.5 text-xs text-white"
+												style="background-color: {ELEMENT_TYPE_COLORS.object}"
+											>
+												{truncateText(element.name, 10)}
+											</span>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
+
+						{#if concepts.length > 0}
+							<div>
+								<div class="text-xs font-medium text-muted-foreground mb-1">Concepts</div>
+								{#each concepts as element}
+									{#if element}
+										<div class="flex items-center gap-1 mb-1">
+											{#if getActiveElementImageUrl(element)}
+												<img
+													src={getActiveElementImageUrl(element)}
+													alt={element.name}
+													class="w-6 h-6 rounded object-cover"
+												/>
+											{/if}
+											<span
+												class="rounded px-1.5 py-0.5 text-xs text-white"
+												style="background-color: {ELEMENT_TYPE_COLORS.concept}"
+											>
+												{truncateText(element.name, 10)}
+											</span>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
 					</div>
 				</div>
 			{/if}
-		{/if}
-	</div>
-
-	<!-- Right Sidebar - Available Assets -->
-	<div class="w-64 shrink-0 space-y-4 overflow-y-auto rounded-lg border p-4">
-		<!-- Scenes Section -->
-		<div data-sidebar-section="scenes">
-			<h3 class="mb-2 font-semibold">Scenes</h3>
-			{#if availableScenes.length === 0}
-				<p class="text-sm text-muted-foreground">No scenes generated yet. Generate scenes first.</p>
-			{:else}
-				<div class="grid grid-cols-2 gap-2">
-					{#each availableScenes as scene}
-						<div
-							class="cursor-grab rounded border p-1 transition-colors hover:bg-muted"
-							draggable="true"
-							ondragstart={(e) => handleDragStart(e, 'scene', scene)}
-							data-scene-thumbnail
-						>
-							<img
-								src={scene.imageUrl}
-								alt={scene.name}
-								class="h-16 w-full rounded object-cover"
-							/>
-							<span class="text-xs">{scene.name}</span>
-						</div>
-					{/each}
-				</div>
-			{/if}
 		</div>
 
-		<!-- Characters Section -->
-		<div data-sidebar-section="characters">
-			<h3 class="mb-2 font-semibold">Characters</h3>
-			{#if availableCharacters.length === 0}
-				<p class="text-sm text-muted-foreground">No characters generated yet</p>
-			{:else}
-				<div class="grid grid-cols-2 gap-2">
-					{#each availableCharacters as character}
-						<div
-							class="cursor-grab rounded border p-1 transition-colors hover:bg-muted"
-							draggable="true"
-							ondragstart={(e) => handleDragStart(e, 'character', character)}
-							data-character-thumbnail
-						>
-							<img
-								src={character.imageUrl}
-								alt={character.name}
-								class="h-16 w-full rounded-full object-cover"
-							/>
-							<span class="text-xs">{character.name}</span>
-						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
-	</div>
-</div>
+		<Sheet.Footer class="flex justify-between">
+			<div>
+				{#if editingScene?.isArchived}
+					<Button
+						variant="outline"
+						onclick={() => {
+							if (editingScene) handleUnarchiveScene(editingScene.id);
+							editModalOpen = false;
+						}}
+					>
+						<ArchiveRestore class="mr-2 h-4 w-4" />
+						Unarchive
+					</Button>
+				{/if}
+			</div>
+			<div class="flex gap-2">
+				<Button variant="outline" onclick={() => (editModalOpen = false)}>Cancel</Button>
+				<Button onclick={saveSceneEdits}>Save Changes</Button>
+			</div>
+		</Sheet.Footer>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Delete Confirmation Sheet -->
+<Sheet.Root bind:open={deleteConfirmOpen}>
+	<Sheet.Content side="right" class="w-[400px]">
+		<Sheet.Header>
+			<Sheet.Title>Delete Scene</Sheet.Title>
+			<Sheet.Description>
+				Are you sure you want to delete this scene? This action cannot be undone.
+			</Sheet.Description>
+		</Sheet.Header>
+		<Sheet.Footer>
+			<Button variant="outline" onclick={() => (deleteConfirmOpen = false)}>Cancel</Button>
+			<Button variant="destructive" onclick={handleDeleteScene}>Delete</Button>
+		</Sheet.Footer>
+	</Sheet.Content>
+</Sheet.Root>
