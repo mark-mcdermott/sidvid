@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { writable, derived, get, type Readable } from 'svelte/store';
 import type { ElementType } from './worldStore';
 
 // Scene status per STATE-WORKFLOW-SPEC.md
@@ -44,6 +44,41 @@ export interface StoryboardState {
 	currentTime: number;
 }
 
+// Forward declarations of legacy wireframe types (full exports below)
+export interface WireframeScene {
+	id: string;
+	imageUrl: string;
+	name: string;
+}
+
+export interface WireframeCharacter {
+	id: string;
+	imageUrl: string;
+	name: string;
+}
+
+export interface Wireframe {
+	id: string;
+	scene: WireframeScene | null;
+	characters: WireframeCharacter[];
+	duration: number;
+}
+
+export interface TimelineItem {
+	id: string;
+	wireframeId: string;
+	scene: WireframeScene | null;
+	characters: WireframeCharacter[];
+	duration: number;
+	transition?: string;
+}
+
+// Extended state type with legacy wireframe support
+export interface StoryboardStoreValue extends StoryboardState {
+	wireframes: Wireframe[];
+	timelineItems: TimelineItem[];
+}
+
 function generateId(): string {
 	return `scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -57,10 +92,69 @@ const initialState: StoryboardState = {
 	currentTime: 0
 };
 
-export const storyboardStore = writable<StoryboardState>(initialState);
+// Internal writable store
+const _internalStore = writable<StoryboardState>(initialState);
+
+// Helper to get active image URL
+function _getActiveSceneImageUrl(scene: Scene): string | undefined {
+	if (!scene.images || scene.images.length === 0) return undefined;
+	const active = scene.images.find((img) => img.isActive);
+	return active?.imageUrl || scene.images[scene.images.length - 1]?.imageUrl;
+}
+
+// Compute wireframes from scenes
+function computeWireframes(scenes: Scene[]): Wireframe[] {
+	const activeScenes = scenes.filter((s) => !s.isArchived);
+	return activeScenes.map((scene) => {
+		const imageUrl = _getActiveSceneImageUrl(scene);
+		return {
+			id: scene.id,
+			scene: imageUrl ? { id: scene.id, imageUrl, name: scene.title } : null,
+			characters: [],
+			duration: scene.duration
+		};
+	});
+}
+
+// Compute timeline items from wireframes
+function computeTimelineItems(wireframes: Wireframe[]): TimelineItem[] {
+	return wireframes
+		.filter((wf) => wf.scene !== null)
+		.map((wf) => ({
+			id: `timeline-${wf.id}`,
+			wireframeId: wf.id,
+			scene: wf.scene,
+			characters: wf.characters,
+			duration: wf.duration
+		}));
+}
+
+// Derived store that adds wireframes and timelineItems
+const _derivedStore = derived(_internalStore, ($state): StoryboardStoreValue => {
+	const wireframes = computeWireframes($state.scenes);
+	const timelineItems = computeTimelineItems(wireframes);
+	return {
+		...$state,
+		wireframes,
+		timelineItems
+	};
+});
+
+// Custom store type that combines readable with update/set
+interface StoryboardStore extends Readable<StoryboardStoreValue> {
+	update: (updater: (state: StoryboardState) => StoryboardState) => void;
+	set: (state: StoryboardState) => void;
+}
+
+// Create custom store that has subscribe from derived but update/set from writable
+export const storyboardStore: StoryboardStore = {
+	subscribe: _derivedStore.subscribe,
+	update: _internalStore.update,
+	set: _internalStore.set
+};
 
 export function resetStoryboardStore() {
-	storyboardStore.set({ ...initialState });
+	_internalStore.set({ ...initialState });
 }
 
 // Get active scenes (not archived)
@@ -500,35 +594,7 @@ export function removeElementFromAllScenes(elementId: string): void {
 }
 
 // ============= LEGACY WIREFRAME SUPPORT =============
-// These types and functions maintain backward compatibility with the old wireframe model
-
-export interface WireframeScene {
-	id: string;
-	imageUrl: string;
-	name: string;
-}
-
-export interface WireframeCharacter {
-	id: string;
-	imageUrl: string;
-	name: string;
-}
-
-export interface Wireframe {
-	id: string;
-	scene: WireframeScene | null;
-	characters: WireframeCharacter[];
-	duration: number;
-}
-
-export interface TimelineItem {
-	id: string;
-	wireframeId: string;
-	scene: WireframeScene | null;
-	characters: WireframeCharacter[];
-	duration: number;
-	transition?: string;
-}
+// These types are defined and exported at the top of the file
 
 // Legacy derived state for dashboard compatibility
 export function getLegacyWireframes(scenes: Scene[]): Wireframe[] {
