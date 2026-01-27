@@ -28,7 +28,7 @@ const STYLE_PROMPTS: Record<Exclude<StylePreset, 'custom'>, string> = {
 
 ## Story Object
 
-Generated in **Stage 1 (Story)** from the user's initial prompt via ChatGPT. This single API call produces the complete story structure.
+Generated in **Stage 2 (Story)** from the user's initial prompt via ChatGPT. This single API call produces the complete story structure.
 
 ```typescript
 interface Story {
@@ -91,7 +91,7 @@ interface StoryConcept {
 
 ## World Element
 
-Created in **Stage 2 (World)** either auto-extracted from story or manually created. Supports four types: character, location, object, concept.
+Created in **Stage 3 (World)** either auto-extracted from story or manually created. Supports four types: character, location, object, concept.
 
 ```typescript
 type ElementType = 'character' | 'location' | 'object' | 'concept';
@@ -137,7 +137,7 @@ interface WorldElementVersion {
 
 ## Scene
 
-Created in **Stage 3 (Scenes)** by composing world elements. Each scene generates "poster images" (supports versioning like world elements).
+Created in **Stage 4 (Scenes)** by composing world elements. Each scene generates "poster images" (supports versioning like world elements).
 
 ```typescript
 type SceneStatus = 'empty' | 'pending' | 'generating' | 'completed' | 'failed';
@@ -184,7 +184,7 @@ interface SceneImage {
 
 ## Storyboard Entry
 
-Created in **Stage 4 (Storyboard)** by dragging scenes from the Scenes section.
+Created in **Stage 5 (Storyboard)** by dragging scenes from the Scenes section.
 
 ```typescript
 interface StoryboardEntry {
@@ -207,7 +207,7 @@ interface Storyboard {
 
 ## Video
 
-Generated in **Stage 5 (Video)** from the storyboard.
+Generated in **Stage 6 (Video)** from the storyboard.
 
 ```typescript
 type VideoStatus = 'not_started' | 'generating' | 'polling' | 'completed' | 'failed';
@@ -492,7 +492,7 @@ User Prompt (or existing World Elements)
     │
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 1: Story                         │
+│  Stage 2: Story                         │
 │  ChatGPT generates Story JSON           │
 │  Smart matching with existing elements  │
 └─────────────────────────────────────────┘
@@ -500,7 +500,7 @@ User Prompt (or existing World Elements)
     │  Story + newElementsIntroduced
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 2: World                         │
+│  Stage 3: World                         │
 │  World elements (4 types) created       │
 │  Images generated with DALL-E           │
 └─────────────────────────────────────────┘
@@ -508,7 +508,7 @@ User Prompt (or existing World Elements)
     │  WorldElement[]
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 3: Scenes                        │
+│  Stage 4: Scenes                        │
 │  Elements composed into scenes          │
 │  Poster images generated                │
 └─────────────────────────────────────────┘
@@ -516,14 +516,14 @@ User Prompt (or existing World Elements)
     │  Scene[]
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 4: Storyboard                    │
+│  Stage 5: Storyboard                    │
 │  Scenes arranged in sequence            │
 └─────────────────────────────────────────┘
     │
     │  Storyboard
     ▼
 ┌─────────────────────────────────────────┐
-│  Stage 5: Video                         │
+│  Stage 6: Video                         │
 │  Final video generated                  │
 └─────────────────────────────────────────┘
 ```

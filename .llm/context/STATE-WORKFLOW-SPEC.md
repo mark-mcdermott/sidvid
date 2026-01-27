@@ -9,24 +9,22 @@ See [SCHEMAS-SPEC.md](./SCHEMAS-SPEC.md) for JSON structures produced at each st
 ## Workflow Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        SESSION LIFECYCLE                             │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────┐    ┌────────────┐    ┌────────────┐    ┌───────────┐  │
-│  │  STORY   │◂──▸│   WORLD    │───▸│   SCENES   │───▸│STORYBOARD │  │
-│  └──────────┘    └────────────┘    └────────────┘    └───────────┘  │
-│       │                │                 │                 │         │
-│       ▼                ▼                 ▼                 ▼         │
-│  ┌──────────┐    ┌────────────┐    ┌────────────┐    ┌───────────┐  │
-│  │  VIDEO   │◂───│            │◂───│            │◂───│           │  │
-│  └──────────┘    └────────────┘    └────────────┘    └───────────┘  │
-│                                                                      │
-│  ◂─────────── Users can go back and modify any previous stage ──────│
-│  ◂─────────── Users can START at any stage (non-linear workflow) ───│
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           SESSION LIFECYCLE                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌─────────┐   ┌────────┐   ┌───────┐   ┌────────┐   ┌───────────┐   ┌─────┐│
+│  │ PROJECT │──▸│ STORY  │◂─▸│ WORLD │──▸│ SCENES │──▸│STORYBOARD │──▸│VIDEO││
+│  └─────────┘   └────────┘   └───────┘   └────────┘   └───────────┘   └─────┘│
+│                     │            │           │              │            │    │
+│                     ▼            ▼           ▼              ▼            ▼    │
+│               ◂─────────── Users can go back and modify any stage ──────────▸│
+│               ◂─────────── Users can START at any content stage ────────────▸│
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+**6 Stages:** Project → Story → World → Scenes → Storyboard → Video
 
 ## Non-Linear Workflow
 
@@ -183,7 +181,125 @@ Users can always manually regenerate images:
 
 Manual regeneration adds a new image version (see Image Version Management sections).
 
-## Stage 1: Story
+## Stage 1: Project
+
+The Project stage is the entry point for all SidVid workflows. Every session operates within a project context.
+
+### UI Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PROJECT                                                         │
+│  Name your project here so you can refer back to it later.      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  New Project [✏️] [🗑️]                                           │
+│                                                                  │
+│  (when 2+ projects exist:)                                      │
+│  [Select project... ▼]                                          │
+│                                                                  │
+│  [+ New Project]                                                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Project Actions
+
+| Element | Action |
+|---------|--------|
+| **Project name (H2)** | Displays current project name, defaults to "New Project" |
+| **Pencil icon (✏️)** | Click to edit project name inline; Enter or blur saves |
+| **Trash icon (🗑️)** | Delete project with confirmation modal |
+| **Project dropdown** | Only visible when 2+ projects exist; switch between projects |
+| **+ New Project button** | Create new project (name: "New Project", or "New Project (1)" if taken) |
+
+### States
+
+| State | Description |
+|-------|-------------|
+| `ACTIVE` | Project loaded, user working in it |
+| `RENAMING` | Project name being edited inline |
+| `LOADING` | Switching to a different project |
+| `DELETING` | Delete confirmation modal shown |
+
+### Transitions
+
+```
+ACTIVE ──[click pencil]──▸ RENAMING
+RENAMING ──[enter/blur]──▸ ACTIVE
+ACTIVE ──[select from dropdown]──▸ LOADING
+LOADING ──[success]──▸ ACTIVE
+ACTIVE ──[click trash]──▸ DELETING
+DELETING ──[confirm]──▸ ACTIVE (new blank project)
+DELETING ──[cancel]──▸ ACTIVE
+ACTIVE ──[click + New Project]──▸ ACTIVE (new blank project)
+```
+
+### Persistence
+
+- Current project saved to **localStorage/cookies** automatically
+- On page refresh, current project reloads (SPA-style, no data loss)
+- Switching projects or creating new project does NOT cause page reload
+- All project data (story, world elements, scenes, storyboard, video) persisted per-project
+
+### Delete Confirmation Modal
+
+```
+┌─────────────────────────────────────────────────┐
+│  Delete Project                                  │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  Are you sure you want to delete "My Video"?    │
+│                                                  │
+│  This action is irreversible. All story,        │
+│  characters, scenes, and video data will be     │
+│  permanently deleted.                           │
+│                                                  │
+│                    [Cancel]  [Delete]           │
+└─────────────────────────────────────────────────┘
+```
+
+### Default Naming
+
+- New projects default to "New Project"
+- If "New Project" exists, use "New Project (1)", "New Project (2)", etc.
+- Name uniqueness is enforced across all user projects
+
+### Auto-Save Behavior
+
+- Auto-save triggers on significant changes (debounced)
+- Save indicator shows sync status
+- Unsaved changes warning on close/switch
+
+### CLI Commands
+
+```bash
+# List all projects
+sidvid project list
+
+# Create new project
+sidvid project create "My Video"
+
+# Open/switch to project
+sidvid project open <project-id>
+
+# Show current project info
+sidvid project info
+
+# Delete project
+sidvid project delete <project-id>
+
+# Rename project
+sidvid project rename <project-id> "New Name"
+
+# Export project to JSON
+sidvid project export <project-id> --output ./backup.json
+
+# Import project from JSON
+sidvid project import ./backup.json
+```
+
+## Stage 2: Story
 
 ### Story Generation Input
 
@@ -275,7 +391,7 @@ Note: World elements (characters, locations, objects, concepts) are automaticall
 
 All story versions remain visible in the UI. Each version shows its prompt and the resulting story. Each version has action buttons, allowing users to branch from any point. When branching, subsequent versions are discarded and the user continues from the selected version.
 
-## Stage 2: World
+## Stage 3: World
 
 The World section (UI label: "World") contains all reusable story elements. On the backend, these are called "world elements."
 
@@ -392,7 +508,7 @@ World elements appear as **thumbnails in the left sidebar** (when open):
 
 This separation keeps the World section for element management while enabling quick drag-and-drop scene composition via the sidebar.
 
-## Stage 3: Scenes
+## Stage 4: Scenes
 
 Scenes are slots where world elements are assembled. Each scene generates a "poster image" used in the Storyboard.
 
@@ -614,7 +730,7 @@ sidvid scene generate-all
 sidvid scene clone <scene-id>
 ```
 
-## Stage 4: Storyboard
+## Stage 5: Storyboard
 
 The Storyboard arranges scenes into a timeline.
 
@@ -667,7 +783,7 @@ Each entry in the storyboard tracks:
 | Element | Action |
 |---------|--------|
 | **Preview** | Play slideshow of poster images with timing |
-| **Generate Video** | Proceed to Stage 5 (Video Generation) |
+| **Generate Video** | Proceed to Stage 6 (Video Generation) |
 | **× on entry** | Remove scene from storyboard (doesn't delete original scene) |
 | **Drag entry** | Reorder within storyboard |
 | **Drop zone** | Drag scene from Scenes section to add |
@@ -680,7 +796,7 @@ Each entry in the storyboard tracks:
 - **Remove**: Click × on entry or drag out of storyboard
 - **Scene shows**: Poster image from the scene, with duration indicator
 - **Auto-updates**: When a scene is edited in Scenes section, storyboard entries referencing it update automatically
-- **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 5
+- **Preview**: Plays poster images in sequence with timing (slideshow/animatic) - actual video clips are generated in Stage 6
 
 ### Metadata Display
 
@@ -706,7 +822,7 @@ EDITING ──[generate video]──▸ VIDEO stage
 2. **Reorder Scenes** - Drag storyboard entries to reorder
 3. **Remove Scene** - Remove scene from storyboard (doesn't delete original scene)
 4. **Preview** - Play storyboard preview
-5. **Generate Video** - Proceed to video generation (Stage 5)
+5. **Generate Video** - Proceed to video generation (Stage 6)
 
 ### CLI Commands
 
@@ -733,7 +849,7 @@ sidvid storyboard move <entry-id> --to <index>
 sidvid storyboard preview
 ```
 
-## Stage 5: Video
+## Stage 6: Video
 
 ### States
 
@@ -805,101 +921,6 @@ FAILED ──[retry]──▸ GENERATING
 3. **Regenerate** - Generate new video version (adds to versions, becomes active)
 4. **Select Active Version** - Choose which video version to display
 5. **Delete Version** - Remove a non-active video (trashcan icon)
-
-## Project Lifecycle
-
-Projects are the top-level container for all SidVid content. See SCHEMAS-SPEC.md for the `Project` interface and `ProjectPersistenceAdapter`.
-
-### States
-
-| State | Description |
-|-------|-------------|
-| `CREATING` | New project dialog/wizard open |
-| `ACTIVE` | Project loaded, user working in it |
-| `SAVING` | Project being persisted |
-| `SAVED` | Project persisted to storage |
-| `LOADING` | Project being loaded from storage |
-| `DELETED` | Project removed (terminal state) |
-
-### Transitions
-
-```
-CREATING ──[name entered]──▸ ACTIVE
-ACTIVE ──[auto-save / manual save]──▸ SAVING
-SAVING ──[success]──▸ SAVED
-SAVING ──[failure]──▸ ACTIVE (with error)
-SAVED ──[user makes changes]──▸ ACTIVE
-SAVED ──[open different project]──▸ LOADING
-LOADING ──[success]──▸ ACTIVE
-LOADING ──[failure]──▸ SAVED (previous project, with error)
-ACTIVE ──[delete]──▸ DELETED
-SAVED ──[delete]──▸ DELETED
-```
-
-### Sidebar UI (Projects Panel)
-
-```
-┌──────────────────────┬─────────────────────────────────────────┐
-│ PROJECTS             │  MAIN CONTENT                           │
-├──────────────────────┤                                         │
-│ + New Project        │  [Story | World | Scenes | ...]         │
-│                      │                                         │
-│ ● frunk landing vid  │  (active project content)               │
-│   tutorial video     │                                         │
-│   demo reel          │                                         │
-│                      │                                         │
-└──────────────────────┴─────────────────────────────────────────┘
-```
-
-| Element | Behavior |
-|---------|----------|
-| **+ New Project** | Opens create dialog, prompts for name |
-| **Project list** | Shows all saved projects, sorted by lastOpenedAt |
-| **Active indicator (●)** | Shows which project is currently loaded |
-| **Click project** | Auto-saves current project, loads clicked project |
-| **Right-click / menu** | Rename, duplicate, delete options |
-
-### User Actions
-
-1. **Create Project** - Enter name, optionally description
-2. **Open Project** - Load project from storage (auto-saves current)
-3. **Save Project** - Persist current state (also happens on auto-save)
-4. **Rename Project** - Change project name
-5. **Duplicate Project** - Copy project with new name
-6. **Delete Project** - Remove project and all assets (with confirmation)
-7. **Export Project** - Download project as JSON (portable backup)
-8. **Import Project** - Load project from JSON file
-
-### Auto-Save Behavior
-
-- Auto-save triggers on significant changes (debounced)
-- Save indicator shows sync status
-- Unsaved changes warning on close/switch
-
-### CLI Commands
-
-```bash
-# List all projects
-sidvid project list
-
-# Create new project
-sidvid project create "My Video"
-
-# Open/switch to project
-sidvid project open <project-id>
-
-# Show current project info
-sidvid project info
-
-# Delete project
-sidvid project delete <project-id>
-
-# Export project to JSON
-sidvid project export <project-id> --output ./backup.json
-
-# Import project from JSON
-sidvid project import ./backup.json
-```
 
 ---
 
