@@ -11,7 +11,7 @@
 	import type { ApiCallType } from '$lib/sidvid/types';
 
 	// Stores
-	import { storyStore } from '$lib/stores/storyStore';
+	import { storyStore, STYLE_OPTIONS, type StylePreset } from '$lib/stores/storyStore';
 
 	// Components
 	import ProjectSection from '$lib/components/project/ProjectSection.svelte';
@@ -114,6 +114,14 @@
 	];
 
 	let selectedLengthValue = $state($storyStore.selectedLength.value);
+
+	// Style selector state
+	let selectedStyleValue = $state<StylePreset>($storyStore.selectedStyle);
+
+	// Get the label for current style
+	let selectedStyleLabel = $derived(
+		STYLE_OPTIONS.find(opt => opt.value === $storyStore.selectedStyle)?.label || 'Anime'
+	);
 
 	// Editable story fields for Manual Edit mode
 	interface EditableScene {
@@ -947,6 +955,20 @@
 		selectedLengthValue = $storyStore.selectedLength.value;
 	});
 
+	// Style selector sync effects
+	$effect(() => {
+		if (selectedStyleValue !== $storyStore.selectedStyle) {
+			storyStore.update(state => ({
+				...state,
+				selectedStyle: selectedStyleValue
+			}));
+		}
+	});
+
+	$effect(() => {
+		selectedStyleValue = $storyStore.selectedStyle;
+	});
+
 	// Story form effect - handles generateStory, editStory, and smartExpandStory actions
 	$effect(() => {
 		if ((form?.action === 'generateStory' || form?.action === 'editStory' || form?.action === 'smartExpandStory') && form?.success && form?.story) {
@@ -1582,22 +1604,53 @@
 
 				{#if $storyStore.stories.length === 0}
 					<div class="w-full xl:max-w-[32rem]">
-						<div class="mb-2">
-							<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
-							<Select.Root type="single" bind:value={selectedLengthValue}>
-								<Select.Trigger class="w-32">
-									{$storyStore.selectedLength.label}
-								</Select.Trigger>
-								<Select.Content>
-									{#each lengthOptions as option}
-										<Select.Item value={option.value} label={option.label}>
-											{option.label}
-										</Select.Item>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-							<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+						<div class="mb-2 flex gap-4">
+							<div>
+								<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
+								<Select.Root type="single" bind:value={selectedLengthValue}>
+									<Select.Trigger class="w-32">
+										{$storyStore.selectedLength.label}
+									</Select.Trigger>
+									<Select.Content>
+										{#each lengthOptions as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+							</div>
+
+							<div>
+								<label for="style" class="mb-1 block text-sm font-medium">Style</label>
+								<Select.Root type="single" bind:value={selectedStyleValue}>
+									<Select.Trigger class="w-40" aria-label="style selector">
+										{selectedStyleLabel}
+									</Select.Trigger>
+									<Select.Content>
+										{#each STYLE_OPTIONS as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" name="style" value={$storyStore.selectedStyle} />
+							</div>
 						</div>
+
+						{#if $storyStore.selectedStyle === 'custom'}
+							<div class="mb-2">
+								<label for="customStylePrompt" class="mb-1 block text-sm font-medium">Custom Style Prompt</label>
+								<Input
+									bind:value={$storyStore.customStylePrompt}
+									name="customStylePrompt"
+									placeholder="e.g., anime style, cel-shaded, studio ghibli inspired..."
+									class="w-full"
+								/>
+							</div>
+						{/if}
 
 						<Textarea
 							bind:value={$storyStore.prompt}
@@ -1850,6 +1903,8 @@
 									</p>
 									<input type="hidden" name="currentStory" value="" />
 									<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+									<input type="hidden" name="style" value={$storyStore.selectedStyle} />
+									<input type="hidden" name="customStylePrompt" value={$storyStore.customStylePrompt} />
 									<Textarea
 										bind:value={$storyStore.editPrompt}
 										name="editPrompt"
@@ -1900,6 +1955,8 @@
 		>
 			<input type="hidden" name="prompt" value={$storyStore.prompt} />
 			<input type="hidden" name="length" value={$storyStore.selectedLength.value} />
+			<input type="hidden" name="style" value={$storyStore.selectedStyle} />
+			<input type="hidden" name="customStylePrompt" value={$storyStore.customStylePrompt} />
 		</form>
 
 		<form
@@ -1923,6 +1980,8 @@
 		>
 			<input type="hidden" name="currentStory" value="" />
 			<input type="hidden" name="length" value={$storyStore.selectedLength.value} />
+			<input type="hidden" name="style" value={$storyStore.selectedStyle} />
+			<input type="hidden" name="customStylePrompt" value={$storyStore.customStylePrompt} />
 		</form>
 	</section>
 
