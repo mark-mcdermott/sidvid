@@ -2,6 +2,12 @@ import { writable, get } from 'svelte/store';
 import { ProjectManager, MemoryStorageAdapter, BrowserStorageAdapter } from '$lib/sidvid';
 import type { Project, ProjectSummary } from '$lib/sidvid';
 import { browser } from '$app/environment';
+import { resetStoryStore } from './storyStore';
+import { resetWorldStore } from './worldStore';
+import { resetStoryboardStore } from './storyboardStore';
+import { resetVideoStore } from './videoStore';
+import { resetCharacterStore } from './characterStore';
+import { resetConversationStore } from './conversationStore';
 
 export interface ProjectState {
 	manager: ProjectManager;
@@ -29,12 +35,27 @@ const initialState: ProjectState = {
 export const projectStore = writable<ProjectState>(initialState);
 
 /**
+ * Reset all content stores to their initial state
+ */
+function resetAllContentStores(): void {
+	resetStoryStore();
+	resetWorldStore();
+	resetStoryboardStore();
+	resetVideoStore();
+	resetCharacterStore();
+	resetConversationStore();
+}
+
+/**
  * Create a new project
  */
 export async function createNewProject(name?: string): Promise<Project> {
 	projectStore.update((s) => ({ ...s, isLoading: true, error: null }));
 
 	try {
+		// Reset all content stores for the new project
+		resetAllContentStores();
+
 		const project = await manager.createProject(name);
 		const projects = await manager.listProjects();
 
@@ -60,6 +81,9 @@ export async function loadProject(id: string): Promise<Project> {
 	projectStore.update((s) => ({ ...s, isLoading: true, error: null }));
 
 	try {
+		// Reset all content stores when switching projects
+		resetAllContentStores();
+
 		const project = await manager.switchProject(id);
 
 		projectStore.update((s) => ({
