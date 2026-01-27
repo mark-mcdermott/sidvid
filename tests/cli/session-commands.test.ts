@@ -10,7 +10,7 @@ const TEST_SESSION_DIR = join(process.cwd(), '.test-cli-sessions');
 // Helper to run CLI commands
 function runCLI(command: string, env: Record<string, string> = {}): string {
   try {
-    return execSync(`tsx ${CLI_PATH} ${command}`, {
+    return execSync(`npx tsx ${CLI_PATH} ${command}`, {
       env: { ...process.env, ...env },
       encoding: 'utf-8'
     });
