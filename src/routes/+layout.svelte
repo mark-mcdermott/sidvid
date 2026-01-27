@@ -352,7 +352,7 @@
 			</div>
 			<button
 				onclick={toggleDarkMode}
-				class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80"
+				class="flex cursor-pointer items-center rounded-full p-2 text-muted-foreground hover:text-foreground transition-colors"
 				title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
 			>
 				{#if darkMode}
