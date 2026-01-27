@@ -28,6 +28,7 @@
 		ELEMENT_TYPE_COLORS
 	} from '$lib/stores/worldStore';
 	import { apiTimingStore } from '$lib/stores/apiTimingStore';
+	import { initializeProjectStore } from '$lib/stores/projectStore';
 	import { Sun, Moon } from '@lucide/svelte';
 
 	let { children } = $props();
@@ -61,6 +62,9 @@
 	onMount(async () => {
 		// Remove sidebar FOUC prevention class now that Svelte has hydrated
 		document.documentElement.classList.remove('sidebar-closed-initial');
+
+		// Initialize project store (loads persisted UI state from localStorage)
+		await initializeProjectStore();
 
 		await apiTimingStore.load();
 	});

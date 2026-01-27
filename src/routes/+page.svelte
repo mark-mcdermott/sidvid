@@ -466,12 +466,55 @@
 	let activeElementId = $state<string | null>(null);
 	let lastProcessedWorldEnhancedText = $state<string>('');
 	let lastProcessedWorldImageUrl = $state<string>('');
+	let autoGenerateWorldElementImages = $state(false);
+	let pendingWorldElementIds = $state<string[]>([]);
 
 	// Track which elements have prompt textarea open
 	let worldShowPromptTextarea = $state<Set<string>>(new Set());
 	let worldUserPrompts = $state<{ [key: string]: string }>({});
 
-	// Custom element form
+	// Custom element forms (multiple can be open at once)
+	interface AddElementForm {
+		id: string;
+		name: string;
+		description: string;
+		type: ElementType;
+	}
+	let addElementForms = $state<AddElementForm[]>([]);
+
+	function createAddElementForm(): AddElementForm {
+		return {
+			id: `form-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			name: '',
+			description: '',
+			type: 'character'
+		};
+	}
+
+	function addNewElementForm() {
+		addElementForms = [...addElementForms, createAddElementForm()];
+	}
+
+	function removeElementForm(formId: string) {
+		addElementForms = addElementForms.filter(f => f.id !== formId);
+	}
+
+	function submitElementForm(formId: string) {
+		const form = addElementForms.find(f => f.id === formId);
+		if (form && form.name.trim() && form.description.trim()) {
+			addElement(form.name.trim(), form.type, form.description.trim());
+			removeElementForm(formId);
+		}
+	}
+
+	function handleElementFormKeydown(e: KeyboardEvent, formId: string) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			submitElementForm(formId);
+		}
+	}
+
+	// Legacy single form (keeping for backwards compat, will remove)
 	let customElementName = $state('');
 	let customElementDescription = $state('');
 	let customElementType = $state<ElementType>('character');
@@ -537,6 +580,89 @@
 	function handleDeleteWorldElement(elementId: string) {
 		if (confirm('Are you sure you want to delete this element?')) {
 			deleteElement(elementId);
+		}
+	}
+
+	async function generateWorldElementImage(elementId: string) {
+		const element = $worldStore.elements.find(el => el.id === elementId);
+		if (!element || element.images.length > 0) return; // Skip if no element or already has image
+
+		const description = element.enhancedDescription || element.description;
+		if (!description) return;
+
+		isWorldGenerating = true;
+		activeElementId = elementId;
+
+		try {
+			const formData = new FormData();
+			formData.append('description', description);
+			formData.append('elementType', element.type);
+
+			const response = await fetch('?/generateImage', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+			console.log('World element image generation result:', result);
+
+			// Parse SvelteKit devalue format
+			let actionData = null;
+
+			if (result.data) {
+				try {
+					const parsed = JSON.parse(result.data);
+					if (Array.isArray(parsed) && parsed.length > 0) {
+						const mainObj = parsed[0];
+						if (typeof mainObj === 'object' && mainObj !== null) {
+							const resolveValue = (val: any): any => {
+								if (typeof val === 'number' && parsed[val] !== undefined) {
+									const resolved = parsed[val];
+									if (typeof resolved === 'object' && resolved !== null) {
+										const resolvedObj: any = Array.isArray(resolved) ? [] : {};
+										for (const key in resolved) {
+											resolvedObj[key] = resolveValue(resolved[key]);
+										}
+										return resolvedObj;
+									}
+									return resolved;
+								}
+								return val;
+							};
+
+							actionData = {};
+							for (const key in mainObj) {
+								actionData[key] = resolveValue(mainObj[key]);
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Error parsing result.data:', e);
+				}
+			} else if (result.success !== undefined) {
+				actionData = result;
+			}
+
+			console.log('Parsed world element action data:', actionData);
+
+			if (actionData?.success && actionData?.character?.imageUrl) {
+				addElementImage(elementId, actionData.character.imageUrl, actionData.character.revisedPrompt);
+			}
+		} catch (error) {
+			console.error('Error generating world element image:', error);
+		} finally {
+			isWorldGenerating = false;
+			activeElementId = null;
+		}
+	}
+
+	async function generateAllWorldElementImages(elementIds: string[]) {
+		// Generate images sequentially to avoid rate limiting
+		for (const elementId of elementIds) {
+			const element = $worldStore.elements.find(el => el.id === elementId);
+			if (element && element.images.length === 0) {
+				await generateWorldElementImage(elementId);
+			}
 		}
 	}
 
@@ -1222,15 +1348,18 @@
 					// Always populate characters and scenes from the story
 					if (form.story!.characters && form.story!.characters.length > 0) {
 						loadStoryCharacters(form.story!.characters);
-						// Auto-generate character images after loading
-						autoGenerateCharacterImages = true;
 
-						// Also populate World section with characters
+						// Populate World section with characters and auto-generate images
 						const worldCharacters = form.story!.characters.map((c: { name: string; description: string; physical?: string }) => ({
 							name: c.name,
 							description: c.physical || c.description
 						}));
-						loadElementsFromStory(worldCharacters);
+						const newElements = loadElementsFromStory(worldCharacters);
+						// Auto-generate world element images
+						if (newElements.length > 0) {
+							pendingWorldElementIds = newElements.map(el => el.id);
+							autoGenerateWorldElementImages = true;
+						}
 					}
 					if (form.story!.scenes && form.story!.scenes.length > 0) {
 						localSlots = form.story!.scenes.map((scene, index) => ({
@@ -1260,6 +1389,19 @@
 			// Small delay to ensure the store is updated
 			setTimeout(() => {
 				generateAllCharacterImages();
+			}, 100);
+		}
+	});
+
+	// Auto-generate world element images effect
+	$effect(() => {
+		if (autoGenerateWorldElementImages && pendingWorldElementIds.length > 0) {
+			autoGenerateWorldElementImages = false;
+			const elementIds = [...pendingWorldElementIds];
+			pendingWorldElementIds = [];
+			// Small delay to ensure the store is updated
+			setTimeout(() => {
+				generateAllWorldElementImages(elementIds);
 			}, 100);
 		}
 	});
@@ -1298,6 +1440,16 @@
 				}
 				return { ...state, characters: updatedCharacters };
 			});
+		}
+
+		// Handle World element image generation response
+		if (form?.action === 'generateImage' && form?.success && form?.character && activeElementId) {
+			const element = $worldStore.elements.find(el => el.id === activeElementId);
+			if (element && form.character.imageUrl) {
+				addElementImage(activeElementId, form.character.imageUrl, form.character.revisedPrompt);
+				// Reset activeElementId after processing
+				activeElementId = null;
+			}
 		}
 	});
 
@@ -1595,13 +1747,17 @@
 			// Reload characters from edited data and trigger auto-generation
 			if (updatedCharacters.length > 0) {
 				loadStoryCharacters(updatedCharacters);
-				autoGenerateCharacterImages = true;
-				// Also populate World section
+				// Populate World section and auto-generate images
 				const worldCharacters = updatedCharacters.map((c: { name: string; description: string; physical?: string }) => ({
 					name: c.name,
 					description: c.physical || c.description
 				}));
-				loadElementsFromStory(worldCharacters);
+				const newElements = loadElementsFromStory(worldCharacters);
+				// Auto-generate world element images
+				if (newElements.length > 0) {
+					pendingWorldElementIds = newElements.map(el => el.id);
+					autoGenerateWorldElementImages = true;
+				}
 			}
 
 			// Reload scenes from updated story
@@ -1667,7 +1823,12 @@
 				name: c.name,
 				description: c.physical || c.description
 			}));
-			loadElementsFromStory(worldCharacters);
+			const newElements = loadElementsFromStory(worldCharacters);
+			// Auto-generate world element images
+			if (newElements.length > 0) {
+				pendingWorldElementIds = newElements.map(el => el.id);
+				autoGenerateWorldElementImages = true;
+			}
 		}
 		scrollToSection('world');
 	}
@@ -2235,67 +2396,8 @@
 					{/each}
 				</div>
 
-				<!-- Element Pills/Buttons -->
-				{#if $worldStore.elements.length > 0}
-					<div class="rounded-md border p-4">
-						<div class="flex flex-wrap gap-2">
-							{#each filteredWorldElements as element}
-								<Button
-									variant={$worldStore.expandedElementIds.has(element.id) ? 'default' : 'outline'}
-									size="sm"
-									onclick={() => toggleElementExpanded(element.id)}
-									style="border-color: {ELEMENT_TYPE_COLORS[element.type]}; {$worldStore.expandedElementIds.has(element.id) ? `background-color: ${ELEMENT_TYPE_COLORS[element.type]};` : ''}"
-								>
-									{element.name}
-								</Button>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Add Custom Element -->
-				<div class="rounded-md border p-4">
-					<h2 class="mb-3 text-lg font-semibold">Add Element</h2>
-					<div class="flex flex-col gap-3">
-						<div class="flex gap-2">
-							<Input
-								bind:value={customElementName}
-								placeholder="Element name"
-								class="flex-1"
-							/>
-							<Select.Root type="single" bind:value={customElementType}>
-								<Select.Trigger class="w-36">
-									{ELEMENT_TYPE_LABELS[customElementType]}
-								</Select.Trigger>
-								<Select.Content>
-									{#each worldTypeOptions as option}
-										<Select.Item value={option.value} label={option.label}>
-											{option.label}
-										</Select.Item>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-						</div>
-						<Textarea
-							bind:value={customElementDescription}
-							placeholder="Describe this element... Press Enter to add, Shift+Enter for new line."
-							class="min-h-24"
-							onkeydown={handleWorldKeydown}
-						/>
-						<Button
-							onclick={handleAddWorldElement}
-							variant="outline"
-							disabled={!customElementName.trim() || !customElementDescription.trim()}
-						>
-							<Plus class="mr-2 h-4 w-4" />
-							Add {ELEMENT_TYPE_LABELS[customElementType]}
-						</Button>
-					</div>
-				</div>
-
-				<!-- Expanded Elements -->
+				<!-- Element Cards (show all elements) -->
 				{#each filteredWorldElements as element}
-					{#if $worldStore.expandedElementIds.has(element.id)}
 						<div
 							class="flex flex-col gap-4 rounded-md border p-4"
 							style="border-left: 4px solid {ELEMENT_TYPE_COLORS[element.type]};"
@@ -2497,8 +2599,69 @@
 								{/if}
 							</div>
 						</div>
-					{/if}
 				{/each}
+
+				<!-- Add Element Forms (dynamically rendered) -->
+				{#each addElementForms as form}
+					<div class="rounded-md border p-4">
+						<div class="flex items-center justify-between mb-3">
+							<h2 class="text-lg font-semibold">Add Element</h2>
+						</div>
+						<div class="flex flex-col gap-3">
+							<div class="flex gap-2">
+								<Input
+									bind:value={form.name}
+									placeholder="Element name"
+									class="flex-1"
+								/>
+								<Select.Root type="single" bind:value={form.type}>
+									<Select.Trigger class="w-36">
+										{ELEMENT_TYPE_LABELS[form.type]}
+									</Select.Trigger>
+									<Select.Content>
+										{#each worldTypeOptions as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+							<Textarea
+								bind:value={form.description}
+								placeholder="Describe this element... Press Enter to add, Shift+Enter for new line."
+								class="min-h-24"
+								onkeydown={(e) => handleElementFormKeydown(e, form.id)}
+							/>
+							<div class="flex justify-end gap-2">
+								<Button
+									variant="outline"
+									onclick={() => removeElementForm(form.id)}
+								>
+									Cancel
+								</Button>
+								<Button
+									onclick={() => submitElementForm(form.id)}
+									class="bg-green-600 hover:bg-green-700 text-white"
+									disabled={!form.name.trim() || !form.description.trim()}
+								>
+									<Plus class="mr-2 h-4 w-4" />
+									Add {ELEMENT_TYPE_LABELS[form.type]}
+								</Button>
+							</div>
+						</div>
+					</div>
+				{/each}
+
+				<!-- Add Element Button -->
+				<Button
+					variant="outline"
+					onclick={addNewElementForm}
+					class="w-fit"
+				>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Element
+				</Button>
 
 				<!-- Empty State -->
 				{#if $worldStore.elements.length === 0}

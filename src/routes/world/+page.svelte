@@ -40,10 +40,46 @@
 	let showPromptTextarea = $state<Set<string>>(new Set());
 	let userPrompts = $state<{ [key: string]: string }>({});
 
-	// Custom element form
-	let customName = $state('');
-	let customDescription = $state('');
-	let customType = $state<ElementType>('character');
+	// Custom element forms (multiple can be open at once)
+	interface AddElementForm {
+		id: string;
+		name: string;
+		description: string;
+		type: ElementType;
+	}
+	let addElementForms = $state<AddElementForm[]>([]);
+
+	function createAddElementForm(): AddElementForm {
+		return {
+			id: `form-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			name: '',
+			description: '',
+			type: 'character'
+		};
+	}
+
+	function addNewElementForm() {
+		addElementForms = [...addElementForms, createAddElementForm()];
+	}
+
+	function removeElementForm(formId: string) {
+		addElementForms = addElementForms.filter(f => f.id !== formId);
+	}
+
+	function submitElementForm(formId: string) {
+		const form = addElementForms.find(f => f.id === formId);
+		if (form && form.name.trim() && form.description.trim()) {
+			addElement(form.name.trim(), form.type, form.description.trim());
+			removeElementForm(formId);
+		}
+	}
+
+	function handleElementFormKeydown(e: KeyboardEvent, formId: string) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			submitElementForm(formId);
+		}
+	}
 
 	// Filter tabs
 	const filterOptions: Array<{ value: ElementType | 'all'; label: string }> = [
@@ -62,16 +98,19 @@
 		{ value: 'concept', label: 'Concept' }
 	];
 
-	// Load story elements on mount
+	// Load story elements on mount (only if worldStore is empty, to avoid overriding persisted state)
 	onMount(() => {
-		const latestStory = $storyStore.stories[$storyStore.stories.length - 1];
-		if (latestStory?.story.characters && latestStory.story.characters.length > 0) {
-			// Convert story characters to world elements format
-			const characters = latestStory.story.characters.map((c) => ({
-				name: c.name,
-				description: c.description
-			}));
-			loadElementsFromStory(characters);
+		// Only populate from story if worldStore is empty (persisted state takes precedence)
+		if ($worldStore.elements.length === 0) {
+			const latestStory = $storyStore.stories[$storyStore.stories.length - 1];
+			if (latestStory?.story.characters && latestStory.story.characters.length > 0) {
+				// Convert story characters to world elements format
+				const characters = latestStory.story.characters.map((c) => ({
+					name: c.name,
+					description: c.description
+				}));
+				loadElementsFromStory(characters);
+			}
 		}
 	});
 
@@ -251,67 +290,8 @@
 					{/each}
 				</div>
 
-				<!-- Element Pills/Buttons -->
-				{#if $worldStore.elements.length > 0}
-					<div class="rounded-md border p-4">
-						<div class="flex flex-wrap gap-2">
-							{#each filteredElements as element}
-								<Button
-									variant={$worldStore.expandedElementIds.has(element.id) ? 'default' : 'outline'}
-									size="sm"
-									onclick={() => toggleElementExpanded(element.id)}
-									style="border-color: {ELEMENT_TYPE_COLORS[element.type]}; {$worldStore.expandedElementIds.has(element.id) ? `background-color: ${ELEMENT_TYPE_COLORS[element.type]};` : ''}"
-								>
-									{element.name}
-								</Button>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Add Custom Element -->
-				<div class="rounded-md border p-4">
-					<h2 class="mb-3 text-lg font-semibold">Add Element</h2>
-					<div class="flex flex-col gap-3">
-						<div class="flex gap-2">
-							<Input
-								bind:value={customName}
-								placeholder="Element name"
-								class="flex-1"
-							/>
-							<Select.Root type="single" bind:value={customType}>
-								<Select.Trigger class="w-36">
-									{ELEMENT_TYPE_LABELS[customType]}
-								</Select.Trigger>
-								<Select.Content>
-									{#each typeOptions as option}
-										<Select.Item value={option.value} label={option.label}>
-											{option.label}
-										</Select.Item>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-						</div>
-						<Textarea
-							bind:value={customDescription}
-							placeholder="Describe this element... Press Enter to add, Shift+Enter for new line."
-							class="min-h-24"
-							onkeydown={handleKeydown}
-						/>
-						<Button
-							onclick={handleAddElement}
-							variant="outline"
-							disabled={!customName.trim() || !customDescription.trim()}
-						>
-							<Plus class="mr-2 h-4 w-4" />
-							Add {ELEMENT_TYPE_LABELS[customType]}
-						</Button>
-					</div>
-				</div>
-
-				<!-- Expanded Elements -->
+				<!-- Element Cards (show all elements) -->
 				{#each filteredElements as element}
-					{#if $worldStore.expandedElementIds.has(element.id)}
 						<div
 							class="flex flex-col gap-4 rounded-md border p-4"
 							style="border-left: 4px solid {ELEMENT_TYPE_COLORS[element.type]};"
@@ -513,8 +493,69 @@
 								{/if}
 							</div>
 						</div>
-					{/if}
 				{/each}
+
+				<!-- Add Element Forms (dynamically rendered) -->
+				{#each addElementForms as formData}
+					<div class="rounded-md border p-4">
+						<div class="flex items-center justify-between mb-3">
+							<h2 class="text-lg font-semibold">Add Element</h2>
+						</div>
+						<div class="flex flex-col gap-3">
+							<div class="flex gap-2">
+								<Input
+									bind:value={formData.name}
+									placeholder="Element name"
+									class="flex-1"
+								/>
+								<Select.Root type="single" bind:value={formData.type}>
+									<Select.Trigger class="w-36">
+										{ELEMENT_TYPE_LABELS[formData.type]}
+									</Select.Trigger>
+									<Select.Content>
+										{#each typeOptions as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+							<Textarea
+								bind:value={formData.description}
+								placeholder="Describe this element... Press Enter to add, Shift+Enter for new line."
+								class="min-h-24"
+								onkeydown={(e) => handleElementFormKeydown(e, formData.id)}
+							/>
+							<div class="flex justify-end gap-2">
+								<Button
+									variant="outline"
+									onclick={() => removeElementForm(formData.id)}
+								>
+									Cancel
+								</Button>
+								<Button
+									onclick={() => submitElementForm(formData.id)}
+									class="bg-green-600 hover:bg-green-700 text-white"
+									disabled={!formData.name.trim() || !formData.description.trim()}
+								>
+									<Plus class="mr-2 h-4 w-4" />
+									Add {ELEMENT_TYPE_LABELS[formData.type]}
+								</Button>
+							</div>
+						</div>
+					</div>
+				{/each}
+
+				<!-- Add Element Button -->
+				<Button
+					variant="outline"
+					onclick={addNewElementForm}
+					class="w-fit"
+				>
+					<Plus class="mr-2 h-4 w-4" />
+					Add Element
+				</Button>
 
 				<!-- Empty State -->
 				{#if $worldStore.elements.length === 0}

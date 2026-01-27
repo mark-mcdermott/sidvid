@@ -301,10 +301,17 @@ export function saveCurrentUIState(): void {
 	}
 }
 
+// Track initialization state to prevent duplicate initialization
+let isInitialized = false;
+
 /**
  * Initialize the project store (load projects list)
+ * This function is idempotent - safe to call multiple times
  */
 export async function initializeProjectStore(): Promise<void> {
+	if (isInitialized) return;
+	isInitialized = true;
+
 	await refreshProjects();
 
 	// Auto-create a project if none exist
