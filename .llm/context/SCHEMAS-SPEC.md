@@ -48,6 +48,7 @@ interface Story {
 
 interface StoryScene {
   number: number;                    // Scene sequence (1-indexed)
+  title: string;                     // Short title (3-5 words, no filler words)
   description: string;               // Setting and visual description
   dialogue: string;                  // Spoken lines (empty if none)
   action: string;                    // What happens
@@ -144,9 +145,12 @@ type SceneStatus = 'empty' | 'pending' | 'generating' | 'completed' | 'failed';
 
 interface Scene {
   id: string;
+  title: string;                     // Short title (3-5 words, no filler words like "of", "the")
   description: string;               // From story or custom
   customDescription?: string;        // User override
   enhancedDescription?: string;      // ChatGPT-enhanced (optional)
+  dialog?: string;                   // Scene dialog (optional)
+  action?: string;                   // Scene action notes (optional)
   assignedElements: string[];        // World element IDs
   images: SceneImage[];              // Multiple versions supported
   duration: number;                  // Scene duration in seconds (default: 5)
@@ -155,6 +159,11 @@ interface Scene {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Scene title guidelines:
+// - 3 words preferred, 5 words max
+// - Avoid filler words: "of", "the", "a", "an", etc.
+// - Example: "Cyber Capybara Hack" NOT "Hack Tactics of the Cyber Capybaras"
 
 interface SceneImage {
   id: string;
