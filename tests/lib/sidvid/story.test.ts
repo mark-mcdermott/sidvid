@@ -94,6 +94,11 @@ const STYLE_PROMPTS: Record<Exclude<StylePreset, 'custom'>, string> = {
 // Mock StoryManager for testing
 class StoryManager {
 	private stories: Map<string, Story> = new Map();
+	private idCounter = 0;
+
+	private generateId(): string {
+		return `story-${Date.now()}-${this.idCounter++}-${Math.random().toString(36).substr(2, 9)}`;
+	}
 
 	async generateStory(
 		prompt: string,
@@ -121,7 +126,7 @@ class StoryManager {
 		}));
 
 		const story: Story = {
-			id: `story-${Date.now()}`,
+			id: this.generateId(),
 			title: 'Generated Story',
 			prompt,
 			style,
@@ -153,7 +158,7 @@ class StoryManager {
 		// Apply edit (mock implementation)
 		const editedStory: Story = {
 			...story,
-			id: `story-${Date.now()}`,
+			id: this.generateId(),
 			narrative: `${story.narrative} [Edited: ${instruction}]`,
 			createdAt: new Date()
 		};
@@ -170,7 +175,7 @@ class StoryManager {
 
 		const expandedStory: Story = {
 			...story,
-			id: `story-${Date.now()}`,
+			id: this.generateId(),
 			isSmartExpanded: true,
 			preExpansionNarrative: story.preExpansionNarrative || story.narrative,
 			narrative: `Expanded: ${story.preExpansionNarrative || story.narrative} with more vivid details...`,

@@ -60,24 +60,67 @@ describe('BrowserStorageAdapter - Initialization', () => {
 
 describe('BrowserStorageAdapter - IndexedDB Operations', () => {
   let storage: BrowserStorageAdapter;
-  let mockDB: any;
+  let mockStore: Map<string, any>;
 
   beforeEach(() => {
-    mockDB = {
+    mockStore = new Map();
+
+    const createMockObjectStore = () => ({
+      get: vi.fn((key: string) => {
+        const request: any = { onsuccess: null, onerror: null, result: null };
+        setTimeout(() => {
+          request.result = mockStore.get(key);
+          if (request.onsuccess) {
+            request.onsuccess({ target: request });
+          }
+        }, 0);
+        return request;
+      }),
+      put: vi.fn((data: any, key: string) => {
+        const request: any = { onsuccess: null, onerror: null };
+        setTimeout(() => {
+          mockStore.set(key, data);
+          if (request.onsuccess) {
+            request.onsuccess({ target: request });
+          }
+        }, 0);
+        return request;
+      }),
+      delete: vi.fn((key: string) => {
+        const request: any = { onsuccess: null, onerror: null };
+        setTimeout(() => {
+          mockStore.delete(key);
+          if (request.onsuccess) {
+            request.onsuccess({ target: request });
+          }
+        }, 0);
+        return request;
+      }),
+      getAllKeys: vi.fn(() => {
+        const request: any = { onsuccess: null, onerror: null, result: [] };
+        setTimeout(() => {
+          request.result = Array.from(mockStore.keys());
+          if (request.onsuccess) {
+            request.onsuccess({ target: request });
+          }
+        }, 0);
+        return request;
+      }),
+      clear: vi.fn(() => {
+        const request: any = { onsuccess: null, onerror: null };
+        setTimeout(() => {
+          mockStore.clear();
+          if (request.onsuccess) {
+            request.onsuccess({ target: request });
+          }
+        }, 0);
+        return request;
+      })
+    });
+
+    const mockDB = {
       transaction: vi.fn(() => ({
-        objectStore: vi.fn(() => ({
-          get: vi.fn((key) => ({
-            onsuccess: null,
-            result: null
-          })),
-          put: vi.fn(),
-          delete: vi.fn(),
-          getAllKeys: vi.fn(() => ({
-            onsuccess: null,
-            result: []
-          })),
-          clear: vi.fn()
-        }))
+        objectStore: vi.fn(() => createMockObjectStore())
       }))
     };
 
@@ -93,7 +136,14 @@ describe('BrowserStorageAdapter - IndexedDB Operations', () => {
         setTimeout(() => {
           if (request.onupgradeneeded) {
             request.onupgradeneeded({
-              target: { result: { createObjectStore: vi.fn() } }
+              target: {
+                result: {
+                  createObjectStore: vi.fn(),
+                  objectStoreNames: {
+                    contains: vi.fn(() => false)
+                  }
+                }
+              }
             });
           }
           if (request.onsuccess) {
@@ -112,20 +162,12 @@ describe('BrowserStorageAdapter - IndexedDB Operations', () => {
     const data = { foo: 'bar', baz: 123 };
     await storage.save('test-key', data);
 
-    // Verify put was called
-    expect(mockDB.transaction).toHaveBeenCalled();
+    // Verify data was saved to mock store
+    expect(mockStore.get('test-key')).toEqual(data);
   });
 
   it('should load data from IndexedDB', async () => {
     const data = { foo: 'bar', baz: 123 };
-
-    // Mock get response
-    const transaction = mockDB.transaction();
-    const objectStore = transaction.objectStore();
-    objectStore.get.mockReturnValue({
-      onsuccess: null,
-      result: data
-    });
 
     await storage.save('test-key', data);
     const loaded = await storage.load('test-key');
@@ -134,13 +176,6 @@ describe('BrowserStorageAdapter - IndexedDB Operations', () => {
   });
 
   it('should throw error when loading non-existent key', async () => {
-    const transaction = mockDB.transaction();
-    const objectStore = transaction.objectStore();
-    objectStore.get.mockReturnValue({
-      onsuccess: null,
-      result: undefined
-    });
-
     await expect(storage.load('non-existent'))
       .rejects.toThrow('Not found');
   });
@@ -324,7 +359,8 @@ describe('BrowserStorageAdapter - Error Handling', () => {
       data: new Map<string, string>(),
       getItem: vi.fn((key: string) => mockLocalStorage.data.get(key) || null),
       setItem: vi.fn((key: string, value: string) => {
-        if (key === 'error-key') {
+        // Key will be prefixed with 'sidvid:'
+        if (key === 'sidvid:error-key') {
           throw new Error('Storage quota exceeded');
         }
         mockLocalStorage.data.set(key, value);

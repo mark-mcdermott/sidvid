@@ -1,7 +1,54 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionManager } from '$lib/sidvid/session-manager';
 import { MemoryStorageAdapter } from '$lib/sidvid/storage/memory-adapter';
 import type { Session } from '$lib/sidvid/session';
+
+// Mock OpenAI module - all definitions must be inside the factory due to hoisting
+vi.mock('openai', () => {
+  const mockStoryResponse = {
+    title: 'The Mystery of the Missing Artifact',
+    scenes: [
+      {
+        title: 'The Discovery',
+        description: 'Detective arrives at the museum',
+        characters: ['Detective Smith']
+      },
+      {
+        title: 'The Investigation',
+        description: 'Examining clues at the crime scene',
+        characters: ['Detective Smith', 'Museum Guard']
+      }
+    ],
+    characters: [
+      { id: 'char-1', name: 'Detective Smith', description: 'A seasoned detective with sharp instincts' },
+      { id: 'char-2', name: 'Museum Guard', description: 'A nervous night guard' }
+    ]
+  };
+
+  class MockOpenAI {
+    chat = {
+      completions: {
+        create: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify(mockStoryResponse)
+            }
+          }]
+        })
+      }
+    };
+    images = {
+      generate: async () => ({
+        data: [{
+          url: 'https://example.com/generated-image.png',
+          revised_prompt: 'A detailed image of the scene'
+        }]
+      })
+    };
+  }
+
+  return { default: MockOpenAI };
+});
 
 describe('SessionManager - Session Creation', () => {
   let manager: SessionManager;
