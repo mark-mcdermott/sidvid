@@ -5,7 +5,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import { enhance } from '$app/forms';
 	import { onMount } from 'svelte';
-	import { Loader2, Trash2, Plus } from '@lucide/svelte';
+	import { Loader2, Trash2, Plus, X } from '@lucide/svelte';
 	import {
 		worldStore,
 		addElement,
@@ -20,6 +20,8 @@
 		setActiveElementImage,
 		deleteElementImage,
 		loadElementsFromStory,
+		setElementImageError,
+		clearElementImageError,
 		ELEMENT_TYPE_LABELS,
 		ELEMENT_TYPE_COLORS,
 		type ElementType
@@ -199,6 +201,98 @@
 		}
 	});
 
+	// Track last processed error to avoid re-processing
+	let lastProcessedError = $state<string>('');
+
+	// Handle form error for image generation
+	$effect(() => {
+		if (form?.error && form.error !== lastProcessedError) {
+			lastProcessedError = form.error;
+			if (activeElementId) {
+				setElementImageError(activeElementId, form.error);
+			}
+		}
+	});
+
+	// Retry image generation function
+	async function retryImageGeneration(elementId: string) {
+		const element = $worldStore.elements.find(el => el.id === elementId);
+		if (!element) return;
+
+		// Clear the error
+		clearElementImageError(elementId);
+
+		isGenerating = true;
+		activeElementId = elementId;
+
+		try {
+			const formData = new FormData();
+			formData.append('description', element.enhancedDescription || element.description);
+			formData.append('elementType', element.type);
+
+			const response = await fetch('?/generateImage', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			// Parse SvelteKit devalue format
+			let actionData = null;
+
+			if (result.data) {
+				try {
+					const parsed = JSON.parse(result.data);
+					if (Array.isArray(parsed) && parsed.length > 0) {
+						const mainObj = parsed[0];
+						if (typeof mainObj === 'object' && mainObj !== null) {
+							const resolveValue = (val: any): any => {
+								if (typeof val === 'number' && parsed[val] !== undefined) {
+									const resolved = parsed[val];
+									if (typeof resolved === 'object' && resolved !== null) {
+										const resolvedObj: any = Array.isArray(resolved) ? [] : {};
+										for (const key in resolved) {
+											resolvedObj[key] = resolveValue(resolved[key]);
+										}
+										return resolvedObj;
+									}
+									return resolved;
+								}
+								return val;
+							};
+
+							actionData = {};
+							for (const key in mainObj) {
+								actionData[key] = resolveValue(mainObj[key]);
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Error parsing result.data:', e);
+				}
+			} else if (result.success !== undefined) {
+				actionData = result;
+			}
+
+			if (actionData?.success && actionData?.imageUrl) {
+				const localPath = await downloadAndReplaceImage(
+					actionData.imageUrl,
+					$conversationStore.currentConversationId || ''
+				);
+				addElementImage(elementId, `/data/images/${localPath}`, actionData.revisedPrompt);
+			} else if (actionData?.error) {
+				setElementImageError(elementId, actionData.error);
+			}
+		} catch (error) {
+			console.error('Error retrying image generation:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to generate image';
+			setElementImageError(elementId, errorMessage);
+		} finally {
+			isGenerating = false;
+			activeElementId = null;
+		}
+	}
+
 	function handleAddElement() {
 		if (customName.trim() && customDescription.trim()) {
 			addElement(customName.trim(), customType, customDescription.trim());
@@ -350,6 +444,36 @@
 											{/if}
 										</div>
 									{/each}
+								</div>
+							{/if}
+
+							<!-- Image Error Alert -->
+							{#if element.imageError}
+								<div class="relative flex items-start gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+									<button
+										class="absolute top-2 right-2 text-destructive/70 hover:text-destructive"
+										onclick={() => clearElementImageError(element.id)}
+									>
+										<X class="h-4 w-4" />
+									</button>
+									<div class="flex-1 pr-6">
+										<p class="font-medium text-destructive">Image generation failed</p>
+										<p class="text-muted-foreground mt-1">{element.imageError}</p>
+										<Button
+											variant="outline"
+											size="sm"
+											class="mt-2"
+											onclick={() => retryImageGeneration(element.id)}
+											disabled={isGenerating && activeElementId === element.id}
+										>
+											{#if isGenerating && activeElementId === element.id}
+												<Loader2 class="mr-2 h-3 w-3 animate-spin" />
+												Retrying...
+											{:else}
+												Retry
+											{/if}
+										</Button>
+									</div>
 								</div>
 							{/if}
 

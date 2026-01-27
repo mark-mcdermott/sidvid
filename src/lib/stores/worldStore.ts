@@ -43,6 +43,7 @@ export interface WorldElement {
 	preEnhancementDescription?: string;
 	isEnhanced: boolean;
 	images: ElementImage[];
+	imageError?: string;
 	historyIndex: number;
 	history: WorldElementVersion[];
 	createdAt: Date;
@@ -362,5 +363,25 @@ export function setFilterType(type: ElementType | 'all'): void {
 	worldStore.update((state) => ({
 		...state,
 		filterType: type
+	}));
+}
+
+// Set image error for an element
+export function setElementImageError(elementId: string, error: string): void {
+	worldStore.update((state) => ({
+		...state,
+		elements: state.elements.map((el) =>
+			el.id === elementId ? { ...el, imageError: error } : el
+		)
+	}));
+}
+
+// Clear image error for an element
+export function clearElementImageError(elementId: string): void {
+	worldStore.update((state) => ({
+		...state,
+		elements: state.elements.map((el) =>
+			el.id === elementId ? { ...el, imageError: undefined } : el
+		)
 	}));
 }

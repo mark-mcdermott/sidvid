@@ -32,6 +32,8 @@
 		ELEMENT_TYPE_LABELS,
 		ELEMENT_TYPE_COLORS,
 		getActiveElementImageUrl,
+		setElementImageError,
+		clearElementImageError,
 		type ElementType
 	} from '$lib/stores/worldStore';
 	import { sessionStore } from '$lib/stores/sessionStore';
@@ -583,12 +585,15 @@
 		}
 	}
 
-	async function generateWorldElementImage(elementId: string) {
+	async function generateWorldElementImage(elementId: string, isRetry = false) {
 		const element = $worldStore.elements.find(el => el.id === elementId);
 		if (!element || element.images.length > 0) return; // Skip if no element or already has image
 
 		const description = element.enhancedDescription || element.description;
 		if (!description) return;
+
+		// Clear any existing error before starting
+		clearElementImageError(elementId);
 
 		isWorldGenerating = true;
 		activeElementId = elementId;
@@ -647,9 +652,30 @@
 
 			if (actionData?.success && actionData?.character?.imageUrl) {
 				addElementImage(elementId, actionData.character.imageUrl, actionData.character.revisedPrompt);
+			} else if (actionData?.error) {
+				// API returned an error
+				if (!isRetry) {
+					console.log('Image generation failed, retrying once...', actionData.error);
+					isWorldGenerating = false;
+					activeElementId = null;
+					await generateWorldElementImage(elementId, true);
+					return;
+				}
+				// Set error on the element after retry fails
+				setElementImageError(elementId, actionData.error);
 			}
 		} catch (error) {
 			console.error('Error generating world element image:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to generate image';
+			if (!isRetry) {
+				console.log('Image generation failed, retrying once...');
+				isWorldGenerating = false;
+				activeElementId = null;
+				await generateWorldElementImage(elementId, true);
+				return;
+			}
+			// Set error on the element after retry fails
+			setElementImageError(elementId, errorMessage);
 		} finally {
 			isWorldGenerating = false;
 			activeElementId = null;
@@ -2456,6 +2482,36 @@
 											{/if}
 										</div>
 									{/each}
+								</div>
+							{/if}
+
+							<!-- Image Error Alert -->
+							{#if element.imageError}
+								<div class="relative flex items-start gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+									<button
+										class="absolute top-2 right-2 text-destructive/70 hover:text-destructive"
+										onclick={() => clearElementImageError(element.id)}
+									>
+										<X class="h-4 w-4" />
+									</button>
+									<div class="flex-1 pr-6">
+										<p class="font-medium text-destructive">Image generation failed</p>
+										<p class="text-muted-foreground mt-1">{element.imageError}</p>
+										<Button
+											variant="outline"
+											size="sm"
+											class="mt-2"
+											onclick={() => generateWorldElementImage(element.id)}
+											disabled={isWorldGenerating && activeElementId === element.id}
+										>
+											{#if isWorldGenerating && activeElementId === element.id}
+												<Loader2 class="mr-2 h-3 w-3 animate-spin" />
+												Retrying...
+											{:else}
+												Retry
+											{/if}
+										</Button>
+									</div>
 								</div>
 							{/if}
 
