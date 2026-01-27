@@ -212,6 +212,7 @@ export interface Story {
   scenes: StoryScene[];
   rawContent: string;
   characters?: StoryCharacter[];
+  locations?: StoryLocation[];
   sceneVisuals?: StorySceneVisual[];
 }
 

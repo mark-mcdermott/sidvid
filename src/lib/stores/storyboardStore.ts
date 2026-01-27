@@ -77,6 +77,7 @@ export interface TimelineItem {
 export interface StoryboardStoreValue extends StoryboardState {
 	wireframes: Wireframe[];
 	timelineItems: TimelineItem[];
+	totalDuration: number;
 }
 
 function generateId(): string {
@@ -129,14 +130,17 @@ function computeTimelineItems(wireframes: Wireframe[]): TimelineItem[] {
 		}));
 }
 
-// Derived store that adds wireframes and timelineItems
+// Derived store that adds wireframes, timelineItems, and totalDuration
 const _derivedStore = derived(_internalStore, ($state): StoryboardStoreValue => {
 	const wireframes = computeWireframes($state.scenes);
 	const timelineItems = computeTimelineItems(wireframes);
+	const activeScenes = $state.scenes.filter((s) => !s.isArchived);
+	const totalDuration = activeScenes.reduce((sum, s) => sum + s.duration, 0);
 	return {
 		...$state,
 		wireframes,
-		timelineItems
+		timelineItems,
+		totalDuration
 	};
 });
 

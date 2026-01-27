@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { Pencil, Trash2, Plus } from '@lucide/svelte';
+	import { Pencil, Trash2, Plus, Bomb } from '@lucide/svelte';
 	import {
 		projectStore,
 		createNewProject,
@@ -13,10 +13,14 @@
 	} from '$lib/stores/projectStore';
 	import type { ProjectSummary } from '$lib/sidvid';
 
+	// Props
+	let { testingMode = false }: { testingMode?: boolean } = $props();
+
 	// State
 	let isEditing = $state(false);
 	let editName = $state('');
 	let showDeleteModal = $state(false);
+	let showNukeModal = $state(false);
 	let nameInputElement: HTMLInputElement | null = $state(null);
 
 	// Derived state
@@ -104,14 +108,42 @@
 			await loadProject(projectId);
 		}
 	}
+
+	function openNukeModal() {
+		showNukeModal = true;
+	}
+
+	function closeNukeModal() {
+		showNukeModal = false;
+	}
+
+	async function confirmNuke() {
+		// Delete all projects
+		const allProjectIds = [...projects.map(p => p.id)];
+		for (const projectId of allProjectIds) {
+			await deleteProject(projectId);
+		}
+
+		// Create a fresh project
+		await createNewProject();
+
+		closeNukeModal();
+	}
 </script>
 
 <section id="project" class="scroll-mt-16 border-b pb-8">
 	<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
 		<!-- Left Column: Section Header -->
-		<div>
-			<h1 class="text-3xl font-bold mb-3">Project</h1>
-			<p class="text-muted-foreground">Name your project</p>
+		<div class="flex items-start justify-between sm:flex-col sm:gap-2">
+			<div>
+				<h1 class="text-3xl font-bold mb-3">Project</h1>
+				<p class="text-muted-foreground">Name your project</p>
+			</div>
+			{#if testingMode}
+				<Button variant="outline" size="sm" onclick={openNukeModal} title="Delete all projects (nuke)">
+					<Bomb class="!mr-0 h-4 w-4 text-destructive" />
+				</Button>
+			{/if}
 		</div>
 
 		<!-- Right Column: Project Name and Controls -->
@@ -198,6 +230,29 @@
 				<div class="mt-4 flex justify-end gap-2">
 					<Button variant="outline" onclick={closeDeleteModal}>Cancel</Button>
 					<Button variant="destructive" onclick={confirmDelete}>Delete</Button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Nuke Confirmation Modal (Testing Mode) -->
+	{#if showNukeModal}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+			role="dialog"
+			aria-modal="true"
+		>
+			<div class="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
+				<h3 class="text-lg font-semibold text-destructive">Nuke All Projects</h3>
+				<p class="mt-2 text-sm text-muted-foreground">
+					This will delete ALL {projects.length} project{projects.length !== 1 ? 's' : ''} and their associated data.
+				</p>
+				<p class="mt-1 text-sm text-destructive font-medium">
+					This action is irreversible!
+				</p>
+				<div class="mt-4 flex justify-end gap-2">
+					<Button variant="outline" onclick={closeNukeModal}>Cancel</Button>
+					<Button variant="destructive" onclick={confirmNuke}>Nuke Everything</Button>
 				</div>
 			</div>
 		</div>

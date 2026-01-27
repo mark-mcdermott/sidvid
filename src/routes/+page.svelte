@@ -55,10 +55,13 @@
 		loadStoryboardFromStorage,
 		saveStoryboardToStorage,
 		resetStoryboardStore,
+		initializeScenesFromStory,
 		getActiveScenes,
 		getArchivedScenes,
 		getActiveSceneImageUrl,
 		getTotalDuration,
+		addSceneImage,
+		setSceneStatus,
 		type Scene,
 		type WireframeScene,
 		type WireframeCharacter
@@ -466,10 +469,13 @@
 	let isWorldGenerating = $state(false);
 	let isWorldEnhancing = $state(false);
 	let activeElementId = $state<string | null>(null);
+	let generatingWorldElementIds = $state<Set<string>>(new Set());
 	let lastProcessedWorldEnhancedText = $state<string>('');
 	let lastProcessedWorldImageUrl = $state<string>('');
 	let autoGenerateWorldElementImages = $state(false);
 	let pendingWorldElementIds = $state<string[]>([]);
+	let autoGenerateStoryboardImages = $state(false);
+	let generatingStoryboardSceneIds = $state<Set<string>>(new Set());
 
 	// Track which elements have prompt textarea open
 	let worldShowPromptTextarea = $state<Set<string>>(new Set());
@@ -595,8 +601,9 @@
 		// Clear any existing error before starting
 		clearElementImageError(elementId);
 
+		// Track this element as generating (supports parallel generation)
+		generatingWorldElementIds = new Set([...generatingWorldElementIds, elementId]);
 		isWorldGenerating = true;
-		activeElementId = elementId;
 
 		try {
 			const formData = new FormData();
@@ -609,7 +616,7 @@
 			});
 
 			const result = await response.json();
-			console.log('World element image generation result:', result);
+			console.log('World element image generation result for', element.name, ':', result);
 
 			// Parse SvelteKit devalue format
 			let actionData = null;
@@ -648,16 +655,16 @@
 				actionData = result;
 			}
 
-			console.log('Parsed world element action data:', actionData);
+			console.log('Parsed world element action data for', element.name, ':', actionData);
 
 			if (actionData?.success && actionData?.character?.imageUrl) {
 				addElementImage(elementId, actionData.character.imageUrl, actionData.character.revisedPrompt);
 			} else if (actionData?.error) {
 				// API returned an error
 				if (!isRetry) {
-					console.log('Image generation failed, retrying once...', actionData.error);
-					isWorldGenerating = false;
-					activeElementId = null;
+					console.log('Image generation failed for', element.name, ', retrying once...', actionData.error);
+					generatingWorldElementIds = new Set([...generatingWorldElementIds].filter(id => id !== elementId));
+					if (generatingWorldElementIds.size === 0) isWorldGenerating = false;
 					await generateWorldElementImage(elementId, true);
 					return;
 				}
@@ -665,31 +672,168 @@
 				setElementImageError(elementId, actionData.error);
 			}
 		} catch (error) {
-			console.error('Error generating world element image:', error);
+			console.error('Error generating world element image for', element.name, ':', error);
 			const errorMessage = error instanceof Error ? error.message : 'Failed to generate image';
 			if (!isRetry) {
-				console.log('Image generation failed, retrying once...');
-				isWorldGenerating = false;
-				activeElementId = null;
+				console.log('Image generation failed for', element.name, ', retrying once...');
+				generatingWorldElementIds = new Set([...generatingWorldElementIds].filter(id => id !== elementId));
+				if (generatingWorldElementIds.size === 0) isWorldGenerating = false;
 				await generateWorldElementImage(elementId, true);
 				return;
 			}
 			// Set error on the element after retry fails
 			setElementImageError(elementId, errorMessage);
 		} finally {
-			isWorldGenerating = false;
-			activeElementId = null;
+			// Remove this element from generating set
+			generatingWorldElementIds = new Set([...generatingWorldElementIds].filter(id => id !== elementId));
+			if (generatingWorldElementIds.size === 0) isWorldGenerating = false;
 		}
 	}
 
 	async function generateAllWorldElementImages(elementIds: string[]) {
-		// Generate images sequentially to avoid rate limiting
-		for (const elementId of elementIds) {
+		// Generate images in parallel
+		const elementsToGenerate = elementIds.filter(elementId => {
 			const element = $worldStore.elements.find(el => el.id === elementId);
-			if (element && element.images.length === 0) {
-				await generateWorldElementImage(elementId);
+			return element && element.images.length === 0;
+		});
+
+		console.log('Starting parallel image generation for', elementsToGenerate.length, 'elements');
+		await Promise.all(elementsToGenerate.map(elementId => generateWorldElementImage(elementId)));
+
+		// After world element images are done, trigger storyboard image generation
+		console.log('World element images complete, starting storyboard image generation');
+		autoGenerateStoryboardImages = true;
+	}
+
+	// Generate a single storyboard scene image
+	async function generateStoryboardSceneImage(sceneId: string, isRetry = false): Promise<void> {
+		const scene = $storyboardStore.scenes.find(s => s.id === sceneId);
+		if (!scene) return;
+
+		// Skip if scene already has images
+		if (scene.images.length > 0) return;
+
+		// Set scene as generating
+		setSceneStatus(sceneId, 'generating');
+		generatingStoryboardSceneIds = new Set([...generatingStoryboardSceneIds, sceneId]);
+
+		try {
+			// Build the prompt from scene description and assigned elements
+			let prompt = scene.customDescription || scene.description;
+
+			// Add character and location details from assigned elements
+			const assignedCharacters: string[] = [];
+			const assignedLocations: string[] = [];
+
+			for (const elementId of scene.assignedElements) {
+				const element = $worldStore.elements.find(el => el.id === elementId);
+				if (element) {
+					if (element.type === 'character') {
+						assignedCharacters.push(`${element.name}: ${element.enhancedDescription || element.description}`);
+					} else if (element.type === 'location') {
+						assignedLocations.push(`${element.name}: ${element.enhancedDescription || element.description}`);
+					}
+				}
 			}
+
+			// Enhance prompt with character and location context
+			if (assignedLocations.length > 0) {
+				prompt += `\n\nSetting: ${assignedLocations.join('; ')}`;
+			}
+			if (assignedCharacters.length > 0) {
+				prompt += `\n\nCharacters in scene: ${assignedCharacters.join('; ')}`;
+			}
+
+			console.log('Generating storyboard image for scene:', scene.title, 'with prompt:', prompt.substring(0, 100) + '...');
+
+			const formData = new FormData();
+			formData.append('description', prompt);
+			formData.append('elementType', 'scene');
+
+			const response = await fetch('?/generateImage', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			// Parse SvelteKit devalue format (same as world element parsing)
+			let actionData: any = null;
+
+			if (result.data) {
+				try {
+					const parsed = JSON.parse(result.data);
+					if (Array.isArray(parsed) && parsed.length > 0) {
+						const mainObj = parsed[0];
+						if (typeof mainObj === 'object' && mainObj !== null) {
+							const resolveValue = (val: any): any => {
+								if (typeof val === 'number' && parsed[val] !== undefined) {
+									const resolved = parsed[val];
+									if (typeof resolved === 'object' && resolved !== null) {
+										const resolvedObj: any = Array.isArray(resolved) ? [] : {};
+										for (const key in resolved) {
+											resolvedObj[key] = resolveValue(resolved[key]);
+										}
+										return resolvedObj;
+									}
+									return resolved;
+								}
+								return val;
+							};
+
+							actionData = {};
+							for (const key in mainObj) {
+								actionData[key] = resolveValue(mainObj[key]);
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Error parsing result.data:', e);
+				}
+			} else if (result.success !== undefined) {
+				actionData = result;
+			}
+
+			console.log('Parsed storyboard scene action data for', scene.title, ':', actionData);
+
+			if (actionData?.success && actionData?.character?.imageUrl) {
+				addSceneImage(sceneId, actionData.character.imageUrl, actionData.character.revisedPrompt);
+			} else if (actionData?.error) {
+				if (!isRetry) {
+					console.log('Storyboard image generation failed for', scene.title, ', retrying once...', actionData.error);
+					generatingStoryboardSceneIds = new Set([...generatingStoryboardSceneIds].filter(id => id !== sceneId));
+					await generateStoryboardSceneImage(sceneId, true);
+					return;
+				}
+				setSceneStatus(sceneId, 'failed', actionData.error);
+			}
+		} catch (error) {
+			console.error('Error generating storyboard scene image for', scene.title, ':', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to generate image';
+			if (!isRetry) {
+				console.log('Storyboard image generation failed for', scene.title, ', retrying once...');
+				generatingStoryboardSceneIds = new Set([...generatingStoryboardSceneIds].filter(id => id !== sceneId));
+				await generateStoryboardSceneImage(sceneId, true);
+				return;
+			}
+			setSceneStatus(sceneId, 'failed', errorMessage);
+		} finally {
+			generatingStoryboardSceneIds = new Set([...generatingStoryboardSceneIds].filter(id => id !== sceneId));
 		}
+	}
+
+	// Generate images for all storyboard scenes in parallel
+	async function generateAllStoryboardImages() {
+		const scenesToGenerate = activeScenes.filter(scene => scene.images.length === 0);
+
+		if (scenesToGenerate.length === 0) {
+			console.log('No storyboard scenes need image generation');
+			return;
+		}
+
+		console.log('Starting parallel storyboard image generation for', scenesToGenerate.length, 'scenes');
+		await Promise.all(scenesToGenerate.map(scene => generateStoryboardSceneImage(scene.id)));
+		console.log('Storyboard image generation complete');
 	}
 
 	// ========== Storyboard State ==========
@@ -919,6 +1063,19 @@
 	let hasScenes = $derived(sceneThumbnails.length > 0);
 	let totalVideoDuration = $derived(sceneVideos.length * 5);
 
+	// Calculate current preview scene index based on currentTime and scene durations
+	let currentPreviewSceneIndex = $derived.by(() => {
+		if (!$storyboardStore.isPlaying) return -1;
+		const currentTime = $storyboardStore.currentTime;
+		const activeScenes = $storyboardStore.scenes.filter(s => !s.isArchived);
+		let elapsed = 0;
+		for (let i = 0; i < activeScenes.length; i++) {
+			elapsed += activeScenes[i].duration;
+			if (currentTime < elapsed) return i;
+		}
+		return activeScenes.length - 1;
+	});
+
 	function startPolling() {
 		if (pollInterval) return;
 		pollInterval = setInterval(() => {
@@ -1057,147 +1214,160 @@
 	// ========== Test Data ==========
 	const TEST_DATA = {
 		story: {
-			title: 'Neon Capybara Heist',
+			title: 'Cyber Capybaras: Mainframe Hack',
 			rawContent: JSON.stringify({
-				title: 'Neon Capybara Heist',
+				title: 'Cyber Capybaras: Mainframe Hack',
 				scenes: [
-					{
-						number: 1,
-						description: 'A neon-lit server room in a dystopian megacity. Rows of humming mainframes cast an eerie blue glow. Two cybernetic capybaras crouch behind a terminal.',
-						dialogue: 'Chip, disable the firewall. We have 30 seconds.',
-						action: 'Byte types furiously on a holographic keyboard while Chip plugs into the mainframe.'
-					},
-					{
-						number: 2,
-						description: 'Alarms blare as red lights flood the room. Security drones descend from the ceiling. The capybaras exchange a knowing glance.',
-						dialogue: 'Time to go swimming.',
-						action: 'They dive into a cooling vent, escaping into the city sewers below.'
-					}
+					{ number: 1, description: 'A shadowy alley with neon lights flickering overhead, wires spiraling down from rooftops.', dialogue: '', action: 'Two cybernetic humanoid capybaras scuttle past, their red LED eyes scanning surroundings.' },
+					{ number: 2, description: 'A high-tech control room filled with blinking servers and holographic displays.', dialogue: '', action: 'The capybaras plug cables from their appendages into the mainframe, lights flicker as hacking commences.' },
+					{ number: 3, description: 'Close-up of data streams on a screen, displaying rapid-fire code and schematics.', dialogue: '', action: "The capybaras' eyes glow brighter as a progress bar fills to completion." },
+					{ number: 4, description: 'An exterior cityscape view, where the dystopian skyline suddenly dims, save for the glow of neon signs.', dialogue: '', action: 'The capybaras retreat into the shadows as city lights flicker in their wake.' }
 				],
 				characters: [
-					{ name: 'Byte', description: 'A sleek cybernetic capybara with glowing blue circuit patterns across their fur, expert hacker' },
-					{ name: 'Chip', description: 'A muscular capybara with a chrome-plated arm and infrared eye implant, the muscle of the operation' }
+					{ name: 'Cyber Capybara 1', description: 'A technologically-enhanced capybara with cybernetic features.', physical: 'Sleek metallic fur with embedded circuits, glowing red LED eyes, and mechanical limbs.', profile: 'Stealthy and intelligent, this capybara is experienced in infiltration and data acquisition.' },
+					{ name: 'Cyber Capybara 2', description: 'A second cybernetic capybara with similar enhancements.', physical: 'Metallic shell with vibrant neon stripes, camera-like eyes, augmented hearing devices on its head.', profile: 'Strategic and resourceful, specializes in encryption and rapid data processing.' }
+				],
+				locations: [
+					{ name: 'Neon Alley', description: 'A dimly-lit alley in a bustling cyberpunk city, featuring towering buildings with cascading wires and omnipresent neon glow interspersed with graffiti.' },
+					{ name: 'Government Control Room', description: 'A sleek, futuristic room filled with wall-to-wall server units, holographic interfaces, and omnipresent blue LED illumination.' },
+					{ name: 'Cyberpunk Cityscape', description: 'An expansive, futuristic city skyline at night, dominated by towering skyscrapers with digital billboards and pulsing neon lights.' }
+				],
+				sceneVisuals: [
+					{ sceneNumber: 1, setting: 'Neon-lit alley with dim lighting and glowing wires.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: 'The capybaras are scampering along the ground, with neon lights casting reflections on their metallic bodies.' },
+					{ sceneNumber: 2, setting: 'High-tech control room full of servers and holographic displays.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: 'Capybaras are interfacing with the mainframe using cables extending from their limbs.' },
+					{ sceneNumber: 3, setting: 'Close-up of code on a digital screen.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: "Capybaras' eyes reflecting streams of cascading code as the progress bar fills." },
+					{ sceneNumber: 4, setting: 'Cityscape view with neon lights.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: 'Capybaras silhouetted against the darkened city, moving into a shadow.' }
 				]
 			}),
 			scenes: [
-				{
-					number: 1,
-					description: 'A neon-lit server room in a dystopian megacity. Rows of humming mainframes cast an eerie blue glow. Two cybernetic capybaras crouch behind a terminal.',
-					dialogue: 'Chip, disable the firewall. We have 30 seconds.',
-					action: 'Byte types furiously on a holographic keyboard while Chip plugs into the mainframe.'
-				},
-				{
-					number: 2,
-					description: 'Alarms blare as red lights flood the room. Security drones descend from the ceiling. The capybaras exchange a knowing glance.',
-					dialogue: 'Time to go swimming.',
-					action: 'They dive into a cooling vent, escaping into the city sewers below.'
-				}
+				{ number: 1, description: 'A shadowy alley with neon lights flickering overhead, wires spiraling down from rooftops.', dialogue: '', action: 'Two cybernetic humanoid capybaras scuttle past, their red LED eyes scanning surroundings.' },
+				{ number: 2, description: 'A high-tech control room filled with blinking servers and holographic displays.', dialogue: '', action: 'The capybaras plug cables from their appendages into the mainframe, lights flicker as hacking commences.' },
+				{ number: 3, description: 'Close-up of data streams on a screen, displaying rapid-fire code and schematics.', dialogue: '', action: "The capybaras' eyes glow brighter as a progress bar fills to completion." },
+				{ number: 4, description: 'An exterior cityscape view, where the dystopian skyline suddenly dims, save for the glow of neon signs.', dialogue: '', action: 'The capybaras retreat into the shadows as city lights flicker in their wake.' }
 			],
 			characters: [
-				{ name: 'Byte', description: 'A sleek cybernetic capybara with glowing blue circuit patterns across their fur, expert hacker' },
-				{ name: 'Chip', description: 'A muscular capybara with a chrome-plated arm and infrared eye implant, the muscle of the operation' }
+				{ name: 'Cyber Capybara 1', description: 'A technologically-enhanced capybara with cybernetic features.', physical: 'Sleek metallic fur with embedded circuits, glowing red LED eyes, and mechanical limbs.', profile: 'Stealthy and intelligent, this capybara is experienced in infiltration and data acquisition.' },
+				{ name: 'Cyber Capybara 2', description: 'A second cybernetic capybara with similar enhancements.', physical: 'Metallic shell with vibrant neon stripes, camera-like eyes, augmented hearing devices on its head.', profile: 'Strategic and resourceful, specializes in encryption and rapid data processing.' }
+			],
+			locations: [
+				{ name: 'Neon Alley', description: 'A dimly-lit alley in a bustling cyberpunk city, featuring towering buildings with cascading wires and omnipresent neon glow interspersed with graffiti.' },
+				{ name: 'Government Control Room', description: 'A sleek, futuristic room filled with wall-to-wall server units, holographic interfaces, and omnipresent blue LED illumination.' },
+				{ name: 'Cyberpunk Cityscape', description: 'An expansive, futuristic city skyline at night, dominated by towering skyscrapers with digital billboards and pulsing neon lights.' }
+			],
+			sceneVisuals: [
+				{ sceneNumber: 1, setting: 'Neon-lit alley with dim lighting and glowing wires.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: 'The capybaras are scampering along the ground, with neon lights casting reflections on their metallic bodies.' },
+				{ sceneNumber: 2, setting: 'High-tech control room full of servers and holographic displays.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: 'Capybaras are interfacing with the mainframe using cables extending from their limbs.' },
+				{ sceneNumber: 3, setting: 'Close-up of code on a digital screen.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: "Capybaras' eyes reflecting streams of cascading code as the progress bar fills." },
+				{ sceneNumber: 4, setting: 'Cityscape view with neon lights.', charactersPresent: ['Cyber Capybara 1', 'Cyber Capybara 2'], visualDescription: 'Capybaras silhouetted against the darkened city, moving into a shadow.' }
 			]
 		},
 		characters: [
+			{ name: 'Cyber Capybara 1', description: 'A technologically-enhanced capybara with cybernetic features.', enhancedDescription: 'Sleek metallic fur with embedded circuits, glowing red LED eyes, and mechanical limbs.', imageUrl: '/test-data/cyber-capybara-1.png' },
+			{ name: 'Cyber Capybara 2', description: 'A second cybernetic capybara with similar enhancements.', enhancedDescription: 'Metallic shell with vibrant neon stripes, camera-like eyes, augmented hearing devices on its head.', imageUrl: '/test-data/cyber-capybara-2.png' }
+		],
+		worldElements: [
 			{
-				name: 'Byte',
-				description: 'A sleek cybernetic capybara with glowing blue circuit patterns across their fur, expert hacker',
-				enhancedDescription: 'Byte is a sleek, medium-sized capybara with dark brown fur interlaced with bioluminescent blue circuit patterns that pulse gently when processing data. Their eyes have been replaced with advanced optical implants that glow cyan. A neural interface port sits behind their left ear.',
-				imageUrl: 'https://picsum.photos/seed/byte-capybara/512/512'
+				id: 'world-capybara-1',
+				name: 'Cyber Capybara 1',
+				type: 'character' as ElementType,
+				description: 'Sleek metallic fur with embedded circuits, glowing red LED eyes, and mechanical limbs.',
+				isEnhanced: false,
+				images: [{ id: 'capybara-1-img-1', imageUrl: '/test-data/cyber-capybara-1.png', isActive: true, createdAt: new Date() }],
+				historyIndex: 0, history: [], createdAt: new Date(), updatedAt: new Date()
 			},
 			{
-				name: 'Chip',
-				description: 'A muscular capybara with a chrome-plated arm and infrared eye implant, the muscle of the operation',
-				enhancedDescription: 'Chip is a large, imposing capybara with sandy brown fur and a fully chrome-plated cybernetic right arm capable of interfacing with any system. Their left eye has been replaced with a red infrared sensor that can see through walls. Battle scars cross their snout.',
-				imageUrl: 'https://picsum.photos/seed/chip-capybara/512/512'
-			}
-		],
-		scenes: [
-			{
-				id: 'test-scene-1',
-				storySceneIndex: 0,
-				storyScene: {
-					number: 1,
-					description: 'A neon-lit server room in a dystopian megacity. Rows of humming mainframes cast an eerie blue glow. Two cybernetic capybaras crouch behind a terminal.',
-					dialogue: 'Chip, disable the firewall. We have 30 seconds.',
-					action: 'Byte types furiously on a holographic keyboard while Chip plugs into the mainframe.'
-				},
-				characterIds: [],
-				status: 'completed' as const,
-				generatedScene: {
-					description: 'A neon-lit server room in a dystopian megacity',
-					imageUrl: 'https://picsum.photos/seed/neon-server-room/1280/720'
-				}
+				id: 'world-capybara-2',
+				name: 'Cyber Capybara 2',
+				type: 'character' as ElementType,
+				description: 'Metallic shell with vibrant neon stripes, camera-like eyes, augmented hearing devices on its head.',
+				isEnhanced: false,
+				images: [{ id: 'capybara-2-img-1', imageUrl: '/test-data/cyber-capybara-2.png', isActive: true, createdAt: new Date() }],
+				historyIndex: 0, history: [], createdAt: new Date(), updatedAt: new Date()
 			},
 			{
-				id: 'test-scene-2',
-				storySceneIndex: 1,
-				storyScene: {
-					number: 2,
-					description: 'Alarms blare as red lights flood the room. Security drones descend from the ceiling. The capybaras exchange a knowing glance.',
-					dialogue: 'Time to go swimming.',
-					action: 'They dive into a cooling vent, escaping into the city sewers below.'
-				},
-				characterIds: [],
-				status: 'completed' as const,
-				generatedScene: {
-					description: 'Alarms blare as red lights flood the room',
-					imageUrl: 'https://picsum.photos/seed/alarm-room/1280/720'
-				}
-			}
-		],
-		storyboard: [
-			{
-				id: 'test-wf-1',
-				scene: {
-					id: 'test-scene-1',
-					sceneNumber: 1,
-					name: 'A neon-lit server room in a dystopian megacity',
-					imageUrl: 'https://picsum.photos/seed/neon-server-room/1280/720',
-					characterIds: []
-				},
-				characters: [],
-				duration: 5
+				id: 'world-neon-alley',
+				name: 'Neon Alley',
+				type: 'location' as ElementType,
+				description: 'A dimly-lit alley in a bustling cyberpunk city, featuring towering buildings with cascading wires and omnipresent neon glow interspersed with graffiti.',
+				isEnhanced: false,
+				images: [{ id: 'neon-alley-img-1', imageUrl: '/test-data/neon-alley.png', isActive: true, createdAt: new Date() }],
+				historyIndex: 0, history: [], createdAt: new Date(), updatedAt: new Date()
 			},
 			{
-				id: 'test-wf-2',
-				scene: {
-					id: 'test-scene-2',
-					sceneNumber: 2,
-					name: 'Alarms blare as red lights flood the room',
-					imageUrl: 'https://picsum.photos/seed/alarm-room/1280/720',
-					characterIds: []
-				},
-				characters: [],
-				duration: 5
+				id: 'world-control-room',
+				name: 'Government Control Room',
+				type: 'location' as ElementType,
+				description: 'A sleek, futuristic room filled with wall-to-wall server units, holographic interfaces, and omnipresent blue LED illumination.',
+				isEnhanced: false,
+				images: [{ id: 'control-room-img-1', imageUrl: '/test-data/control-room.png', isActive: true, createdAt: new Date() }],
+				historyIndex: 0, history: [], createdAt: new Date(), updatedAt: new Date()
+			},
+			{
+				id: 'world-cityscape',
+				name: 'Cyberpunk Cityscape',
+				type: 'location' as ElementType,
+				description: 'An expansive, futuristic city skyline at night, dominated by towering skyscrapers with digital billboards and pulsing neon lights.',
+				isEnhanced: false,
+				images: [{ id: 'cityscape-img-1', imageUrl: '/test-data/cityscape.png', isActive: true, createdAt: new Date() }],
+				historyIndex: 0, history: [], createdAt: new Date(), updatedAt: new Date()
 			}
 		],
+		storyboardScenes: [
+			{
+				id: 'sb-scene-1', title: 'Scene 1',
+				description: 'The capybaras are scampering along the ground, with neon lights casting reflections on their metallic bodies.',
+				dialog: '', action: 'Two cybernetic humanoid capybaras scuttle past, their red LED eyes scanning surroundings.',
+				assignedElements: ['world-capybara-1', 'world-capybara-2'],
+				duration: 5, status: 'completed' as const, isArchived: false, isSmartExpanded: false,
+				images: [{ id: 'sb-scene-1-img-1', imageUrl: '/test-data/scene-1.png', isActive: true, createdAt: new Date() }],
+				createdAt: new Date(), updatedAt: new Date()
+			},
+			{
+				id: 'sb-scene-2', title: 'Scene 2',
+				description: 'Capybaras are interfacing with the mainframe using cables extending from their limbs.',
+				dialog: '', action: 'The capybaras plug cables from their appendages into the mainframe, lights flicker as hacking commences.',
+				assignedElements: ['world-capybara-1', 'world-capybara-2'],
+				duration: 5, status: 'completed' as const, isArchived: false, isSmartExpanded: false,
+				images: [{ id: 'sb-scene-2-img-1', imageUrl: '/test-data/scene-2.png', isActive: true, createdAt: new Date() }],
+				createdAt: new Date(), updatedAt: new Date()
+			},
+			{
+				id: 'sb-scene-3', title: 'Scene 3',
+				description: "Capybaras' eyes reflecting streams of cascading code as the progress bar fills.",
+				dialog: '', action: "The capybaras' eyes glow brighter as a progress bar fills to completion.",
+				assignedElements: ['world-capybara-1', 'world-capybara-2'],
+				duration: 5, status: 'completed' as const, isArchived: false, isSmartExpanded: false,
+				images: [{ id: 'sb-scene-3-img-1', imageUrl: '/test-data/scene-3.png', isActive: true, createdAt: new Date() }],
+				createdAt: new Date(), updatedAt: new Date()
+			},
+			{
+				id: 'sb-scene-4', title: 'Scene 4',
+				description: 'Capybaras silhouetted against the darkened city, moving into a shadow.',
+				dialog: '', action: 'The capybaras retreat into the shadows as city lights flicker in their wake.',
+				assignedElements: ['world-capybara-1', 'world-capybara-2'],
+				duration: 5, status: 'completed' as const, isArchived: false, isSmartExpanded: false,
+				images: [{ id: 'sb-scene-4-img-1', imageUrl: '/test-data/scene-4.png', isActive: true, createdAt: new Date() }],
+				createdAt: new Date(), updatedAt: new Date()
+			}
+		],
+		scenes: [],
+		storyboard: [],
 		videos: [
-			{
-				sceneIndex: 0,
-				sceneId: 'test-scene-1',
-				sceneName: 'A neon-lit server room in a dystopian megacity',
-				sceneImageUrl: 'https://picsum.photos/seed/neon-server-room/1280/720',
-				videoUrl: 'https://tempfile.aiquickdraw.com/h/7606ab4948924b782c10b86a797717ee_1769128334.mp4'
-			},
-			{
-				sceneIndex: 1,
-				sceneId: 'test-scene-2',
-				sceneName: 'Alarms blare as red lights flood the room',
-				sceneImageUrl: 'https://picsum.photos/seed/alarm-room/1280/720',
-				videoUrl: 'https://tempfile.aiquickdraw.com/h/0debb33d4be73af035dc263ebe58b06f_1769129630.mp4'
-			}
+			{ sceneIndex: 0, sceneId: 'sb-scene-1', sceneName: 'Scene 1', sceneImageUrl: '/test-data/scene-1.png', videoUrl: '' },
+			{ sceneIndex: 1, sceneId: 'sb-scene-2', sceneName: 'Scene 2', sceneImageUrl: '/test-data/scene-2.png', videoUrl: '' },
+			{ sceneIndex: 2, sceneId: 'sb-scene-3', sceneName: 'Scene 3', sceneImageUrl: '/test-data/scene-3.png', videoUrl: '' },
+			{ sceneIndex: 3, sceneId: 'sb-scene-4', sceneName: 'Scene 4', sceneImageUrl: '/test-data/scene-4.png', videoUrl: '' }
 		]
 	};
 
 	function loadTestStory() {
 		storyStore.update(state => ({
 			...state,
-			prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe',
+			prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe',
 			stories: [{
 				story: TEST_DATA.story as Story,
-				prompt: 'anime: cybernetic humanoid capybaras hacking into a dystopian government mainframe',
-				length: '10s'
+				prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe',
+				length: '20s'
 			}]
 		}));
 	}
@@ -1220,6 +1390,23 @@
 		enhancedCharacters = new Set([0, 1]);
 	}
 
+	function loadTestWorldElements() {
+		// First load story if not present
+		if ($storyStore.stories.length === 0) {
+			loadTestStory();
+		}
+
+		worldStore.update(state => ({
+			...state,
+			elements: TEST_DATA.worldElements.map(el => ({
+				...el,
+				images: el.images.map(img => ({ ...img })),
+				history: [...el.history]
+			})),
+			expandedElementIds: new Set(TEST_DATA.worldElements.map(el => el.id))
+		}));
+	}
+
 	function loadTestScenes() {
 		// First load story and characters if not present
 		if ($storyStore.stories.length === 0) {
@@ -1240,49 +1427,117 @@
 		if ($storyStore.stories.length === 0) {
 			loadTestStory();
 		}
-		if ($characterStore.characters.length === 0) {
-			loadTestCharacters();
-		}
-		if (slots.length === 0 || !slots.some(s => s.status === 'completed')) {
-			loadTestScenes();
+		if ($worldStore.elements.length === 0) {
+			loadTestWorldElements();
 		}
 
 		storyboardStore.update(state => ({
 			...state,
-			wireframes: TEST_DATA.storyboard.map(wf => ({
-				...wf,
-				scene: wf.scene as WireframeScene | null,
-				characters: wf.characters as WireframeCharacter[]
-			})),
-			selectedWireframeId: TEST_DATA.storyboard[0].id
+			scenes: TEST_DATA.storyboardScenes.map(scene => ({
+				...scene,
+				images: scene.images.map(img => ({ ...img }))
+			})) as Scene[],
+			pipelineStatus: 'complete',
+			selectedSceneId: TEST_DATA.storyboardScenes[0].id
 		}));
 	}
 
 	function loadTestVideo() {
-		// First load all previous steps if not present
+		// First load story
 		if ($storyStore.stories.length === 0) {
 			loadTestStory();
 		}
-		if ($characterStore.characters.length === 0) {
-			loadTestCharacters();
+		// Load world elements
+		if ($worldStore.elements.length === 0) {
+			loadTestWorldElements();
 		}
-		if (slots.length === 0 || !slots.some(s => s.status === 'completed')) {
-			loadTestScenes();
-		}
-		if ($storyboardStore.wireframes.length === 0 || !$storyboardStore.wireframes.some(wf => wf.scene !== null)) {
+		// Load storyboard scenes
+		if ($storyboardStore.scenes.length === 0) {
 			loadTestStoryboard();
 		}
 
-		sceneVideos = TEST_DATA.videos.map(v => ({
-			...v,
-			videoId: `test-video-${v.sceneIndex}`,
-			status: 'completed' as const,
-			progress: 100,
-			error: null,
-			retryCount: 0
-		}));
+		// Update video references to use storyboard scene data
+		const activeScenes = $storyboardStore.scenes.filter(s => !s.isArchived);
+		sceneVideos = activeScenes.map((scene, idx) => {
+			const activeImage = scene.images.find(img => img.isActive);
+			return {
+				sceneIndex: idx,
+				sceneId: scene.id,
+				sceneName: scene.title,
+				sceneImageUrl: activeImage?.imageUrl || '',
+				videoUrl: TEST_DATA.videos[idx]?.videoUrl || '',
+				videoId: `test-video-${idx}`,
+				status: 'completed' as const,
+				progress: 100,
+				error: null,
+				retryCount: 0
+			};
+		});
 		isVideoGenerating = false;
 		stopPolling();
+	}
+
+	function exportCurrentState() {
+		const exportData = {
+			story: $storyStore.stories.length > 0 ? {
+				title: $storyStore.stories[0].story.title,
+				rawContent: $storyStore.stories[0].story.rawContent,
+				scenes: $storyStore.stories[0].story.scenes,
+				characters: $storyStore.stories[0].story.characters,
+				locations: $storyStore.stories[0].story.locations,
+				sceneVisuals: $storyStore.stories[0].story.sceneVisuals
+			} : null,
+			worldElements: $worldStore.elements.map(el => ({
+				id: el.id,
+				name: el.name,
+				type: el.type,
+				description: el.description,
+				enhancedDescription: el.enhancedDescription,
+				images: el.images.map(img => ({
+					id: img.id,
+					imageUrl: img.imageUrl,
+					isActive: img.isActive
+				}))
+			})),
+			storyboardScenes: $storyboardStore.scenes.map(scene => ({
+				id: scene.id,
+				title: scene.title,
+				description: scene.description,
+				enhancedDescription: scene.enhancedDescription,
+				dialog: scene.dialog,
+				action: scene.action,
+				assignedElements: scene.assignedElements,
+				duration: scene.duration,
+				status: scene.status,
+				isArchived: scene.isArchived,
+				images: scene.images.map(img => ({
+					id: img.id,
+					imageUrl: img.imageUrl,
+					isActive: img.isActive
+				}))
+			})),
+			videos: sceneVideos.map(v => ({
+				sceneIndex: v.sceneIndex,
+				sceneId: v.sceneId,
+				sceneName: v.sceneName,
+				sceneImageUrl: v.sceneImageUrl,
+				videoUrl: v.videoUrl,
+				status: v.status
+			}))
+		};
+
+		console.log('=== EXPORT CURRENT STATE ===');
+		console.log(JSON.stringify(exportData, null, 2));
+		console.log('=== END EXPORT ===');
+
+		// Also copy to clipboard if possible
+		if (browser && navigator.clipboard) {
+			navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
+				.then(() => alert('Current state copied to clipboard! Check the console for formatted output.'))
+				.catch(() => alert('State logged to console. Copy from there.'));
+		} else {
+			alert('State logged to console. Copy from there.');
+		}
 	}
 
 	// ========== Effects ==========
@@ -1375,12 +1630,17 @@
 					if (form.story!.characters && form.story!.characters.length > 0) {
 						loadStoryCharacters(form.story!.characters);
 
-						// Populate World section with characters and auto-generate images
+						// Populate World section with characters and locations, auto-generate images
 						const worldCharacters = form.story!.characters.map((c: { name: string; description: string; physical?: string }) => ({
 							name: c.name,
 							description: c.physical || c.description
 						}));
-						const newElements = loadElementsFromStory(worldCharacters);
+						const worldLocations = (form.story!.locations || []).map((l: { name: string; description: string }) => ({
+							name: l.name,
+							description: l.description
+						}));
+						console.log('Story generation complete. Characters:', form.story!.characters, 'Locations:', form.story!.locations);
+						const newElements = loadElementsFromStory(worldCharacters, worldLocations);
 						// Auto-generate world element images
 						if (newElements.length > 0) {
 							pendingWorldElementIds = newElements.map(el => el.id);
@@ -1395,6 +1655,55 @@
 							characterIds: [],
 							status: 'pending' as const
 						}));
+
+						// Populate Storyboard with scenes
+						// Build a name-to-ID map from world elements
+						const elementNameToId = new Map<string, string>();
+						$worldStore.elements.forEach(el => {
+							elementNameToId.set(el.name.toLowerCase(), el.id);
+						});
+
+						// Map story scenes to storyboard scenes with assigned elements
+						const sceneVisuals = form.story!.sceneVisuals || [];
+						const storyboardScenes = form.story!.scenes.map((scene, index) => {
+							// Find matching sceneVisual
+							const visual = sceneVisuals.find((sv: { sceneNumber: number }) => sv.sceneNumber === scene.number) ||
+								sceneVisuals[index];
+
+							// Find world element IDs for characters present
+							const assignedElements: string[] = [];
+							if (visual?.charactersPresent) {
+								visual.charactersPresent.forEach((charName: string) => {
+									const elementId = elementNameToId.get(charName.toLowerCase());
+									if (elementId) {
+										assignedElements.push(elementId);
+									}
+								});
+							}
+							// Also try to match the setting to a location
+							if (visual?.setting) {
+								$worldStore.elements.forEach(el => {
+									if (el.type === 'location' && visual.setting.toLowerCase().includes(el.name.toLowerCase())) {
+										if (!assignedElements.includes(el.id)) {
+											assignedElements.push(el.id);
+										}
+									}
+								});
+							}
+
+							return {
+								title: `Scene ${scene.number}`,
+								description: visual?.visualDescription || scene.description,
+								dialog: scene.dialogue,
+								action: scene.action,
+								assignedElements
+							};
+						});
+
+						// Reset and initialize storyboard with new scenes
+						resetStoryboardStore();
+						initializeScenesFromStory(storyboardScenes);
+						console.log('Initialized storyboard with', storyboardScenes.length, 'scenes');
 					}
 
 					// Auto-navigate to characters if "Generate Video Now" was clicked
@@ -1428,6 +1737,17 @@
 			// Small delay to ensure the store is updated
 			setTimeout(() => {
 				generateAllWorldElementImages(elementIds);
+			}, 100);
+		}
+	});
+
+	// Auto-generate storyboard images effect (triggered after world element images complete)
+	$effect(() => {
+		if (autoGenerateStoryboardImages && activeScenes.length > 0) {
+			autoGenerateStoryboardImages = false;
+			// Small delay to ensure world element images are saved
+			setTimeout(() => {
+				generateAllStoryboardImages();
 			}, 100);
 		}
 	});
@@ -1557,16 +1877,30 @@
 	});
 
 	$effect(() => {
-		if ($storyboardStore.isPlaying) {
+		if ($storyboardStore.isPlaying && $storyboardStore.totalDuration > 0) {
+			// Clear any existing interval first
+			if (playbackInterval) {
+				clearInterval(playbackInterval);
+			}
 			playbackInterval = setInterval(() => {
-				const newTime = $storyboardStore.currentTime + 0.1;
-				if (newTime >= $storyboardStore.totalDuration) {
+				const currentTime = $storyboardStore.currentTime;
+				const totalDuration = $storyboardStore.totalDuration;
+				const newTime = currentTime + 0.1;
+				if (newTime >= totalDuration) {
 					togglePlayback();
 					setCurrentTime(0);
 				} else {
 					setCurrentTime(newTime);
 				}
 			}, 100);
+
+			// Cleanup function for when effect re-runs or component unmounts
+			return () => {
+				if (playbackInterval) {
+					clearInterval(playbackInterval);
+					playbackInterval = null;
+				}
+			};
 		} else {
 			if (playbackInterval) {
 				clearInterval(playbackInterval);
@@ -1736,6 +2070,7 @@
 				title: editableTitle,
 				scenes: updatedScenes,
 				characters: updatedCharacters,
+				locations: latestEntry.story.locations,
 				sceneVisuals: latestEntry.story.sceneVisuals
 			});
 
@@ -1755,7 +2090,8 @@
 						rawContent: newRawContent,
 						title: editableTitle,
 						scenes: updatedScenes,
-						characters: updatedCharacters
+						characters: updatedCharacters,
+						locations: latestEntry.story.locations
 					}
 				};
 				return {
@@ -1773,12 +2109,16 @@
 			// Reload characters from edited data and trigger auto-generation
 			if (updatedCharacters.length > 0) {
 				loadStoryCharacters(updatedCharacters);
-				// Populate World section and auto-generate images
+				// Populate World section with characters and locations, auto-generate images
 				const worldCharacters = updatedCharacters.map((c: { name: string; description: string; physical?: string }) => ({
 					name: c.name,
 					description: c.physical || c.description
 				}));
-				const newElements = loadElementsFromStory(worldCharacters);
+				const worldLocations = (latestEntry.story.locations || []).map((l: { name: string; description: string }) => ({
+					name: l.name,
+					description: l.description
+				}));
+				const newElements = loadElementsFromStory(worldCharacters, worldLocations);
 				// Auto-generate world element images
 				if (newElements.length > 0) {
 					pendingWorldElementIds = newElements.map(el => el.id);
@@ -1844,12 +2184,16 @@
 		const latestStory = $storyStore.stories[$storyStore.stories.length - 1];
 		if (latestStory?.story.characters && latestStory.story.characters.length > 0) {
 			loadStoryCharacters(latestStory.story.characters);
-			// Also populate World section
+			// Also populate World section with characters and locations
 			const worldCharacters = latestStory.story.characters.map((c: { name: string; description: string; physical?: string }) => ({
 				name: c.name,
 				description: c.physical || c.description
 			}));
-			const newElements = loadElementsFromStory(worldCharacters);
+			const worldLocations = (latestStory.story.locations || []).map((l: { name: string; description: string }) => ({
+				name: l.name,
+				description: l.description
+			}));
+			const newElements = loadElementsFromStory(worldCharacters, worldLocations);
 			// Auto-generate world element images
 			if (newElements.length > 0) {
 				pendingWorldElementIds = newElements.map(el => el.id);
@@ -1929,17 +2273,28 @@
 </script>
 
 <!-- Testing Mode Toggle -->
-<button
-	onclick={toggleTestingMode}
-	class="fixed bottom-4 right-4 z-50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
-	title="Toggle testing mode"
->
-	<FlaskConical class="!mr-0 h-4 w-4" />
-</button>
+<div class="fixed bottom-4 right-4 z-50 flex items-center gap-2">
+	{#if testingMode}
+		<button
+			onclick={exportCurrentState}
+			class="flex cursor-pointer items-center gap-2 rounded-full border border-blue-800 bg-blue-200 px-3 py-2 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-300"
+			title="Export current state to clipboard/console"
+		>
+			<Download class="!mr-0 h-4 w-4" />
+		</button>
+	{/if}
+	<button
+		onclick={toggleTestingMode}
+		class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
+		title="Toggle testing mode"
+	>
+		<FlaskConical class="!mr-0 h-4 w-4" />
+	</button>
+</div>
 
 <div class="flex flex-col gap-8">
 	<!-- ========== PROJECT SECTION ========== -->
-	<ProjectSection />
+	<ProjectSection {testingMode} />
 
 	<!-- ========== STORY SECTION ========== -->
 	<section
@@ -1974,14 +2329,9 @@
 						<p class="text-muted-foreground">Create your story text</p>
 					</div>
 					{#if testingMode}
-						<div class="flex gap-1">
-							<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe', stories: [] }))} title="Insert test prompt and clear history">
-								<FlaskConical class="!mr-0 h-4 w-4 opacity-50" />
-							</Button>
-							<Button variant="outline" size="sm" onclick={loadTestStory} title="Load test data">
-								<FlaskConical class="!mr-0 h-4 w-4" />
-							</Button>
-						</div>
+						<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe', stories: [] }))} title="Insert test prompt and clear history">
+							<FlaskConical class="!mr-0 h-4 w-4" />
+						</Button>
 					{/if}
 				</div>
 
@@ -2389,7 +2739,7 @@
 			</div>
 
 			<!-- Right Column: Content -->
-			<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
+			<div class="flex flex-col gap-4 w-full">
 				{#if form?.error}
 					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 						{form.error}
@@ -2414,6 +2764,12 @@
 							size="sm"
 							onclick={() => setFilterType(option.value)}
 						>
+							{#if option.value !== 'all'}
+								<span
+									class="w-2 h-2 rounded-full mr-1.5 inline-block"
+									style="background-color: {ELEMENT_TYPE_COLORS[option.value]};"
+								></span>
+							{/if}
 							{option.label}
 							{#if count > 0}
 								<span class="ml-1 text-xs">({count})</span>
@@ -2423,41 +2779,42 @@
 				</div>
 
 				<!-- Element Cards (show all elements) -->
+				<div class="flex flex-wrap gap-4">
 				{#each filteredWorldElements as element}
 						<div
-							class="flex flex-col gap-4 rounded-md border p-4"
+							class="flex flex-col gap-3 rounded-md border p-4 w-80 flex-shrink-0"
 							style="border-left: 4px solid {ELEMENT_TYPE_COLORS[element.type]};"
 							data-element-content={element.id}
 						>
-							<div class="flex items-start justify-between">
-								<div>
-									<div class="flex items-center gap-2">
-										<h2 class="text-xl font-semibold">{element.name}</h2>
+							<div class="flex items-start justify-between gap-2">
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2 flex-wrap">
+										<h2 class="text-base font-semibold truncate">{element.name}</h2>
 										<span
-											class="rounded-full px-2 py-0.5 text-xs text-white"
+											class="rounded-full px-2 py-0.5 text-xs text-black flex-shrink-0"
 											style="background-color: {ELEMENT_TYPE_COLORS[element.type]};"
 										>
 											{ELEMENT_TYPE_LABELS[element.type]}
 										</span>
 									</div>
-									<p class="text-sm text-muted-foreground mt-1">{element.description}</p>
+									<p class="text-xs text-muted-foreground mt-1 line-clamp-2">{element.description}</p>
 								</div>
 								<Button
 									variant="ghost"
 									size="icon"
 									onclick={() => handleDeleteWorldElement(element.id)}
-									class="text-destructive hover:text-destructive"
+									class="text-destructive hover:text-destructive flex-shrink-0"
 								>
 									<Trash2 class="h-4 w-4" />
 								</Button>
 							</div>
 
 							{#if element.enhancedDescription && element.enhancedDescription !== element.description}
-								<div class="rounded-md bg-muted/50 p-3">
+								<div class="rounded-md bg-muted/50 p-2">
 									<p class="mb-1 text-xs font-medium uppercase text-muted-foreground">
-										Enhanced Description:
+										Enhanced:
 									</p>
-									<p class="text-sm">{element.enhancedDescription}</p>
+									<p class="text-xs line-clamp-3">{element.enhancedDescription}</p>
 								</div>
 							{/if}
 
@@ -2502,9 +2859,9 @@
 											size="sm"
 											class="mt-2"
 											onclick={() => generateWorldElementImage(element.id)}
-											disabled={isWorldGenerating && activeElementId === element.id}
+											disabled={generatingWorldElementIds.has(element.id)}
 										>
-											{#if isWorldGenerating && activeElementId === element.id}
+											{#if generatingWorldElementIds.has(element.id)}
 												<Loader2 class="mr-2 h-3 w-3 animate-spin" />
 												Retrying...
 											{:else}
@@ -2516,8 +2873,8 @@
 							{/if}
 
 							<!-- Action Buttons -->
-							<div class="flex flex-col gap-3">
-								<div class="flex flex-wrap gap-2">
+							<div class="flex flex-col gap-2">
+								<div class="flex flex-wrap gap-1">
 									{#if !element.isEnhanced}
 										<!-- Initial Enhance Description button -->
 										<form
@@ -2538,10 +2895,11 @@
 											<Button
 												type="submit"
 												variant="outline"
+												size="sm"
 												disabled={isWorldEnhancing || !element.description}
 											>
 												{#if isWorldEnhancing && activeElementId === element.id}
-													<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+													<Loader2 class="mr-1 h-3 w-3 animate-spin" />
 													Enhancing...
 												{:else}
 													Enhance Description
@@ -2567,22 +2925,24 @@
 											<Button
 												type="submit"
 												variant="outline"
+												size="sm"
 												disabled={isWorldEnhancing || isWorldGenerating}
 											>
 												{#if isWorldEnhancing && activeElementId === element.id}
-													<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+													<Loader2 class="mr-1 h-3 w-3 animate-spin" />
 													Improving...
 												{:else}
-													Re-enhance Description
+													Re-enhance
 												{/if}
 											</Button>
 										</form>
 										<Button
 											variant="outline"
+											size="sm"
 											onclick={() => openWorldPromptTextarea(element.id)}
 											disabled={isWorldEnhancing || isWorldGenerating}
 										>
-											Enhance With Prompt
+											With Prompt
 										</Button>
 									{/if}
 
@@ -2590,19 +2950,20 @@
 										method="POST"
 										action="?/generateImage"
 										use:enhance={() => {
+											generatingWorldElementIds = new Set([...generatingWorldElementIds, element.id]);
 											isWorldGenerating = true;
-											activeElementId = element.id;
 											return async ({ update }) => {
 												await update();
-												isWorldGenerating = false;
+												generatingWorldElementIds = new Set([...generatingWorldElementIds].filter(id => id !== element.id));
+												if (generatingWorldElementIds.size === 0) isWorldGenerating = false;
 											};
 										}}
 									>
 										<input type="hidden" name="description" value={getWorldCurrentDescription(element)} />
 										<input type="hidden" name="elementType" value={element.type} />
-										<Button type="submit" disabled={isWorldGenerating || !getWorldCurrentDescription(element)}>
-											{#if isWorldGenerating && activeElementId === element.id}
-												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										<Button type="submit" size="sm" disabled={generatingWorldElementIds.has(element.id) || !getWorldCurrentDescription(element)}>
+											{#if generatingWorldElementIds.has(element.id)}
+												<Loader2 class="mr-1 h-3 w-3 animate-spin" />
 												Generating...
 											{:else}
 												Generate Image
@@ -2656,6 +3017,7 @@
 							</div>
 						</div>
 				{/each}
+				</div>
 
 				<!-- Add Element Forms (dynamically rendered) -->
 				{#each addElementForms as form}
@@ -2744,28 +3106,10 @@
 					<h1 class="text-3xl font-bold mb-3">Storyboard</h1>
 					<p class="text-muted-foreground">Create and arrange your scenes</p>
 				</div>
-				{#if testingMode}
-					<Button variant="outline" size="sm" onclick={loadTestStoryboard} title="Load test data">
-						<FlaskConical class="!mr-0 h-4 w-4" />
-					</Button>
-				{/if}
 			</div>
 
 			<!-- Right Column: Content -->
-			<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
-				<!-- New Scene Button (at top of right column) -->
-				<div
-					class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
-					onclick={handleAddScene}
-					ondragover={handleStoryboardSceneDragOver}
-					ondrop={handleNewStoryboardElementDrop}
-					role="button"
-					tabindex="0"
-					data-add-scene
-				>
-					<Plus class="h-12 w-12 text-muted-foreground" />
-				</div>
-
+			<div class="flex flex-col gap-4 w-full">
 				<!-- Timeline info -->
 				{#if activeScenes.length > 0}
 					<div class="flex items-center gap-4 text-sm text-muted-foreground">
@@ -2774,10 +3118,9 @@
 					</div>
 				{/if}
 
-				<!-- Scene Cards Grid -->
-				{#if activeScenes.length > 0}
+				<!-- Scene Cards Grid + New Scene Button -->
 				<div class="flex flex-wrap gap-4">
-					{#each activeScenes as scene, index}
+					{#each activeScenes as scene, index (scene.id)}
 					{@const sceneImageUrl = getActiveSceneImageUrl(scene)}
 					{@const showText = sceneTextVisibility[scene.id] !== false}
 					<div
@@ -2831,21 +3174,21 @@
 									</div>
 									<div class="flex gap-1">
 										<button
-											class="rounded p-1 hover:bg-white/20 transition-colors"
+											class="rounded p-1 hover:bg-white/20 transition-colors cursor-pointer"
 											onclick={(e) => handleCloneScene(scene.id, e)}
 											title="Clone scene"
 										>
 											<Copy class="h-4 w-4" />
 										</button>
 										<button
-											class="rounded p-1 hover:bg-white/20 transition-colors"
+											class="rounded p-1 hover:bg-white/20 transition-colors cursor-pointer"
 											onclick={(e) => handleArchiveScene(scene.id, e)}
 											title="Archive scene"
 										>
 											<Archive class="h-4 w-4" />
 										</button>
 										<button
-											class="rounded p-1 hover:bg-red-500/80 text-red-400 transition-colors"
+											class="rounded p-1 hover:bg-red-500/80 text-red-400 transition-colors cursor-pointer"
 											onclick={(e) => confirmDeleteScene(scene.id, e)}
 											title="Delete scene"
 										>
@@ -2870,21 +3213,21 @@
 
 								<!-- World element pills -->
 								{#if scene.assignedElements.length > 0}
-									<div class="mt-2 flex flex-wrap gap-1">
-										{#each scene.assignedElements.slice(0, 4) as elementId}
+									<div class="mt-2 flex gap-1 overflow-hidden {sceneImageUrl ? 'ml-8' : ''}">
+										{#each scene.assignedElements.slice(0, 3) as elementId}
 											{@const element = getWorldElement(elementId)}
 											{#if element}
 												<span
-													class="rounded px-2 py-0.5 text-xs font-medium text-white"
+													class="rounded px-2 py-0.5 text-xs font-medium text-white truncate max-w-[5rem] flex-shrink-0"
 													style="background-color: {ELEMENT_TYPE_COLORS[element.type]}"
 												>
-													{truncateSceneText(element.name, 12)}
+													{truncateSceneText(element.name, 8)}
 												</span>
 											{/if}
 										{/each}
-										{#if scene.assignedElements.length > 4}
-											<span class="rounded bg-gray-500 px-2 py-0.5 text-xs font-medium text-white">
-												+{scene.assignedElements.length - 4}
+										{#if scene.assignedElements.length > 3}
+											<span class="rounded bg-gray-500 px-2 py-0.5 text-xs font-medium text-white flex-shrink-0">
+												+{scene.assignedElements.length - 3}
 											</span>
 										{/if}
 									</div>
@@ -2895,7 +3238,7 @@
 						<!-- Text toggle button (only when image exists) -->
 						{#if sceneImageUrl}
 							<button
-								class="absolute bottom-2 left-2 rounded p-1 bg-black/50 text-white hover:bg-black/70 transition-colors"
+								class="absolute bottom-2 left-2 rounded p-1 bg-black/50 text-white hover:bg-black/70 transition-colors cursor-pointer"
 								onclick={(e) => toggleSceneTextVisibility(scene.id, e)}
 								title={showText ? 'Hide text' : 'Show text'}
 							>
@@ -2908,17 +3251,45 @@
 						{/if}
 
 						<!-- Status indicator -->
-						{#if scene.status === 'generating'}
+						{#if scene.status === 'generating' || generatingStoryboardSceneIds.has(scene.id)}
 							<div class="absolute inset-0 flex items-center justify-center bg-black/50">
 								<Loader2 class="h-8 w-8 animate-spin text-white" />
+							</div>
+						{:else if scene.status === 'failed' && scene.error}
+							<div class="absolute inset-0 flex flex-col items-center justify-center bg-red-900/80 p-2">
+								<X class="h-6 w-6 text-red-300 mb-1" />
+								<p class="text-red-100 text-xs text-center line-clamp-3">{scene.error}</p>
+								<Button
+									variant="outline"
+									size="sm"
+									class="mt-2 text-xs h-6 bg-red-800 border-red-600 text-red-100 hover:bg-red-700"
+									onclick={(e) => {
+										e.stopPropagation();
+										generateStoryboardSceneImage(scene.id);
+									}}
+								>
+									Retry
+								</Button>
 							</div>
 						{/if}
 					</div>
 				{/each}
-			</div>
-			{/if}
 
-			<!-- Archived Scenes Section -->
+					<!-- New Scene Button (at end of row) -->
+					<div
+						class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
+						onclick={handleAddScene}
+						ondragover={handleStoryboardSceneDragOver}
+						ondrop={handleNewStoryboardElementDrop}
+						role="button"
+						tabindex="0"
+						data-add-scene
+					>
+						<Plus class="h-12 w-12 text-muted-foreground" />
+					</div>
+				</div>
+
+				<!-- Archived Scenes Section -->
 			<div class="border-t pt-6 mt-6">
 				<h2 class="text-lg font-semibold mb-4">Archived Scenes</h2>
 				{#if archivedScenes.length === 0}
@@ -3039,22 +3410,46 @@
 					</div>
 				{:else}
 					{#if sceneThumbnails.length > 0}
-						<div class="absolute inset-0 flex items-center justify-center p-4" data-video-placeholder>
-							<div class="flex gap-2 overflow-x-auto">
-								{#each sceneThumbnails as thumbnail, index}
+						{#if $storyboardStore.isPlaying && currentPreviewSceneIndex >= 0 && sceneThumbnails[currentPreviewSceneIndex]}
+							<!-- Full-screen preview of current scene -->
+							<div class="absolute inset-0" data-video-preview>
+								<img
+									src={sceneThumbnails[currentPreviewSceneIndex].imageUrl}
+									alt={sceneThumbnails[currentPreviewSceneIndex].name}
+									class="w-full h-full object-contain"
+								/>
+								<!-- Scene indicator overlay -->
+								<div class="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg">
+									<p class="text-sm font-medium">Scene {currentPreviewSceneIndex + 1} of {sceneThumbnails.length}</p>
+									<p class="text-xs text-white/70">{sceneThumbnails[currentPreviewSceneIndex].name}</p>
+								</div>
+								<!-- Progress bar -->
+								<div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
 									<div
-										class="flex-shrink-0 rounded border-2 border-white/50 overflow-hidden"
-										data-scene-thumbnail={index}
-									>
-										<img
-											src={thumbnail.imageUrl}
-											alt={thumbnail.name}
-											class="h-32 w-auto object-cover"
-										/>
-									</div>
-								{/each}
+										class="h-full bg-primary transition-all duration-100"
+										style="width: {($storyboardStore.currentTime % 5) / 5 * 100}%"
+									></div>
+								</div>
 							</div>
-						</div>
+						{:else}
+							<!-- Thumbnail view when not playing -->
+							<div class="absolute inset-0 flex items-center justify-center p-4" data-video-placeholder>
+								<div class="flex gap-3 overflow-x-auto items-center">
+									{#each sceneThumbnails as thumbnail, index}
+										<div
+											class="relative flex-shrink-0 rounded overflow-hidden border-2 border-white/50"
+											data-scene-thumbnail={index}
+										>
+											<img
+												src={thumbnail.imageUrl}
+												alt={thumbnail.name}
+												class="h-32 w-auto object-cover"
+											/>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
 					{:else}
 						<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
 							<p class="text-white/50">No scenes available. Generate scenes first.</p>

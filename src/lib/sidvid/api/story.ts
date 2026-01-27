@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { StoryOptions, EditStoryOptions, ExpandStoryOptions, Story, StoryScene, StoryCharacter, StorySceneVisual } from '../types';
+import type { StoryOptions, EditStoryOptions, ExpandStoryOptions, Story, StoryScene, StoryCharacter, StoryLocation, StorySceneVisual } from '../types';
 import { storyOptionsSchema } from '../schemas';
 import { getComplexityGuidance } from '../utils/story-helpers';
 
@@ -24,6 +24,12 @@ Format your response as JSON with the following structure:
       "profile": "Personality traits, background, motivations, and relevant history"
     }
   ],
+  "locations": [
+    {
+      "name": "Location Name",
+      "description": "Detailed visual description of the setting: architecture, atmosphere, lighting, colors, textures, and key visual elements (used for image generation)"
+    }
+  ],
   "sceneVisuals": [
     {
       "sceneNumber": 1,
@@ -35,6 +41,7 @@ Format your response as JSON with the following structure:
 }
 Keep descriptions vivid and visual, suitable for video generation.
 For characters, provide detailed physical descriptions for image generation and personality/background for story context.
+For locations, provide detailed visual descriptions suitable for generating background/environment images.
 For sceneVisuals, extract information directly from the story text without adding creative embellishments.`;
 
 export async function generateStory(
@@ -74,6 +81,7 @@ Return only valid JSON.`;
     title: string;
     scenes: StoryScene[];
     characters?: StoryCharacter[];
+    locations?: StoryLocation[];
     sceneVisuals?: StorySceneVisual[];
   };
 
@@ -82,6 +90,7 @@ Return only valid JSON.`;
     scenes: parsed.scenes,
     rawContent: content,
     characters: parsed.characters,
+    locations: parsed.locations,
     sceneVisuals: parsed.sceneVisuals,
   };
 }
@@ -132,6 +141,12 @@ Return the EDITED story in this JSON format:
       "profile": "Personality traits, background, motivations, and relevant history"
     }
   ],
+  "locations": [
+    {
+      "name": "Location Name",
+      "description": "Detailed visual description of the setting"
+    }
+  ],
   "sceneVisuals": [
     {
       "sceneNumber": 1,
@@ -164,6 +179,7 @@ Return only valid JSON.`;
     title: string;
     scenes: StoryScene[];
     characters?: StoryCharacter[];
+    locations?: StoryLocation[];
     sceneVisuals?: StorySceneVisual[];
   };
 
@@ -172,6 +188,7 @@ Return only valid JSON.`;
     scenes: parsed.scenes,
     rawContent: content,
     characters: parsed.characters,
+    locations: parsed.locations,
     sceneVisuals: parsed.sceneVisuals,
   };
 }
@@ -193,10 +210,11 @@ EXPANSION INSTRUCTIONS:
 1. EXPAND each scene's description, dialogue, and action with 4-5x more detail
 2. EXPAND each character's physical description with vivid, specific visual details (colors, textures, expressions, posture, clothing details)
 3. EXPAND each character's profile with deeper personality insights, backstory, and motivations
-4. EXPAND each sceneVisual with rich atmospheric and compositional details
-5. KEEP the same title, number of scenes, and characters - just make everything much more detailed
-6. FOLLOW the lead of the existing text in terms of style, genre, and tone - but push it farther
-7. Write as an expert screenwriter would for a high-quality production
+4. EXPAND each location's description with atmospheric details, lighting, colors, textures, and visual elements
+5. EXPAND each sceneVisual with rich atmospheric and compositional details
+6. KEEP the same title, number of scenes, and characters - just make everything much more detailed
+7. FOLLOW the lead of the existing text in terms of style, genre, and tone - but push it farther
+8. Write as an expert screenwriter would for a high-quality production
 
 The entire story must fit within a ${length} video.
 
@@ -217,6 +235,12 @@ Return the EXPANDED story in this JSON format:
       "description": "Expanded overall description",
       "physical": "Greatly expanded physical description with vivid details",
       "profile": "Greatly expanded personality, background, and motivations"
+    }
+  ],
+  "locations": [
+    {
+      "name": "Location Name",
+      "description": "Greatly expanded visual description of the setting"
     }
   ],
   "sceneVisuals": [
@@ -251,6 +275,7 @@ Return only valid JSON.`;
     title: string;
     scenes: StoryScene[];
     characters?: StoryCharacter[];
+    locations?: StoryLocation[];
     sceneVisuals?: StorySceneVisual[];
   };
 
@@ -259,6 +284,7 @@ Return only valid JSON.`;
     scenes: parsed.scenes,
     rawContent: content,
     characters: parsed.characters,
+    locations: parsed.locations,
     sceneVisuals: parsed.sceneVisuals,
   };
 }
