@@ -57,11 +57,14 @@
 
 	const menuItems = [
 		{ title: 'Dashboard', href: '/', icon: LayoutDashboard },
-		{ title: 'Projects', href: '/projects', icon: FolderKanban },
-		{ title: 'Story', href: '/story', icon: BookOpen },
-		{ title: 'World', href: '/world', icon: Globe },
-		{ title: 'Storyboard', href: '/storyboard', icon: LayoutGrid },
-		{ title: 'Video', href: '/video', icon: Video }
+		{ title: 'Projects', href: '/projects', icon: FolderKanban }
+	];
+
+	const sectionItems = [
+		{ title: 'Story', href: '/#story', icon: BookOpen },
+		{ title: 'World', href: '/#world', icon: Globe },
+		{ title: 'Storyboard', href: '/#storyboard', icon: LayoutGrid },
+		{ title: 'Video', href: '/#video', icon: Video }
 	];
 
 	onMount(async () => {
@@ -110,6 +113,17 @@
 								<SidebarMenuButton
 									href={item.href}
 									class={$page.url.pathname === item.href ? 'font-bold' : ''}
+								>
+									<item.icon class="h-4 w-4" />
+									{item.title}
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+						{/each}
+						{#each sectionItems as item}
+							<SidebarMenuItem>
+								<SidebarMenuButton
+									href={item.href}
+									class="pl-8 text-muted-foreground hover:text-foreground"
 								>
 									<item.icon class="h-4 w-4" />
 									{item.title}
