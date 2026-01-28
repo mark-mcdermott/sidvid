@@ -2856,7 +2856,7 @@
 
 			<!-- Right Column: Content -->
 			<div class="flex flex-col gap-4 w-full">
-				{#if form?.error}
+				{#if form?.error && (form?.action === 'generateImage' || form?.action === 'enhanceDescription')}
 					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
 						{form.error}
 					</div>
@@ -3199,7 +3199,7 @@
 
 				<!-- Empty State -->
 				{#if $worldStore.elements.length === 0}
-					<div class="rounded-md border border-dashed p-8 text-center">
+					<div class="w-full xl:max-w-[32rem] rounded-md border border-dashed p-8 text-center">
 						<p class="text-muted-foreground">
 							No world elements yet. Add characters, locations, objects, or concepts to build your story world.
 						</p>
@@ -3406,7 +3406,7 @@
 				</div>
 
 				<!-- Archived Scenes Section -->
-			<div class="border-t pt-6 mt-6">
+			<div class="w-full xl:max-w-[32rem] border-t pt-6 mt-6">
 				<h2 class="text-lg font-semibold mb-4">Archived Scenes</h2>
 				{#if archivedScenes.length === 0}
 					<p class="text-sm text-muted-foreground">You have no archived scenes</p>
@@ -3461,6 +3461,12 @@
 
 			<!-- Right Column: Content -->
 			<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
+				{#if form?.error && (form?.action === 'generateSceneVideo' || form?.action === 'checkSceneVideoStatus')}
+					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+						{form.error}
+					</div>
+				{/if}
+
 				{#if !allCompleted && !isVideoGenerating}
 				<div class="flex items-center gap-4">
 					<div class="flex items-center gap-2">
