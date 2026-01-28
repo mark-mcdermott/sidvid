@@ -25,6 +25,8 @@ vite.config.ts.timestamp-*
 
 # Test
 coverage
+playwright-report
+test-results
 
 # Data (conversations and images)
 /data
