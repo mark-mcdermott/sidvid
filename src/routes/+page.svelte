@@ -1106,6 +1106,10 @@
 		sceneVideos.filter(sv => sv.status === 'completed')
 	);
 
+	let selectedVideoCompleted = $derived(
+		sceneVideos[currentPlayingIndex]?.status === 'completed'
+	);
+
 	let hasScenes = $derived(sceneThumbnails.length > 0);
 	let totalVideoDuration = $derived(sceneVideos.length * 5);
 
@@ -1233,14 +1237,36 @@
 	}
 
 	function downloadVideo() {
-		const completedVideo = sceneVideos.find(sv => sv.videoUrl);
-		if (completedVideo?.videoUrl) {
+		const selectedVideo = sceneVideos[currentPlayingIndex];
+		if (selectedVideo?.videoUrl) {
 			const link = document.createElement('a');
-			link.href = completedVideo.videoUrl;
-			link.download = `sidvid-video-${Date.now()}.mp4`;
+			link.href = selectedVideo.videoUrl;
+			link.download = `sidvid-scene-${currentPlayingIndex + 1}-${Date.now()}.mp4`;
 			document.body.appendChild(link);
 			link.click();
 			document.body.removeChild(link);
+		}
+	}
+
+	async function downloadAllVideos() {
+		const completedVideos = sceneVideos.filter(sv => sv.videoUrl);
+		if (completedVideos.length === 0) return;
+
+		// Download each video with a small delay to avoid browser blocking
+		for (let i = 0; i < completedVideos.length; i++) {
+			const video = completedVideos[i];
+			if (video.videoUrl) {
+				const link = document.createElement('a');
+				link.href = video.videoUrl;
+				link.download = `sidvid-scene-${video.sceneIndex + 1}-${Date.now()}.mp4`;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+				// Small delay between downloads
+				if (i < completedVideos.length - 1) {
+					await new Promise(resolve => setTimeout(resolve, 300));
+				}
+			}
 		}
 	}
 
@@ -3500,7 +3526,7 @@
 
 			<div
 				data-video-container
-				class="relative rounded-lg border border-black overflow-hidden bg-black"
+				class="relative rounded-lg border border-gray-300 overflow-hidden bg-black"
 				style="width: 800px; max-width: 100%; aspect-ratio: 16/9;"
 			>
 				{#if currentVideoUrl}
@@ -3584,8 +3610,8 @@
 				<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 					{#each sceneVideos as sceneVideo, index}
 						<div
-							class="relative rounded border overflow-hidden cursor-pointer transition-all {sceneVideo.status === 'completed' ? 'border-green-500' : sceneVideo.status === 'failed' ? 'border-red-500' : 'border-gray-300'}"
-							onclick={() => sceneVideo.videoUrl && playFromScene(index)}
+							class="relative rounded border-2 overflow-hidden cursor-pointer transition-all {currentPlayingIndex === index ? 'ring-4 ring-gray-300' : ''} {sceneVideo.status === 'completed' ? 'border-green-500' : sceneVideo.status === 'failed' ? 'border-red-500' : 'border-gray-300'}"
+							onclick={() => { currentPlayingIndex = index; if (sceneVideo.videoUrl) playFromScene(index); }}
 						>
 							<img
 								src={sceneVideo.sceneImageUrl}
@@ -3629,7 +3655,7 @@
 						Stop Preview
 					{:else}
 						<Play class="mr-2 h-4 w-4" />
-						Preview
+						Preview "Slideshow"
 					{/if}
 				</Button>
 
@@ -3653,10 +3679,16 @@
 					</Button>
 				{/if}
 
-				{#if allCompleted}
-					<Button onclick={downloadVideo}>
+				{#if selectedVideoCompleted}
+					<Button onclick={downloadVideo} variant="outline">
 						<Download class="mr-2 h-4 w-4" />
-						Download
+						Download Selected
+					</Button>
+				{/if}
+				{#if allCompleted}
+					<Button onclick={downloadAllVideos}>
+						<Download class="mr-2 h-4 w-4" />
+						Download All
 					</Button>
 				{/if}
 			</div>
