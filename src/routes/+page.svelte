@@ -13,6 +13,7 @@
 
 	// Stores
 	import { storyStore, STYLE_OPTIONS, type StylePreset } from '$lib/stores/storyStore';
+	import { projectStore } from '$lib/stores/projectStore';
 
 	// Components
 	import ProjectSection from '$lib/components/project/ProjectSection.svelte';
@@ -798,6 +799,7 @@
 
 			if (actionData?.success && actionData?.character?.imageUrl) {
 				addSceneImage(sceneId, actionData.character.imageUrl, actionData.character.revisedPrompt);
+				console.log('Successfully added image to scene:', scene.title);
 			} else if (actionData?.error) {
 				if (!isRetry) {
 					console.log('Storyboard image generation failed for', scene.title, ', retrying once...', actionData.error);
@@ -806,6 +808,18 @@
 					return;
 				}
 				setSceneStatus(sceneId, 'failed', actionData.error);
+			} else {
+				// Handle case where success is true but no imageUrl, or actionData is malformed
+				const errorMsg = actionData?.success
+					? 'API returned success but no image URL'
+					: 'Failed to parse image generation response';
+				console.error('Storyboard image generation issue for', scene.title, ':', errorMsg, 'actionData:', actionData);
+				if (!isRetry) {
+					generatingStoryboardSceneIds = new Set([...generatingStoryboardSceneIds].filter(id => id !== sceneId));
+					await generateStoryboardSceneImage(sceneId, true);
+					return;
+				}
+				setSceneStatus(sceneId, 'failed', errorMsg);
 			}
 		} catch (error) {
 			console.error('Error generating storyboard scene image for', scene.title, ':', error);
@@ -824,6 +838,10 @@
 
 	// Generate images for all storyboard scenes in parallel
 	async function generateAllStoryboardImages() {
+		// Log current state for debugging
+		console.log('generateAllStoryboardImages called. Total activeScenes:', activeScenes.length);
+		console.log('Active scenes:', activeScenes.map(s => ({ id: s.id, title: s.title, imagesCount: s.images.length })));
+
 		const scenesToGenerate = activeScenes.filter(scene => scene.images.length === 0);
 
 		if (scenesToGenerate.length === 0) {
@@ -831,7 +849,7 @@
 			return;
 		}
 
-		console.log('Starting parallel storyboard image generation for', scenesToGenerate.length, 'scenes');
+		console.log('Starting parallel storyboard image generation for', scenesToGenerate.length, 'scenes:', scenesToGenerate.map(s => s.title));
 		await Promise.all(scenesToGenerate.map(scene => generateStoryboardSceneImage(scene.id)));
 		console.log('Storyboard image generation complete');
 	}
@@ -1011,15 +1029,43 @@
 	let sceneVideos = $state<SceneVideo[]>([]);
 	let currentGeneratingIndex = $state<number>(-1);
 	let isVideoGenerating = $state(false);
-	let overallProgress = $state(0);
 	let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 	let selectedProvider = $state<'mock' | 'kling'>('kling');
 	let enableSound = $state(true);
 
+	// Track last processed form to prevent re-processing the same error
+	// NOTE: This must NOT be $state - updating reactive state inside $effect causes infinite loops
+	let lastProcessedVideoFormId: string | null = null;
+
 	let videoElement = $state<HTMLVideoElement | null>(null);
 	let currentPlayingIndex = $state(0);
 	let isPlaying = $state(false);
+
+	// Track project changes to reset video state
+	// NOTE: lastProjectId must NOT be $state - updating it inside $effect would cause infinite loop
+	let lastProjectId: string | null = null;
+	$effect(() => {
+		const currentProjectId = $projectStore.currentProject?.id ?? null;
+		if (lastProjectId !== null && currentProjectId !== lastProjectId) {
+			// Project changed - reset video state
+			sceneVideos = [];
+			currentGeneratingIndex = -1;
+			isVideoGenerating = false;
+			// calculatedProgress is derived from sceneVideos, so resetting sceneVideos resets it
+			currentPlayingIndex = 0;
+			isPlaying = false;
+			if (pollInterval) {
+				clearInterval(pollInterval);
+				pollInterval = null;
+			}
+			if (retryTimeoutId) {
+				clearTimeout(retryTimeoutId);
+				retryTimeoutId = null;
+			}
+		}
+		lastProjectId = currentProjectId;
+	});
 
 	const mockScenes = [
 		{
@@ -1581,6 +1627,10 @@
 				untrack(() => {
 					const isEdit = form.action === 'editStory' || form.action === 'smartExpandStory';
 
+					// Reset auto-generate flags to ensure clean state for new story processing
+					autoGenerateWorldElementImages = false;
+					autoGenerateStoryboardImages = false;
+
 					let storyPrompt: string;
 					if (capturedPromptForNextStory) {
 						storyPrompt = capturedPromptForNextStory;
@@ -1641,8 +1691,9 @@
 						}));
 						console.log('Story generation complete. Characters:', form.story!.characters, 'Locations:', form.story!.locations);
 						const newElements = loadElementsFromStory(worldCharacters, worldLocations);
-						// Auto-generate world element images
-						if (newElements.length > 0) {
+						// Track if new world elements need images (will trigger storyboard images after completion)
+						const willGenerateWorldImages = newElements.length > 0;
+						if (willGenerateWorldImages) {
 							pendingWorldElementIds = newElements.map(el => el.id);
 							autoGenerateWorldElementImages = true;
 						}
@@ -1704,6 +1755,13 @@
 						resetStoryboardStore();
 						initializeScenesFromStory(storyboardScenes);
 						console.log('Initialized storyboard with', storyboardScenes.length, 'scenes');
+
+						// If no new world elements to generate images for, directly trigger storyboard image generation
+						// (otherwise, storyboard images will be triggered after world images complete)
+						if (!autoGenerateWorldElementImages) {
+							console.log('No new world elements - directly triggering storyboard image generation');
+							autoGenerateStoryboardImages = true;
+						}
 					}
 
 					// Auto-navigate to characters if "Generate Video Now" was clicked
@@ -1744,6 +1802,7 @@
 	// Auto-generate storyboard images effect (triggered after world element images complete)
 	$effect(() => {
 		if (autoGenerateStoryboardImages && activeScenes.length > 0) {
+			console.log('Storyboard image effect triggered. activeScenes.length:', activeScenes.length);
 			autoGenerateStoryboardImages = false;
 			// Small delay to ensure world element images are saved
 			setTimeout(() => {
@@ -1915,37 +1974,79 @@
 		}
 	});
 
-	// Video effects
+	// Video effects - sync sceneVideos with sceneThumbnails
 	$effect(() => {
-		if (sceneThumbnails.length > 0 && sceneVideos.length === 0) {
-			sceneVideos = sceneThumbnails.map((thumb, index) => ({
-				sceneIndex: index,
-				sceneId: thumb.id,
-				sceneName: thumb.name,
-				sceneImageUrl: thumb.imageUrl,
-				videoId: null,
-				videoUrl: null,
-				status: 'pending',
-				progress: 0,
-				error: null,
-				retryCount: 0
-			}));
+		// Only track sceneThumbnails, not sceneVideos (use untrack to prevent loop)
+		const currentSceneVideos = untrack(() => sceneVideos);
+
+		if (sceneThumbnails.length === 0) return;
+
+		// Check if we need to update sceneVideos
+		// Case 1: sceneVideos is empty - initialize
+		// Case 2: sceneThumbnails has different scene IDs - rebuild with preserved state
+		const thumbnailIds = new Set(sceneThumbnails.map(t => t.id));
+		const sceneVideoIds = new Set(currentSceneVideos.map(sv => sv.sceneId));
+
+		const needsUpdate =
+			currentSceneVideos.length === 0 ||
+			sceneThumbnails.length !== currentSceneVideos.length ||
+			sceneThumbnails.some(t => !sceneVideoIds.has(t.id));
+
+		if (needsUpdate) {
+			// Create a map of existing sceneVideos by sceneId to preserve video state
+			const existingBySceneId = new Map(currentSceneVideos.map(sv => [sv.sceneId, sv]));
+
+			sceneVideos = sceneThumbnails.map((thumb, index) => {
+				const existing = existingBySceneId.get(thumb.id);
+				if (existing) {
+					// Preserve existing video state, update index and thumbnail data
+					return {
+						...existing,
+						sceneIndex: index,
+						sceneName: thumb.name,
+						sceneImageUrl: thumb.imageUrl
+					};
+				}
+				// Create new entry for new scenes
+				return {
+					sceneIndex: index,
+					sceneId: thumb.id,
+					sceneName: thumb.name,
+					sceneImageUrl: thumb.imageUrl,
+					videoId: null,
+					videoUrl: null,
+					status: 'pending' as const,
+					progress: 0,
+					error: null,
+					retryCount: 0
+				};
+			});
+			console.log('sceneVideos synced with sceneThumbnails:', sceneVideos.length, 'scenes');
 		}
 	});
 
-	$effect(() => {
-		if (sceneVideos.length > 0) {
-			const totalProgress = sceneVideos.reduce((sum, sv) => sum + sv.progress, 0);
-			overallProgress = Math.round(totalProgress / sceneVideos.length);
-		}
-	});
+	// Progress is now calculated as derived state to avoid effect cascades
+	let calculatedProgress = $derived(
+		sceneVideos.length > 0
+			? Math.round(sceneVideos.reduce((sum, sv) => sum + sv.progress, 0) / sceneVideos.length)
+			: 0
+	);
 
 	$effect(() => {
+		// Read sceneVideos once with untrack to avoid creating a reactive dependency
+		// This effect writes to sceneVideos, so tracking it would cause infinite loops
+		const currentSceneVideos = untrack(() => sceneVideos);
+
 		if (form?.action === 'generateSceneVideo') {
+			// Create unique ID for this form response to prevent re-processing
+			const formId = `${form.action}-${form.sceneIndex}-${form.success}-${form.error || ''}`;
+			if (formId === lastProcessedVideoFormId) return;
+			lastProcessedVideoFormId = formId;
+
 			if (form.success && form.videoId && form.sceneIndex !== undefined) {
 				const videoId = form.videoId;
 				const sceneIdx = form.sceneIndex;
-				sceneVideos = sceneVideos.map((sv, idx) =>
+				sceneVideos = currentSceneVideos.map((sv, idx) =>
 					idx === sceneIdx
 						? { ...sv, videoId: videoId, status: 'queued' as const, progress: 0 }
 						: sv
@@ -1953,27 +2054,37 @@
 				setTimeout(() => startPolling(), 100);
 			} else if (!form.success && form.sceneIndex !== undefined) {
 				const failedIndex = form.sceneIndex;
-				const currentScene = sceneVideos[failedIndex];
+				const currentScene = currentSceneVideos[failedIndex];
 				const isRateLimited = form.error?.includes('frequency') || form.error?.includes('rate');
+
+				// Only handle rate limit if scene is not already queued for retry
+				if (currentScene?.status === 'queued') return;
 
 				if (isRateLimited && currentScene && currentScene.retryCount < MAX_RETRIES) {
 					const retryCount = currentScene.retryCount + 1;
 					const delayMs = RETRY_DELAY_MS * retryCount;
 
-					sceneVideos = sceneVideos.map((sv, idx) =>
+					// Set status to 'queued' to prevent generateNextScene from picking it up again
+					sceneVideos = currentSceneVideos.map((sv, idx) =>
 						idx === failedIndex
-							? { ...sv, retryCount, error: `Rate limited, retrying in ${delayMs/1000}s...` }
+							? { ...sv, status: 'queued' as const, retryCount, error: `Rate limited, retrying in ${delayMs/1000}s...` }
 							: sv
 					);
 
 					retryTimeoutId = setTimeout(() => {
+						// Reset to pending before retrying so the form can process it
+						sceneVideos = sceneVideos.map((sv, idx) =>
+							idx === failedIndex
+								? { ...sv, status: 'pending' as const, error: null }
+								: sv
+						);
 						const retryForm = document.getElementById(`generate-form-${failedIndex}`) as HTMLFormElement;
 						if (retryForm) {
 							retryForm.requestSubmit();
 						}
 					}, delayMs);
 				} else {
-					sceneVideos = sceneVideos.map((sv, idx) =>
+					sceneVideos = currentSceneVideos.map((sv, idx) =>
 						idx === failedIndex
 							? { ...sv, status: 'failed' as const, error: form.error || 'Failed to start' }
 							: sv
@@ -1982,13 +2093,18 @@
 				}
 			}
 		} else if (form?.action === 'checkSceneVideoStatus') {
+			// Deduplicate status check responses
+			const statusFormId = `${form.action}-${form.sceneIndex}-${form.status}-${form.progress}-${form.videoUrl || ''}`;
+			if (statusFormId === lastProcessedVideoFormId) return;
+			lastProcessedVideoFormId = statusFormId;
+
 			if (form.success && form.sceneIndex !== undefined) {
 				const sceneIndex = form.sceneIndex;
 				const newStatus = form.status === 'completed' ? 'completed' :
 					form.status === 'failed' ? 'failed' :
 					form.status === 'in_progress' ? 'generating' : 'queued';
 
-				sceneVideos = sceneVideos.map((sv, idx) =>
+				sceneVideos = currentSceneVideos.map((sv, idx) =>
 					idx === sceneIndex
 						? {
 								...sv,
@@ -3401,11 +3517,11 @@
 						<div class="w-48 h-2 bg-gray-700 rounded-full mt-2">
 							<div
 								class="h-full bg-primary rounded-full transition-all"
-								style="width: {Math.max(5, overallProgress)}%"
+								style="width: {Math.max(5, calculatedProgress)}%"
 							></div>
 						</div>
 						<p class="text-white/70 text-xs mt-1">
-							Overall: {overallProgress}%
+							Overall: {calculatedProgress}%
 						</p>
 					</div>
 				{:else}

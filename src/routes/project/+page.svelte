@@ -318,7 +318,7 @@
 			role="dialog"
 			aria-modal="true"
 		>
-			<div class="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
+			<div class="w-full max-w-md rounded-lg bg-background p-6 shadow-lg dark:border-[5px] dark:border-zinc-700">
 				<h3 class="text-lg font-semibold">Delete Project</h3>
 				<p class="mt-2 text-sm text-muted-foreground">
 					Are you sure you want to delete "{getDeletingProjectName()}"?
