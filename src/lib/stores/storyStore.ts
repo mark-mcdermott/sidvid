@@ -4,6 +4,9 @@ import type { ActionData } from '../../routes/story/$types';
 // Style presets per STATE-WORKFLOW-SPEC.md
 export type StylePreset = 'anime' | 'photorealistic' | '3d-animated' | 'watercolor' | 'comic' | 'custom';
 
+// Video provider options
+export type VideoProvider = 'mock' | 'kling';
+
 export const STYLE_OPTIONS: { value: StylePreset; label: string }[] = [
 	{ value: 'anime', label: 'Anime' },
 	{ value: 'photorealistic', label: 'Photorealistic' },
@@ -37,6 +40,10 @@ export interface StoryState {
 	tryAgainLength: { value: string; label: string };
 	/** Prototyping mode: faster generation without character consistency (uses DALL-E only) */
 	prototypingMode: boolean;
+	/** Video provider: mock for testing, kling for real video generation */
+	selectedProvider: VideoProvider;
+	/** Enable sound in video generation (Kling only) */
+	enableSound: boolean;
 }
 
 const initialState: StoryState = {
@@ -53,7 +60,9 @@ const initialState: StoryState = {
 	editPrompt: '',
 	tryAgainPrompt: '',
 	tryAgainLength: { value: '5s', label: '5s' },
-	prototypingMode: false // Default to Production mode (character consistency)
+	prototypingMode: false, // Default to Production mode (character consistency)
+	selectedProvider: 'kling', // Default to Kling AI for real video generation
+	enableSound: false // Default to audio disabled
 };
 
 export const storyStore = writable<StoryState>(initialState);

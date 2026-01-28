@@ -8,6 +8,7 @@
 		getActiveScenes,
 		getActiveSceneImageUrl
 	} from '$lib/stores/storyboardStore';
+	import { storyStore } from '$lib/stores/storyStore';
 	import {
 		videoStore,
 		loadVideoFromStorage,
@@ -22,7 +23,7 @@
 		setVideoStatus,
 		setGenerationProgress
 	} from '$lib/stores/videoStore';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, Download, Trash2 } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Check, Download, Trash2 } from '@lucide/svelte';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
@@ -50,9 +51,9 @@
 	let overallProgress = $state(0);
 	let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-	// Video provider options
-	let selectedProvider = $state<'mock' | 'kling'>('kling');
-	let enableSound = $state(true);
+	// Video provider/sound from store
+	let selectedProvider = $derived($storyStore.selectedProvider);
+	let enableSound = $derived($storyStore.enableSound);
 
 	// Video player state
 	let videoElement = $state<HTMLVideoElement | null>(null);
@@ -468,7 +469,7 @@
 		<div>
 			<h1 class="text-3xl font-bold mb-3">Video</h1>
 			<p class="text-muted-foreground">
-				Generate {sceneVideos.length} video clip{sceneVideos.length !== 1 ? 's' : ''} ({totalDuration}s total) using {selectedProvider === 'kling' ? 'Kling AI (with audio)' : 'Mock (for testing)'}
+				Generate {sceneVideos.length} video clip{sceneVideos.length !== 1 ? 's' : ''} ({totalDuration}s total)
 			</p>
 			{#if allCompleted}
 				<Button variant="outline" class="mt-4" onclick={handleRegenerate}>
@@ -480,37 +481,9 @@
 
 		<!-- Right Column: Content -->
 		<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
-			<!-- Provider Selection -->
+			<!-- Test button to load previously generated videos (testing only) -->
 			{#if !allCompleted && !isGenerating}
 				<div class="flex items-center gap-4">
-					<div class="flex items-center gap-2">
-						<span class="text-sm font-medium">Provider:</span>
-						<select
-							bind:value={selectedProvider}
-							class="rounded border px-2 py-1 text-sm"
-						>
-							<option value="mock">Mock (Testing)</option>
-							<option value="kling">Kling AI (Real Video + Audio)</option>
-						</select>
-					</div>
-
-					{#if selectedProvider === 'kling'}
-						<button
-							type="button"
-							class="flex items-center gap-1 text-sm"
-							onclick={() => enableSound = !enableSound}
-						>
-							{#if enableSound}
-								<Volume2 class="h-4 w-4" />
-								<span>Audio On</span>
-							{:else}
-								<VolumeX class="h-4 w-4" />
-								<span>Audio Off</span>
-							{/if}
-						</button>
-					{/if}
-
-					<!-- Test button to load previously generated videos -->
 					<Button variant="outline" size="sm" onclick={loadTestVideos}>
 						Load Test Videos
 					</Button>
@@ -734,14 +707,6 @@
 				</div>
 			{/if}
 
-			<!-- Kling Info -->
-			{#if selectedProvider === 'kling' && !allCompleted && !isGenerating}
-				<div class="text-xs text-muted-foreground border rounded p-2 bg-muted/50">
-					<strong>Kling AI 2.6:</strong> Generates 5-second video clips with native audio from each scene image.
-					Cost: ~$0.35-0.70 per clip ({enableSound ? 'with' : 'without'} audio).
-					<strong>Total estimate: ~${(sceneVideos.length * 0.5).toFixed(2)}</strong>
-				</div>
-			{/if}
 		</div>
 	</div>
 </section>

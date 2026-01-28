@@ -457,6 +457,7 @@
 			ondrop={handleNewSceneDrop}
 			role="button"
 			tabindex="0"
+			title="Create scene"
 			data-add-scene
 		>
 			<Plus class="h-12 w-12 text-muted-foreground" />

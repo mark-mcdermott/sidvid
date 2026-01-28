@@ -37,7 +37,7 @@
 	// === Current Project Editing ===
 
 	function startEditing() {
-		editName = currentProject?.name ?? 'My New Project';
+		editName = currentProject?.name ?? 'My Project';
 		isEditing = true;
 		setTimeout(() => nameInputElement?.focus(), 0);
 	}
@@ -183,8 +183,8 @@
 	<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
 		<!-- Left Column: Section Header -->
 		<div>
-			<h1 class="text-3xl font-bold mb-3">Project</h1>
-			<p class="text-muted-foreground">Name your project</p>
+			<h1 class="text-3xl font-bold mb-3">Projects</h1>
+			<p class="text-muted-foreground">Manage your projects</p>
 		</div>
 
 		<!-- Right Column: Content -->
@@ -202,7 +202,7 @@
 					/>
 				{:else}
 					<h2 class="text-lg font-medium">
-						{currentProject?.name ?? 'My New Project'}
+						{currentProject?.name ?? 'My Project'}
 					</h2>
 				{/if}
 

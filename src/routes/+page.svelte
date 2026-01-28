@@ -6,7 +6,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown, Info } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown, Info } from '@lucide/svelte';
 	import { ProgressBar } from '$lib/components/ui/progress-bar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { createTimingContext } from '$lib/utils/apiTiming';
@@ -105,16 +105,6 @@
 		}
 	}
 
-	function togglePrototypingMode() {
-		storyStore.update(s => {
-			const newValue = !s.prototypingMode;
-			if (browser) {
-				localStorage.setItem('sidvid-prototyping-mode', String(newValue));
-			}
-			return { ...s, prototypingMode: newValue };
-		});
-	}
-
 	// ========== AI Service Labels ==========
 	// Set to false to hide "Uses: ChatGPT", "Uses: DALL·E 3", etc. from section headers
 	const showAiServiceLabels = true;
@@ -184,35 +174,6 @@
 		$storyStore.stories.length > 0
 			? JSON.stringify($storyStore.stories[$storyStore.stories.length - 1].story)
 			: ''
-	);
-
-	const lengthOptions = [
-		{ value: '2s', label: '2s' },
-		{ value: '5s', label: '5s' },
-		{ value: '10s', label: '10s' },
-		{ value: '15s', label: '15s' },
-		{ value: '30s', label: '30s' },
-		{ value: '1m', label: '1m' },
-		{ value: '2m', label: '2m' },
-		{ value: '5m', label: '5m' },
-		{ value: '10m', label: '10m' },
-		{ value: '15m', label: '15m' },
-		{ value: '30m', label: '30m' }
-	];
-
-	const sceneLengthOptions = [
-		{ value: '5s', label: '5s' }
-	];
-
-	let selectedLengthValue = $state($storyStore.selectedLength.value);
-	let selectedSceneLengthValue = $state('5s');
-
-	// Style selector state
-	let selectedStyleValue = $state<StylePreset>($storyStore.selectedStyle);
-
-	// Get the label for current style
-	let selectedStyleLabel = $derived(
-		STYLE_OPTIONS.find(opt => opt.value === $storyStore.selectedStyle)?.label || 'Anime'
 	);
 
 	// Editable story fields for Manual Edit mode
@@ -1272,8 +1233,8 @@
 	let isVideoGenerating = $state(false);
 	let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-	let selectedProvider = $state<'mock' | 'kling'>('kling');
-	let enableSound = $state(true);
+	let selectedProvider = $derived($storyStore.selectedProvider);
+	let enableSound = $derived($storyStore.enableSound);
 
 	// Track last processed form to prevent re-processing the same error
 	// NOTE: This must NOT be $state - updating reactive state inside $effect causes infinite loops
@@ -1839,35 +1800,6 @@
 	}
 
 	// ========== Effects ==========
-
-	// Story effects
-	$effect(() => {
-		const selectedOption = lengthOptions.find(opt => opt.value === selectedLengthValue);
-		if (selectedOption && selectedOption.value !== $storyStore.selectedLength.value) {
-			storyStore.update(state => ({
-				...state,
-				selectedLength: selectedOption
-			}));
-		}
-	});
-
-	$effect(() => {
-		selectedLengthValue = $storyStore.selectedLength.value;
-	});
-
-	// Style selector sync effects
-	$effect(() => {
-		if (selectedStyleValue !== $storyStore.selectedStyle) {
-			storyStore.update(state => ({
-				...state,
-				selectedStyle: selectedStyleValue
-			}));
-		}
-	});
-
-	$effect(() => {
-		selectedStyleValue = $storyStore.selectedStyle;
-	});
 
 	// Story form effect - handles generateStory, editStory, and smartExpandStory actions
 	$effect(() => {
@@ -2742,91 +2674,11 @@
 
 				{#if $storyStore.stories.length === 0}
 					<div class="w-full xl:max-w-[32rem]">
-						<div class="mb-2 flex gap-4">
-							<div>
-								<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
-								<Select.Root type="single" bind:value={selectedLengthValue}>
-									<Select.Trigger class="w-32">
-										{$storyStore.selectedLength.label}
-									</Select.Trigger>
-									<Select.Content>
-										{#each lengthOptions as option}
-											<Select.Item value={option.value} label={option.label}>
-												{option.label}
-											</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
-							</div>
-
-							<div>
-								<label for="sceneLength" class="mb-1 flex items-center gap-1 text-sm font-medium">
-									Scenes Length
-									<Tooltip.Root>
-										<Tooltip.Trigger>
-											<Info class="h-3.5 w-3.5 text-muted-foreground" />
-										</Tooltip.Trigger>
-										<Tooltip.Content>
-											<p>Kling only offers 5 second clips</p>
-										</Tooltip.Content>
-									</Tooltip.Root>
-								</label>
-								<Select.Root type="single" bind:value={selectedSceneLengthValue}>
-									<Select.Trigger class="w-32">
-										{selectedSceneLengthValue}
-									</Select.Trigger>
-									<Select.Content>
-										{#each sceneLengthOptions as option}
-											<Select.Item value={option.value} label={option.label}>
-												{option.label}
-											</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" name="sceneLength" value={selectedSceneLengthValue} />
-							</div>
-
-							<div>
-								<label for="style" class="mb-1 block text-sm font-medium">Style</label>
-								<Select.Root type="single" bind:value={selectedStyleValue}>
-									<Select.Trigger class="w-40" aria-label="style selector">
-										{selectedStyleLabel}
-									</Select.Trigger>
-									<Select.Content>
-										{#each STYLE_OPTIONS as option}
-											<Select.Item value={option.value} label={option.label}>
-												{option.label}
-											</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								<input type="hidden" name="style" value={$storyStore.selectedStyle} />
-							</div>
-
-							<div>
-								<label class="mb-1 block text-sm font-medium">Prototype</label>
-								<button
-									type="button"
-									onclick={togglePrototypingMode}
-									class="flex cursor-pointer items-center rounded-full p-2 transition-colors {$storyStore.prototypingMode ? 'border border-orange-700 bg-orange-200 text-orange-800' : 'text-muted-foreground hover:text-foreground'}"
-									title={$storyStore.prototypingMode ? 'Prototyping mode: Fast generation with DALL-E (no character consistency)' : 'Production mode: Character consistency enabled via Flux Kontext'}
-								>
-									<Zap class="h-4 w-4" />
-								</button>
-							</div>
-						</div>
-
+						<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+						<input type="hidden" name="sceneLength" value={'5s'} />
+						<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 						{#if $storyStore.selectedStyle === 'custom'}
-							<div class="mb-2">
-								<label for="customStylePrompt" class="mb-1 block text-sm font-medium">Custom Style Prompt</label>
-								<Input
-									bind:value={$storyStore.customStylePrompt}
-									name="customStylePrompt"
-									placeholder="e.g., anime style, cel-shaded, studio ghibli inspired..."
-									class="w-full"
-								/>
-							</div>
+							<input type="hidden" name="customStylePrompt" value={$storyStore.customStylePrompt} />
 						{/if}
 
 						<Textarea
@@ -2846,7 +2698,7 @@
 								Generating...
 							{:else}
 								<Pencil class="h-4 w-4" />
-								Generate Story, World and Storyboard
+								Create Assets
 							{/if}
 						</Button>
 						<Button
@@ -2859,7 +2711,7 @@
 								Generating...
 							{:else}
 								<Video class="h-4 w-4" />
-								Generate Everything (Including Video)
+								Create Assets & Video
 							{/if}
 						</Button>
 					</div>
@@ -3201,7 +3053,8 @@
 					</div>
 				{/if}
 
-				<!-- Filter Tabs -->
+				<!-- Filter Tabs - only show when elements exist -->
+				{#if $worldStore.elements.length > 0}
 				<div class="flex flex-wrap gap-2">
 					{#each worldFilterOptions as option}
 						{@const count =
@@ -3232,6 +3085,7 @@
 						</Button>
 					{/each}
 				</div>
+				{/if}
 
 				<!-- Element Cards (show all elements) -->
 				<div class="flex flex-wrap gap-4">
@@ -3539,7 +3393,8 @@
 					</div>
 				{/each}
 
-				<!-- Add Element Button -->
+				<!-- Add Element Button - only show when elements exist or forms are open -->
+				{#if $worldStore.elements.length > 0 || addElementForms.length > 0}
 				<Button
 					variant="outline"
 					onclick={addNewElementForm}
@@ -3548,13 +3403,18 @@
 					<Plus class="mr-2 h-4 w-4" />
 					Add Element
 				</Button>
+				{/if}
 
-				<!-- Empty State -->
-				{#if $worldStore.elements.length === 0}
-					<div class="w-full xl:max-w-[32rem] rounded-md border border-dashed p-8 text-center">
-						<p class="text-muted-foreground">
-							No world elements yet. Add characters, locations, objects, or concepts to build your story world.
-						</p>
+				<!-- Empty State - dashed + box when no elements and no forms -->
+				{#if $worldStore.elements.length === 0 && addElementForms.length === 0}
+					<div
+						class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
+						onclick={addNewElementForm}
+						role="button"
+						tabindex="0"
+						title="Add element"
+					>
+						<Plus class="h-12 w-12 text-muted-foreground" />
 					</div>
 				{/if}
 			</div>
@@ -3781,6 +3641,7 @@
 						ondrop={handleNewStoryboardElementDrop}
 						role="button"
 						tabindex="0"
+						title="Create scene"
 						data-add-scene
 					>
 						<Plus class="h-12 w-12 text-muted-foreground" />
@@ -3866,37 +3727,6 @@
 						{form.error}
 					</div>
 				{/if}
-
-				{#if !allCompleted && !isVideoGenerating}
-				<div class="flex items-center gap-4">
-					<div class="flex items-center gap-2">
-						<span class="text-sm font-medium">Provider:</span>
-						<select
-							bind:value={selectedProvider}
-							class="rounded border px-2 py-1 text-sm"
-						>
-							<option value="mock">Mock (Testing)</option>
-							<option value="kling">Kling AI (Real Video + Audio)</option>
-						</select>
-					</div>
-
-					{#if selectedProvider === 'kling'}
-						<button
-							type="button"
-							class="flex items-center gap-1 text-sm"
-							onclick={() => enableSound = !enableSound}
-						>
-							{#if enableSound}
-								<Volume2 class="h-4 w-4" />
-								<span>Audio On</span>
-							{:else}
-								<VolumeX class="h-4 w-4" />
-								<span>Audio Off</span>
-							{/if}
-						</button>
-					{/if}
-				</div>
-			{/if}
 
 			<div
 				data-video-container
@@ -4019,6 +3849,7 @@
 				</div>
 			{/each}
 
+			{#if hasScenes}
 			<div class="flex items-center justify-center gap-2">
 				<Button variant="outline" onclick={() => togglePlayback()} disabled={!hasScenes}>
 					{#if $storyboardStore.isPlaying}
@@ -4063,6 +3894,7 @@
 					</Button>
 				{/if}
 			</div>
+			{/if}
 
 			{#each sceneVideos as sceneVideo, index}
 				<form
@@ -4100,13 +3932,6 @@
 				{/if}
 			{/each}
 
-			{#if selectedProvider === 'kling' && !allCompleted && !isVideoGenerating}
-				<div class="text-xs rounded p-2" style="background-color: #f5f5f5; color: #666; border: 1px solid #ddd;">
-					<strong>Kling AI 2.6:</strong> Generates 5-second video clips with native audio from each scene image.
-					Cost: ~$0.35-0.70 per clip ({enableSound ? 'with' : 'without'} audio).
-					<strong>Total estimate: ~${(sceneVideos.length * 0.5).toFixed(2)}</strong>
-				</div>
-			{/if}
 		</div>
 		{/if}
 	</div>

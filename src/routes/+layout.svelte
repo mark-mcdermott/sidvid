@@ -28,8 +28,13 @@
 		ELEMENT_TYPE_COLORS
 	} from '$lib/stores/worldStore';
 	import { apiTimingStore } from '$lib/stores/apiTimingStore';
-	import { initializeProjectStore } from '$lib/stores/projectStore';
-	import { Sun, Moon, LayoutDashboard, FolderKanban, BookOpen, Globe, LayoutGrid, Video } from '@lucide/svelte';
+	import {
+		projectStore,
+		initializeProjectStore,
+		createNewProject,
+		loadProject
+	} from '$lib/stores/projectStore';
+	import { Sun, Moon, LayoutDashboard, FolderKanban, BookOpen, Globe, LayoutGrid, Video, Plus, Layers } from '@lucide/svelte';
 
 	let { children } = $props();
 
@@ -52,7 +57,7 @@
 
 	const menuItems = [
 		{ title: 'Dashboard', href: '/', icon: LayoutDashboard },
-		{ title: 'Project', href: '/project', icon: FolderKanban },
+		{ title: 'Projects', href: '/projects', icon: FolderKanban },
 		{ title: 'Story', href: '/story', icon: BookOpen },
 		{ title: 'World', href: '/world', icon: Globe },
 		{ title: 'Storyboard', href: '/storyboard', icon: LayoutGrid },
@@ -68,6 +73,19 @@
 
 		await apiTimingStore.load();
 	});
+
+	// Derived project state
+	let currentProject = $derived($projectStore.currentProject);
+	let projects = $derived($projectStore.projects);
+	let hasMultipleProjects = $derived(projects.length > 1);
+
+	async function handleProjectSwitch(e: Event) {
+		const select = e.target as HTMLSelectElement;
+		const projectId = select.value;
+		if (projectId && projectId !== currentProject?.id) {
+			await loadProject(projectId);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -273,25 +291,57 @@
 	<SidebarInset>
 		{@const sidebar = useSidebar()}
 		<header class="relative flex h-16 items-center justify-between border-b px-4">
-			<div class="flex items-center">
+			<div class="flex items-center gap-3">
 				<SidebarTrigger />
+				<!-- Project Name -->
+				<span class="text-sm font-medium">
+					{currentProject?.name ?? 'My Project'}
+				</span>
+				{#if hasMultipleProjects}
+					<select
+						class="ml-2 h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+						onchange={handleProjectSwitch}
+						value={currentProject?.id ?? ''}
+						aria-label="select project"
+					>
+						{#each projects as project}
+							<option value={project.id}>{project.name}</option>
+						{/each}
+					</select>
+				{/if}
 			</div>
 			{#if !sidebar.open}
 				<a href="/" class="absolute left-1/2 -translate-x-1/2 hover:opacity-80 transition-opacity">
 					<h1 class="text-2xl font-bold">SidVid</h1>
 				</a>
 			{/if}
-			<button
-				onclick={toggleDarkMode}
-				class="flex cursor-pointer items-center rounded-full p-2 text-muted-foreground hover:text-foreground transition-colors"
-				title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-			>
-				{#if darkMode}
-					<Moon class="h-4 w-4" />
-				{:else}
-					<Sun class="h-4 w-4" />
-				{/if}
-			</button>
+			<div class="flex items-center gap-1">
+				<a
+					href="/projects"
+					class="flex items-center rounded-full p-2 text-muted-foreground hover:text-foreground transition-colors"
+					title="All Projects"
+				>
+					<Layers class="h-4 w-4" />
+				</a>
+				<button
+					onclick={() => createNewProject()}
+					class="flex cursor-pointer items-center rounded-full p-2 text-muted-foreground hover:text-foreground transition-colors"
+					title="New Project"
+				>
+					<Plus class="h-4 w-4" />
+				</button>
+				<button
+					onclick={toggleDarkMode}
+					class="flex cursor-pointer items-center rounded-full p-2 text-muted-foreground hover:text-foreground transition-colors"
+					title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+				>
+					{#if darkMode}
+						<Moon class="h-4 w-4" />
+					{:else}
+						<Sun class="h-4 w-4" />
+					{/if}
+				</button>
+			</div>
 		</header>
 		<main class="flex-1 p-4">
 			{@render children()}

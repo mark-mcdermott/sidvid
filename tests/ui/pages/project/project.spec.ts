@@ -29,16 +29,16 @@ test.describe('Stage 1: Project @project', () => {
 		test('displays Project header and subtitle', async ({ page }) => {
 			await navigateAndWait(page, '/');
 
-			// Check section header (use exact match to avoid matching "My New Project")
+			// Check section header (use exact match to avoid matching "My Project")
 			await expect(page.getByRole('heading', { name: 'Project', exact: true })).toBeVisible();
 			await expect(page.getByText('Name your project')).toBeVisible();
 		});
 
-		test('displays project name with default "My New Project"', async ({ page }) => {
+		test('displays project name with default "My Project"', async ({ page }) => {
 			await navigateAndWait(page, '/');
 
-			// Project name should default to "My New Project"
-			await expect(page.getByRole('heading', { name: 'My New Project', level: 2 })).toBeVisible();
+			// Project name should default to "My Project"
+			await expect(page.getByRole('heading', { name: 'My Project', level: 2 })).toBeVisible();
 		});
 
 		test('displays pencil icon next to project name', async ({ page }) => {
@@ -124,7 +124,7 @@ test.describe('Stage 1: Project @project', () => {
 			await nameInput.press('Escape');
 
 			// Should revert to original name
-			await expect(page.getByRole('heading', { name: 'My New Project', level: 2 })).toBeVisible();
+			await expect(page.getByRole('heading', { name: 'My Project', level: 2 })).toBeVisible();
 		});
 	});
 
@@ -181,7 +181,7 @@ test.describe('Stage 1: Project @project', () => {
 			await page.getByRole('button', { name: 'Delete' }).click();
 
 			// Should create new blank project
-			await expect(page.getByRole('heading', { name: 'My New Project', level: 2 })).toBeVisible();
+			await expect(page.getByRole('heading', { name: 'My Project', level: 2 })).toBeVisible();
 		});
 	});
 
@@ -239,32 +239,32 @@ test.describe('Stage 1: Project @project', () => {
 			await page.getByRole('button', { name: /\+ New Project|New Project/i }).click();
 
 			// Should create new project with default name
-			await expect(page.getByRole('heading', { name: 'My New Project', level: 2 })).toBeVisible();
+			await expect(page.getByRole('heading', { name: 'My Project', level: 2 })).toBeVisible();
 		});
 
-		test('new project gets numbered name if "My New Project" exists', async ({ page }) => {
-			// Setup existing "My New Project"
-			await setupProjectInLocalStorage(page, { id: 'proj-1', name: 'My New Project' });
+		test('new project gets numbered name if "My Project" exists', async ({ page }) => {
+			// Setup existing "My Project"
+			await setupProjectInLocalStorage(page, { id: 'proj-1', name: 'My Project' });
 			await navigateAndWait(page, '/');
 
 			await page.getByRole('button', { name: /\+ New Project/i }).click();
 
 			// Should get numbered name
-			await expect(page.getByRole('heading', { name: /My New Project \(1\)/, level: 2 })).toBeVisible();
+			await expect(page.getByRole('heading', { name: /My Project \(1\)/, level: 2 })).toBeVisible();
 		});
 
 		test('sequential new projects get incrementing numbers', async ({ page }) => {
 			// Setup existing projects
 			await setupMultipleProjects(page, [
-				{ id: 'proj-1', name: 'My New Project' },
-				{ id: 'proj-2', name: 'My New Project (1)' }
+				{ id: 'proj-1', name: 'My Project' },
+				{ id: 'proj-2', name: 'My Project (1)' }
 			]);
 			await navigateAndWait(page, '/');
 
 			await page.getByRole('button', { name: /\+ New Project/i }).click();
 
 			// Should get next number
-			await expect(page.getByRole('heading', { name: /My New Project \(2\)/, level: 2 })).toBeVisible();
+			await expect(page.getByRole('heading', { name: /My Project \(2\)/, level: 2 })).toBeVisible();
 		});
 	});
 
@@ -395,7 +395,7 @@ test.describe('Stage 1: Project @project', () => {
 			await navigateAndWait(page, '/');
 
 			// ACTIVE state: project name visible
-			await expect(page.getByRole('heading', { name: 'My New Project', level: 2 })).toBeVisible();
+			await expect(page.getByRole('heading', { name: 'My Project', level: 2 })).toBeVisible();
 
 			// Transition to RENAMING
 			await page.getByRole('button', { name: /edit|pencil/i }).click();

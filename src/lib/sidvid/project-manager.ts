@@ -31,7 +31,7 @@ export class ProjectManager {
 
 	// ===== Project Creation =====
 
-	async createProject(name: string = 'My New Project'): Promise<Project> {
+	async createProject(name: string = 'My Project'): Promise<Project> {
 		// Load existing projects to check names
 		await this.loadAllFromStorage();
 

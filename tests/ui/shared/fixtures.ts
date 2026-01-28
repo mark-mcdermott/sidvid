@@ -24,7 +24,7 @@ export function createProject(overrides: Partial<Project> = {}): Project {
 	const now = new Date();
 	return {
 		id: `proj-${Date.now()}`,
-		name: 'My New Project',
+		name: 'My Project',
 		description: undefined,
 		thumbnail: undefined,
 		createdAt: now,
@@ -184,7 +184,7 @@ export const mockApiResponses = {
 		}
 	],
 
-	createProject: (name: string = 'My New Project') => ({
+	createProject: (name: string = 'My Project') => ({
 		id: `proj-${Date.now()}`,
 		name,
 		description: undefined,

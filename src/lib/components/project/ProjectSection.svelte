@@ -1,114 +1,137 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { Pencil, Trash2, Plus, Bomb, FolderKanban, ChevronDown } from '@lucide/svelte';
+	import * as Select from '$lib/components/ui/select';
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Switch } from '$lib/components/ui/switch';
+	import { Bomb, Settings, ChevronDown, Info } from '@lucide/svelte';
+	import { storyStore, STYLE_OPTIONS, type StylePreset, type VideoProvider } from '$lib/stores/storyStore';
 	import {
 		projectStore,
 		createNewProject,
-		loadProject,
 		deleteProject,
-		renameProject,
 		initializeProjectStore
 	} from '$lib/stores/projectStore';
-	import type { ProjectSummary } from '$lib/sidvid';
 
 	// Props
 	let { testingMode = false }: { testingMode?: boolean } = $props();
 
 	// State
-	let isEditing = $state(false);
-	let editName = $state('');
-	let showDeleteModal = $state(false);
 	let showNukeModal = $state(false);
-	let nameInputElement: HTMLInputElement | null = $state(null);
 	let sectionOpen = $state(true);
 
+	// Video/Scene Length Options
+	const lengthOptions = [
+		{ value: '2s', label: '2s' },
+		{ value: '5s', label: '5s' },
+		{ value: '10s', label: '10s' },
+		{ value: '15s', label: '15s' },
+		{ value: '30s', label: '30s' },
+		{ value: '1m', label: '1m' },
+		{ value: '2m', label: '2m' },
+		{ value: '5m', label: '5m' },
+		{ value: '10m', label: '10m' },
+		{ value: '15m', label: '15m' },
+		{ value: '30m', label: '30m' }
+	];
+
+	const sceneLengthOptions = [
+		{ value: '5s', label: '5s' }
+	];
+
+	const providerOptions = [
+		{ value: 'mock', label: 'Mock' },
+		{ value: 'kling', label: 'Kling AI' }
+	];
+
+	let selectedLengthValue = $state($storyStore.selectedLength.value);
+	let selectedSceneLengthValue = $state('5s');
+	let selectedStyleValue = $state<StylePreset>($storyStore.selectedStyle);
+	let selectedProviderValue = $state<VideoProvider>($storyStore.selectedProvider);
+	let prototypingModeValue = $state($storyStore.prototypingMode);
+	let enableSoundValue = $state($storyStore.enableSound);
+
 	// Derived state
-	let currentProject = $derived($projectStore.currentProject);
 	let projects = $derived($projectStore.projects);
-	let hasMultipleProjects = $derived(projects.length > 1);
+	let selectedStyleLabel = $derived(
+		STYLE_OPTIONS.find(opt => opt.value === $storyStore.selectedStyle)?.label || 'Anime'
+	);
+	let selectedProviderLabel = $derived(
+		providerOptions.find(opt => opt.value === $storyStore.selectedProvider)?.label || 'Kling'
+	);
 
 	// Initialize on mount
 	onMount(async () => {
 		await initializeProjectStore();
 	});
 
-	function startEditing() {
-		editName = currentProject?.name ?? 'My New Project';
-		isEditing = true;
-		// Focus input after render
-		setTimeout(() => nameInputElement?.focus(), 0);
-	}
-
-	async function saveEdit() {
-		if (!currentProject || !editName.trim()) {
-			cancelEdit();
-			return;
+	// Effects to sync select values with store
+	$effect(() => {
+		const selectedOption = lengthOptions.find(opt => opt.value === selectedLengthValue);
+		if (selectedOption && selectedOption.value !== $storyStore.selectedLength.value) {
+			storyStore.update(state => ({
+				...state,
+				selectedLength: selectedOption
+			}));
 		}
+	});
 
-		try {
-			await renameProject(currentProject.id, editName.trim());
-		} catch (e) {
-			// Revert on error
+	$effect(() => {
+		selectedLengthValue = $storyStore.selectedLength.value;
+	});
+
+	$effect(() => {
+		if (selectedStyleValue !== $storyStore.selectedStyle) {
+			storyStore.update(state => ({
+				...state,
+				selectedStyle: selectedStyleValue
+			}));
 		}
-		isEditing = false;
-	}
+	});
 
-	function cancelEdit() {
-		isEditing = false;
-		editName = '';
-	}
+	$effect(() => {
+		selectedStyleValue = $storyStore.selectedStyle;
+	});
 
-	function handleEditKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			saveEdit();
-		} else if (e.key === 'Escape') {
-			e.preventDefault();
-			cancelEdit();
+	$effect(() => {
+		if (selectedProviderValue !== $storyStore.selectedProvider) {
+			storyStore.update(state => ({
+				...state,
+				selectedProvider: selectedProviderValue
+			}));
 		}
-	}
+	});
 
-	function handleEditBlur() {
-		saveEdit();
-	}
+	$effect(() => {
+		selectedProviderValue = $storyStore.selectedProvider;
+	});
 
-	function openDeleteModal() {
-		showDeleteModal = true;
-	}
-
-	function closeDeleteModal() {
-		showDeleteModal = false;
-	}
-
-	async function confirmDelete() {
-		if (!currentProject) return;
-
-		await deleteProject(currentProject.id);
-
-		// If no projects left, create a new one
-		if ($projectStore.projects.length === 0) {
-			await createNewProject();
-		} else {
-			// Switch to first available project
-			await loadProject($projectStore.projects[0].id);
+	// Effect to sync prototyping mode switch with store
+	$effect(() => {
+		if (prototypingModeValue !== $storyStore.prototypingMode) {
+			if (browser) {
+				localStorage.setItem('sidvid-prototyping-mode', String(prototypingModeValue));
+			}
+			storyStore.update(s => ({ ...s, prototypingMode: prototypingModeValue }));
 		}
+	});
 
-		closeDeleteModal();
-	}
+	$effect(() => {
+		prototypingModeValue = $storyStore.prototypingMode;
+	});
 
-	async function handleNewProject() {
-		await createNewProject();
-	}
-
-	async function handleProjectSwitch(e: Event) {
-		const select = e.target as HTMLSelectElement;
-		const projectId = select.value;
-		if (projectId && projectId !== currentProject?.id) {
-			await loadProject(projectId);
+	// Effect to sync audio switch with store
+	$effect(() => {
+		if (enableSoundValue !== $storyStore.enableSound) {
+			storyStore.update(s => ({ ...s, enableSound: enableSoundValue }));
 		}
-	}
+	});
+
+	$effect(() => {
+		enableSoundValue = $storyStore.enableSound;
+	});
 
 	function openNukeModal() {
 		showNukeModal = true;
@@ -138,7 +161,7 @@
 		<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 			<div>
 				<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
-					<FolderKanban class="h-7 w-7" />Project
+					<Settings class="h-7 w-7" />Settings
 					<button
 						type="button"
 						onclick={() => sectionOpen = !sectionOpen}
@@ -149,106 +172,153 @@
 					</button>
 				</h1>
 				{#if sectionOpen}
-					<p class="text-muted-foreground">Name your project</p>
+					<p class="text-muted-foreground">Configure your project</p>
 				{/if}
 			</div>
 			{#if testingMode && sectionOpen}
 				<Button variant="outline" size="sm" onclick={openNukeModal} title="Delete all projects (nuke)">
-					<Bomb class="!mr-0 h-4 w-4 text-destructive" />
+					<Bomb class="!mr-0 h-4 w-4" />
 				</Button>
 			{/if}
 		</div>
 
-		<!-- Right Column: Project Name and Controls -->
+		<!-- Right Column: Video Settings -->
 		{#if sectionOpen}
 		<div class="flex flex-col gap-3">
-			<!-- Project Name Row -->
-			<div class="flex items-center">
-				{#if isEditing}
-					<input
-						bind:this={nameInputElement}
-						bind:value={editName}
-						onkeydown={handleEditKeydown}
-						onblur={handleEditBlur}
-						aria-label="project name"
-						class="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-lg font-medium outline-none focus:ring-2 focus:ring-ring"
+			<!-- Video Settings Row -->
+			<div class="flex gap-4">
+				<div>
+					<label for="length" class="mb-1 block text-sm font-medium">Video Length</label>
+					<Select.Root type="single" bind:value={selectedLengthValue}>
+						<Select.Trigger class="w-32">
+							{$storyStore.selectedLength.label}
+						</Select.Trigger>
+						<Select.Content>
+							{#each lengthOptions as option}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<div>
+					<label for="sceneLength" class="mb-1 flex items-center gap-1 text-sm font-medium">
+						Scenes Length
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Info class="h-3.5 w-3.5 text-muted-foreground" />
+							</Tooltip.Trigger>
+							<Tooltip.Content>
+								<p>Kling only offers 5 second clips</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</label>
+					<Select.Root type="single" bind:value={selectedSceneLengthValue}>
+						<Select.Trigger class="w-32">
+							{selectedSceneLengthValue}
+						</Select.Trigger>
+						<Select.Content>
+							{#each sceneLengthOptions as option}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<div>
+					<label for="style" class="mb-1 block text-sm font-medium">Style</label>
+					<Select.Root type="single" bind:value={selectedStyleValue}>
+						<Select.Trigger class="w-40" aria-label="style selector">
+							{selectedStyleLabel}
+						</Select.Trigger>
+						<Select.Content>
+							{#each STYLE_OPTIONS as option}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<div>
+					<label class="mb-1 flex items-center gap-1 text-sm font-medium">
+						Prototype
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Info class="h-3.5 w-3.5 text-muted-foreground" />
+							</Tooltip.Trigger>
+							<Tooltip.Content>
+								<p>Fast generation with DALL-E (no character consistency)</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</label>
+					<Switch bind:checked={prototypingModeValue} />
+				</div>
+			</div>
+
+			<!-- Video Provider Row -->
+			<div class="flex gap-4">
+				<div>
+					<label for="provider" class="mb-1 flex items-center gap-1 text-sm font-medium">
+						Video Provider
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Info class="h-3.5 w-3.5 text-muted-foreground" />
+							</Tooltip.Trigger>
+							<Tooltip.Content>
+								<p>Kling AI 2.6: ~$0.75/clip</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</label>
+					<Select.Root type="single" bind:value={selectedProviderValue}>
+						<Select.Trigger class="w-32">
+							{selectedProviderLabel}
+						</Select.Trigger>
+						<Select.Content>
+							{#each providerOptions as option}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<div>
+					<label class="mb-1 flex items-center gap-1 text-sm font-medium">
+						Audio
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Info class="h-3.5 w-3.5 text-muted-foreground" />
+							</Tooltip.Trigger>
+							<Tooltip.Content>
+								<p>Generate video clips with sound effects</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</label>
+					<Switch bind:checked={enableSoundValue} />
+				</div>
+			</div>
+
+			{#if $storyStore.selectedStyle === 'custom'}
+				<div class="mt-2">
+					<label for="customStylePrompt" class="mb-1 block text-sm font-medium">Custom Style Prompt</label>
+					<Input
+						bind:value={$storyStore.customStylePrompt}
+						name="customStylePrompt"
+						placeholder="e.g., anime style, cel-shaded, studio ghibli inspired..."
+						class="w-full"
 					/>
-				{:else}
-					<h2 class="text-lg font-medium mr-2">
-						{currentProject?.name ?? 'My New Project'}
-					</h2>
-				{/if}
-
-				<!-- Edit Button -->
-				<Button
-					variant="ghost"
-					size="icon"
-					class="h-8 w-8"
-					onclick={startEditing}
-					aria-label="edit project name"
-				>
-					<Pencil class="h-4 w-4" />
-				</Button>
-
-				<!-- Delete Button -->
-				<Button
-					variant="ghost"
-					size="icon"
-					class="h-8 w-8 text-destructive hover:text-destructive"
-					onclick={openDeleteModal}
-					aria-label="delete project"
-				>
-					<Trash2 class="h-4 w-4" />
-				</Button>
-
-				<!-- Project Dropdown (only shown when 2+ projects) -->
-				{#if hasMultipleProjects}
-					<select
-						class="ml-4 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-						onchange={handleProjectSwitch}
-						value={currentProject?.id ?? ''}
-						aria-label="select project"
-					>
-						{#each projects as project}
-							<option value={project.id}>{project.name}</option>
-						{/each}
-					</select>
-				{/if}
-			</div>
-
-			<!-- New Project Button -->
-			<div>
-				<Button variant="outline" size="sm" class="pr-4" onclick={handleNewProject}>
-					<Plus class="mr-1 h-4 w-4" />
-					New Project
-				</Button>
-			</div>
+				</div>
+			{/if}
 		</div>
 		{/if}
 	</div>
-
-	<!-- Delete Confirmation Modal -->
-	{#if showDeleteModal}
-		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-			role="dialog"
-			aria-modal="true"
-		>
-			<div class="w-full max-w-md rounded-lg bg-background p-6 shadow-lg dark:border-[5px] dark:border-zinc-700">
-				<h3 class="text-lg font-semibold">Delete Project</h3>
-				<p class="mt-2 text-sm text-muted-foreground">
-					Are you sure you want to delete "{currentProject?.name}"?
-				</p>
-				<p class="mt-1 text-sm text-muted-foreground">
-					This action is irreversible.
-				</p>
-				<div class="mt-4 flex justify-end gap-2">
-					<Button variant="outline" onclick={closeDeleteModal}>Cancel</Button>
-					<Button variant="destructive" onclick={confirmDelete}>Delete</Button>
-				</div>
-			</div>
-		</div>
-	{/if}
 
 	<!-- Nuke Confirmation Modal (Testing Mode) -->
 	{#if showNukeModal}

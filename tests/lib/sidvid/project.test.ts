@@ -27,10 +27,10 @@ describe('Stage 1: Project - Unit Tests', () => {
 	// ===========================================================================
 
 	describe('createProject', () => {
-		it('creates a project with default name "My New Project"', async () => {
+		it('creates a project with default name "My Project"', async () => {
 			const project = await manager.createProject();
 
-			expect(project.name).toBe('My New Project');
+			expect(project.name).toBe('My Project');
 		});
 
 		it('creates a project with specified name', async () => {
@@ -50,7 +50,7 @@ describe('Stage 1: Project - Unit Tests', () => {
 			const project = await manager.createProject();
 
 			expect(project).toMatchObject({
-				name: 'My New Project',
+				name: 'My Project',
 				storyHistory: [],
 				storyHistoryIndex: -1,
 				currentStory: null,
@@ -84,36 +84,36 @@ describe('Stage 1: Project - Unit Tests', () => {
 	// ===========================================================================
 
 	describe('Default Naming', () => {
-		it('generates "My New Project (1)" if "My New Project" exists', async () => {
-			await manager.createProject('My New Project');
-			const project2 = await manager.createProject('My New Project');
+		it('generates "My Project (1)" if "My Project" exists', async () => {
+			await manager.createProject('My Project');
+			const project2 = await manager.createProject('My Project');
 
-			expect(project2.name).toBe('My New Project (1)');
+			expect(project2.name).toBe('My Project (1)');
 		});
 
-		it('generates "My New Project (2)" if (1) also exists', async () => {
-			await manager.createProject('My New Project');
-			await manager.createProject('My New Project');
-			const project3 = await manager.createProject('My New Project');
+		it('generates "My Project (2)" if (1) also exists', async () => {
+			await manager.createProject('My Project');
+			await manager.createProject('My Project');
+			const project3 = await manager.createProject('My Project');
 
-			expect(project3.name).toBe('My New Project (2)');
+			expect(project3.name).toBe('My Project (2)');
 		});
 
 		it('handles gaps in numbering correctly', async () => {
-			await manager.createProject('My New Project');
-			await manager.createProject('My New Project'); // (1)
-			await manager.createProject('My New Project'); // (2)
+			await manager.createProject('My Project');
+			await manager.createProject('My Project'); // (1)
+			await manager.createProject('My Project'); // (2)
 
 			// Delete (1)
 			const projects = await manager.listProjects();
-			const proj1 = projects.find((p) => p.name === 'My New Project (1)');
+			const proj1 = projects.find((p) => p.name === 'My Project (1)');
 			if (proj1) {
 				await manager.deleteProject(proj1.id);
 			}
 
 			// Next should be (1) again since it's free
-			const newProject = await manager.createProject('My New Project');
-			expect(newProject.name).toBe('My New Project (1)');
+			const newProject = await manager.createProject('My Project');
+			expect(newProject.name).toBe('My Project (1)');
 		});
 
 		it('applies uniqueness to custom names too', async () => {
