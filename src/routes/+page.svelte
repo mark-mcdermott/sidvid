@@ -2574,7 +2574,7 @@
 
 				{#each $storyStore.stories as entry, index}
 					<div class="my-4 rounded-md bg-muted/30 p-3 text-sm">
-						<p class="font-medium text-muted-foreground">Prompt ({entry.length}):</p>
+						<p class="font-medium text-muted-foreground">Prompt ({entry.length}, {STYLE_OPTIONS.find(opt => opt.value === entry.style)?.label || entry.style || 'Anime'}):</p>
 						<p class="mt-1">{entry.prompt}</p>
 					</div>
 

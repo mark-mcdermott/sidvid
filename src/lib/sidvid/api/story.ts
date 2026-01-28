@@ -8,6 +8,8 @@ Generate structured stories that can be turned into videos.
 Format your response as JSON with the following structure:
 {
   "title": "Story Title",
+  "length": "Video duration (e.g., 5s, 20s, 60s)",
+  "visualStyle": "Visual style for the video (e.g., Anime, Photorealistic, 3D Animated)",
   "scenes": [
     {
       "number": 1,
@@ -79,6 +81,8 @@ Return only valid JSON.`;
 
   const parsed = JSON.parse(content) as {
     title: string;
+    length?: string;
+    visualStyle?: string;
     scenes: StoryScene[];
     characters?: StoryCharacter[];
     locations?: StoryLocation[];
@@ -87,6 +91,8 @@ Return only valid JSON.`;
 
   return {
     title: parsed.title,
+    length: parsed.length || videoLength,
+    visualStyle: parsed.visualStyle || validated.style,
     scenes: parsed.scenes,
     rawContent: content,
     characters: parsed.characters,
@@ -125,6 +131,8 @@ The entire story must fit within a ${length} video.
 Return the EDITED story in this JSON format:
 {
   "title": "${currentStory.title}",
+  "length": "${length}",
+  "visualStyle": "${currentStory.visualStyle || 'Anime'}",
   "scenes": [
     {
       "number": 1,
@@ -177,6 +185,8 @@ Return only valid JSON.`;
 
   const parsed = JSON.parse(content) as {
     title: string;
+    length?: string;
+    visualStyle?: string;
     scenes: StoryScene[];
     characters?: StoryCharacter[];
     locations?: StoryLocation[];
@@ -185,6 +195,8 @@ Return only valid JSON.`;
 
   return {
     title: parsed.title,
+    length: parsed.length || length,
+    visualStyle: parsed.visualStyle || currentStory.visualStyle,
     scenes: parsed.scenes,
     rawContent: content,
     characters: parsed.characters,
@@ -221,6 +233,8 @@ The entire story must fit within a ${length} video.
 Return the EXPANDED story in this JSON format:
 {
   "title": "${currentStory.title}",
+  "length": "${length}",
+  "visualStyle": "${currentStory.visualStyle || 'Anime'}",
   "scenes": [
     {
       "number": 1,
@@ -273,6 +287,8 @@ Return only valid JSON.`;
 
   const parsed = JSON.parse(content) as {
     title: string;
+    length?: string;
+    visualStyle?: string;
     scenes: StoryScene[];
     characters?: StoryCharacter[];
     locations?: StoryLocation[];
@@ -281,6 +297,8 @@ Return only valid JSON.`;
 
   return {
     title: parsed.title,
+    length: parsed.length || length,
+    visualStyle: parsed.visualStyle || currentStory.visualStyle,
     scenes: parsed.scenes,
     rawContent: content,
     characters: parsed.characters,

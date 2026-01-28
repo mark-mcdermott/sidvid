@@ -209,6 +209,8 @@ export interface StorySceneVisual {
 
 export interface Story {
   title: string;
+  length?: string;
+  visualStyle?: string;
   scenes: StoryScene[];
   rawContent: string;
   characters?: StoryCharacter[];
