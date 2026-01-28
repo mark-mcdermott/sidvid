@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { Pencil, Trash2, Plus, Bomb } from '@lucide/svelte';
+	import { Pencil, Trash2, Plus, Bomb, FolderKanban, ChevronDown } from '@lucide/svelte';
 	import {
 		projectStore,
 		createNewProject,
@@ -22,6 +22,7 @@
 	let showDeleteModal = $state(false);
 	let showNukeModal = $state(false);
 	let nameInputElement: HTMLInputElement | null = $state(null);
+	let sectionOpen = $state(true);
 
 	// Derived state
 	let currentProject = $derived($projectStore.currentProject);
@@ -136,10 +137,22 @@
 		<!-- Left Column: Section Header -->
 		<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 			<div>
-				<h1 class="text-3xl font-bold mb-3">Project</h1>
-				<p class="text-muted-foreground">Name your project</p>
+				<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
+					<FolderKanban class="h-7 w-7" />Project
+					<button
+						type="button"
+						onclick={() => sectionOpen = !sectionOpen}
+						class="ml-2 cursor-pointer hover:text-primary transition-colors"
+						title={sectionOpen ? 'Collapse section' : 'Expand section'}
+					>
+						<ChevronDown class="h-5 w-5 transition-transform duration-200 {sectionOpen ? '' : '-rotate-90'}" />
+					</button>
+				</h1>
+				{#if sectionOpen}
+					<p class="text-muted-foreground">Name your project</p>
+				{/if}
 			</div>
-			{#if testingMode}
+			{#if testingMode && sectionOpen}
 				<Button variant="outline" size="sm" onclick={openNukeModal} title="Delete all projects (nuke)">
 					<Bomb class="!mr-0 h-4 w-4 text-destructive" />
 				</Button>
@@ -147,6 +160,7 @@
 		</div>
 
 		<!-- Right Column: Project Name and Controls -->
+		{#if sectionOpen}
 		<div class="flex flex-col gap-3">
 			<!-- Project Name Row -->
 			<div class="flex items-center">
@@ -210,6 +224,7 @@
 				</Button>
 			</div>
 		</div>
+		{/if}
 	</div>
 
 	<!-- Delete Confirmation Modal -->
