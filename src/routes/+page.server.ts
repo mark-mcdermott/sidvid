@@ -177,17 +177,35 @@ export const actions = {
 	generateImage: async ({ request }) => {
 		const data = await request.formData();
 		const description = data.get('description');
+		const styleParam = data.get('style');
 
 		if (!description || typeof description !== 'string') {
 			return { success: false, error: 'Character description is required', action: 'generateImage' };
 		}
+
+		// Map UI style presets to API style values
+		const styleMapping: Record<string, 'realistic' | 'anime' | 'cartoon' | 'cinematic'> = {
+			'anime': 'anime',
+			'photorealistic': 'realistic',
+			'3d-animated': 'cartoon',
+			'watercolor': 'realistic',
+			'comic': 'cartoon',
+			'custom': 'realistic',
+			'realistic': 'realistic',
+			'cartoon': 'cartoon',
+			'cinematic': 'cinematic'
+		};
+
+		const style = typeof styleParam === 'string' && styleMapping[styleParam]
+			? styleMapping[styleParam]
+			: 'realistic';
 
 		try {
 			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
 
 			const character = await sidvid.generateCharacter({
 				description,
-				style: 'realistic',
+				style,
 				size: '1024x1024',
 				quality: 'standard'
 			});
@@ -211,6 +229,7 @@ export const actions = {
 		const data = await request.formData();
 		const description = data.get('description');
 		const characterIndex = data.get('characterIndex');
+		const styleParam = data.get('style');
 
 		if (!description || typeof description !== 'string') {
 			return { success: false, error: 'Character description is required', action: 'generateCharacterImage' };
@@ -218,12 +237,29 @@ export const actions = {
 
 		const index = characterIndex ? parseInt(characterIndex as string, 10) : 0;
 
+		// Map UI style presets to API style values
+		const styleMapping: Record<string, 'realistic' | 'anime' | 'cartoon' | 'cinematic'> = {
+			'anime': 'anime',
+			'photorealistic': 'realistic',
+			'3d-animated': 'cartoon',
+			'watercolor': 'realistic',
+			'comic': 'cartoon',
+			'custom': 'realistic',
+			'realistic': 'realistic',
+			'cartoon': 'cartoon',
+			'cinematic': 'cinematic'
+		};
+
+		const style = typeof styleParam === 'string' && styleMapping[styleParam]
+			? styleMapping[styleParam]
+			: 'realistic';
+
 		try {
 			const sidvid = new SidVid({ openaiApiKey: OPENAI_API_KEY });
 
 			const character = await sidvid.generateCharacter({
 				description,
-				style: 'realistic',
+				style,
 				size: '1024x1024',
 				quality: 'standard'
 			});

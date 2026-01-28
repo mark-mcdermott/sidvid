@@ -314,6 +314,7 @@
 			const formData = new FormData();
 			formData.append('description', description);
 			formData.append('characterIndex', index.toString());
+			formData.append('style', $storyStore.selectedStyle);
 
 			const response = await fetch('?/generateCharacterImage', {
 				method: 'POST',
@@ -588,7 +589,12 @@
 	}
 
 	function getWorldCurrentDescription(element: typeof $worldStore.elements[0]) {
-		return element?.enhancedDescription || element?.description || '';
+		const description = element?.enhancedDescription || element?.description || '';
+		// Include element name so the AI knows what to generate (e.g., "Cybernetic Capybara: large and muscular...")
+		if (element?.name && description) {
+			return `${element.name}: ${description}`;
+		}
+		return description;
 	}
 
 	function openWorldPromptTextarea(elementId: string) {
@@ -610,8 +616,11 @@
 		const element = $worldStore.elements.find(el => el.id === elementId);
 		if (!element || element.images.length > 0) return; // Skip if no element or already has image
 
-		const description = element.enhancedDescription || element.description;
-		if (!description) return;
+		const baseDescription = element.enhancedDescription || element.description;
+		if (!baseDescription) return;
+
+		// Include element name so the AI knows what to generate (e.g., "Cybernetic Capybara: large and muscular...")
+		const description = element.name ? `${element.name}: ${baseDescription}` : baseDescription;
 
 		// Clear any existing error before starting
 		clearElementImageError(elementId);
@@ -624,6 +633,7 @@
 			const formData = new FormData();
 			formData.append('description', description);
 			formData.append('elementType', element.type);
+			formData.append('style', $storyStore.selectedStyle);
 
 			const response = await fetch('?/generateImage', {
 				method: 'POST',
@@ -764,6 +774,7 @@
 			const formData = new FormData();
 			formData.append('description', prompt);
 			formData.append('elementType', 'scene');
+			formData.append('style', $storyStore.selectedStyle);
 
 			const response = await fetch('?/generateImage', {
 				method: 'POST',
@@ -3118,6 +3129,7 @@
 									>
 										<input type="hidden" name="description" value={getWorldCurrentDescription(element)} />
 										<input type="hidden" name="elementType" value={element.type} />
+										<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 										<Button type="submit" size="sm" disabled={generatingWorldElementIds.has(element.id) || !getWorldCurrentDescription(element)}>
 											{#if generatingWorldElementIds.has(element.id)}
 												<Loader2 class="mr-1 h-3 w-3 animate-spin" />
@@ -3170,6 +3182,17 @@
 											</Button>
 										</div>
 									</div>
+								{/if}
+
+								<!-- View Prompt (show if active image has revisedPrompt) -->
+								{#if element.images.length > 0}
+									{@const activeImage = element.images.find(img => img.isActive) || element.images[element.images.length - 1]}
+									{#if activeImage?.revisedPrompt}
+										<details class="text-sm mt-2">
+											<summary class="cursor-pointer text-muted-foreground hover:text-foreground">View prompt</summary>
+											<p class="mt-2 whitespace-pre-wrap text-xs text-muted-foreground bg-muted/50 p-2 rounded">{activeImage.revisedPrompt}</p>
+										</details>
+									{/if}
 								{/if}
 							</div>
 						</div>
@@ -3595,27 +3618,14 @@
 								</div>
 							</div>
 						{:else}
-							<!-- Thumbnail view when not playing -->
-							<div class="absolute inset-0 flex items-center justify-center p-4" data-video-placeholder>
-								<div class="flex gap-3 overflow-x-auto items-center">
-									{#each sceneThumbnails as thumbnail, index}
-										<div
-											class="relative flex-shrink-0 rounded overflow-hidden border-2 border-white/50"
-											data-scene-thumbnail={index}
-										>
-											<img
-												src={thumbnail.imageUrl}
-												alt={thumbnail.name}
-												class="h-32 w-auto object-cover"
-											/>
-										</div>
-									{/each}
-								</div>
+							<!-- Empty state with video icon when not playing -->
+							<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
+								<Video class="h-12 w-12 text-white/30" />
 							</div>
 						{/if}
 					{:else}
 						<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
-							<p class="text-white/50">No scenes available. Generate scenes first.</p>
+							<Video class="h-12 w-12 text-white/30" />
 						</div>
 					{/if}
 				{/if}

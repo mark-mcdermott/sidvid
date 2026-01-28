@@ -371,6 +371,7 @@
 						}}
 					>
 						<input type="hidden" name="description" value={getCurrentDescription(index)} />
+						<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 						<Button type="submit" disabled={isGenerating || !getCurrentDescription(index)}>
 							{#if isGenerating && activeCharacterIndex === index && form?.action === 'image'}
 								<Loader2 class="mr-2 h-4 w-4 animate-spin" />

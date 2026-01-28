@@ -226,9 +226,14 @@
 		activeElementId = elementId;
 
 		try {
+			// Include element name so the AI knows what to generate
+			const baseDescription = element.enhancedDescription || element.description;
+			const description = element.name ? `${element.name}: ${baseDescription}` : baseDescription;
+
 			const formData = new FormData();
-			formData.append('description', element.enhancedDescription || element.description);
+			formData.append('description', description);
 			formData.append('elementType', element.type);
+			formData.append('style', $storyStore.selectedStyle);
 
 			const response = await fetch('?/generateImage', {
 				method: 'POST',
@@ -309,7 +314,12 @@
 	}
 
 	function getCurrentDescription(element: typeof $worldStore.elements[0]) {
-		return element?.enhancedDescription || element?.description || '';
+		const description = element?.enhancedDescription || element?.description || '';
+		// Include element name so the AI knows what to generate (e.g., "Cybernetic Capybara: large and muscular...")
+		if (element?.name && description) {
+			return `${element.name}: ${description}`;
+		}
+		return description;
 	}
 
 	function openPromptTextarea(elementId: string) {
@@ -562,6 +572,7 @@
 									>
 										<input type="hidden" name="description" value={getCurrentDescription(element)} />
 										<input type="hidden" name="elementType" value={element.type} />
+										<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 										<Button type="submit" disabled={isGenerating || !getCurrentDescription(element)}>
 											{#if isGenerating && activeElementId === element.id}
 												<Loader2 class="mr-2 h-4 w-4 animate-spin" />

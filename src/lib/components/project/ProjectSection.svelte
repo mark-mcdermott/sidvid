@@ -238,7 +238,7 @@
 	<!-- Nuke Confirmation Modal (Testing Mode) -->
 	{#if showNukeModal}
 		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/80"
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
 			role="dialog"
 			aria-modal="true"
 		>
