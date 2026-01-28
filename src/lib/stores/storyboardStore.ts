@@ -501,9 +501,12 @@ export function initializeScenesFromStory(
 		dialog?: string;
 		action?: string;
 		assignedElements?: string[];
-	}>
+	}>,
+	sceneDuration?: number
 ): void {
 	const now = new Date();
+	// Default to 5 seconds if no duration provided
+	const duration = sceneDuration ?? 5;
 
 	storyboardStore.update((state) => {
 		const newScenes: Scene[] = storyScenes.map((s, index) => ({
@@ -515,7 +518,7 @@ export function initializeScenesFromStory(
 			assignedElements: s.assignedElements || [],
 			isSmartExpanded: false,
 			images: [],
-			duration: 5,
+			duration,
 			status: 'pending' as SceneStatus,
 			isArchived: false,
 			createdAt: now,

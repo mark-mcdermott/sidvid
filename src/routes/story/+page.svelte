@@ -10,7 +10,8 @@
 	import { conversationStore, createMessage, addMessageToConversation, downloadAndReplaceImage } from '$lib/stores/conversationStore';
 	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
 	import { HistoryViewer } from '$lib/components/sessions';
-	import { Loader2 } from '@lucide/svelte';
+	import { Loader2, Info } from '@lucide/svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type { ActionData } from './$types';
 	import type { Story } from '$lib/sidvid';
 	import { loadElementsFromStory, addElementImage, type WorldElement } from '$lib/stores/worldStore';
@@ -316,6 +317,13 @@
 		{ value: '30m', label: '30m' }
 	];
 
+	const sceneLengthOptions = [
+		{ value: '5s', label: '5s' }
+	];
+
+	// Scene length state (currently only 5s available)
+	let selectedSceneLengthValue = $state('5s');
+
 	// Create reactive state variable for the Select component
 	let selectedLengthValue = $state($storyStore.selectedLength.value);
 
@@ -427,6 +435,33 @@
 									</Select.Content>
 								</Select.Root>
 								<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+							</div>
+
+							<div>
+								<label for="sceneLength" class="mb-1 flex items-center gap-1 text-sm font-medium">
+									Scenes Length
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											<Info class="h-3.5 w-3.5 text-muted-foreground" />
+										</Tooltip.Trigger>
+										<Tooltip.Content>
+											<p>Kling only offers 5 second clips</p>
+										</Tooltip.Content>
+									</Tooltip.Root>
+								</label>
+								<Select.Root type="single" bind:value={selectedSceneLengthValue}>
+									<Select.Trigger class="w-32">
+										{selectedSceneLengthValue}
+									</Select.Trigger>
+									<Select.Content>
+										{#each sceneLengthOptions as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" name="sceneLength" value={selectedSceneLengthValue} />
 							</div>
 
 							<div>

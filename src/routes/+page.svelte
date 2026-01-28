@@ -6,8 +6,9 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown, Info } from '@lucide/svelte';
 	import { ProgressBar } from '$lib/components/ui/progress-bar';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { createTimingContext } from '$lib/utils/apiTiming';
 	import type { ApiCallType } from '$lib/sidvid/types';
 
@@ -70,6 +71,7 @@
 
 	// Utils
 	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
+	import { calculateSceneDuration } from '$lib/sidvid/utils/story-helpers';
 	import type { SceneSlot, Story } from '$lib/sidvid';
 	import type { ActionData } from './$types';
 	import { browser } from '$app/environment';
@@ -198,7 +200,12 @@
 		{ value: '30m', label: '30m' }
 	];
 
+	const sceneLengthOptions = [
+		{ value: '5s', label: '5s' }
+	];
+
 	let selectedLengthValue = $state($storyStore.selectedLength.value);
+	let selectedSceneLengthValue = $state('5s');
 
 	// Style selector state
 	let selectedStyleValue = $state<StylePreset>($storyStore.selectedStyle);
@@ -1998,8 +2005,10 @@
 
 						// Reset and initialize storyboard with new scenes
 						resetStoryboardStore();
-						initializeScenesFromStory(storyboardScenes);
-						console.log('Initialized storyboard with', storyboardScenes.length, 'scenes');
+						// Calculate per-scene duration based on total video length
+						const sceneDuration = calculateSceneDuration($storyStore.selectedLength.value, storyboardScenes.length);
+						initializeScenesFromStory(storyboardScenes, sceneDuration);
+						console.log('Initialized storyboard with', storyboardScenes.length, 'scenes, each', sceneDuration, 'seconds');
 
 						// If no new world elements to generate images for, directly trigger storyboard image generation
 						// (otherwise, storyboard images will be triggered after world images complete)
@@ -2756,6 +2765,33 @@
 									</Select.Content>
 								</Select.Root>
 								<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+							</div>
+
+							<div>
+								<label for="sceneLength" class="mb-1 flex items-center gap-1 text-sm font-medium">
+									Scenes Length
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											<Info class="h-3.5 w-3.5 text-muted-foreground" />
+										</Tooltip.Trigger>
+										<Tooltip.Content>
+											<p>Kling only offers 5 second clips</p>
+										</Tooltip.Content>
+									</Tooltip.Root>
+								</label>
+								<Select.Root type="single" bind:value={selectedSceneLengthValue}>
+									<Select.Trigger class="w-32">
+										{selectedSceneLengthValue}
+									</Select.Trigger>
+									<Select.Content>
+										{#each sceneLengthOptions as option}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<input type="hidden" name="sceneLength" value={selectedSceneLengthValue} />
 							</div>
 
 							<div>
