@@ -98,6 +98,20 @@
 	type Section = 'story' | 'world' | 'storyboard' | 'video';
 	let activeSection = $state<Section>('story');
 
+	// ========== Image Lightbox State ==========
+	let lightboxOpen = $state(false);
+	let lightboxImageUrl = $state<string | null>(null);
+
+	function openLightbox(imageUrl: string) {
+		lightboxImageUrl = imageUrl;
+		lightboxOpen = true;
+	}
+
+	function closeLightbox() {
+		lightboxOpen = false;
+		lightboxImageUrl = null;
+	}
+
 	// Section refs for scrolling
 	let sectionRefs: Record<Section, HTMLElement | undefined> = {
 		story: undefined,
@@ -2930,15 +2944,13 @@
 						>
 							<div class="flex items-start justify-between gap-2">
 								<div class="flex-1 min-w-0">
-									<div class="flex items-center gap-2 flex-wrap">
-										<h2 class="text-base font-semibold truncate">{element.name}</h2>
-										<span
-											class="rounded-full px-2 py-0.5 text-xs text-black flex-shrink-0"
-											style="background-color: {ELEMENT_TYPE_COLORS[element.type]};"
-										>
-											{ELEMENT_TYPE_LABELS[element.type]}
-										</span>
-									</div>
+									<h2 class="text-base font-semibold truncate">{element.name}</h2>
+									<span
+										class="rounded-full px-2 py-0.5 text-xs text-black inline-block mt-1"
+										style="background-color: {ELEMENT_TYPE_COLORS[element.type]};"
+									>
+										{ELEMENT_TYPE_LABELS[element.type]}
+									</span>
 									<p class="text-xs text-muted-foreground mt-1 line-clamp-2">{element.description}</p>
 								</div>
 								<Button
@@ -2969,7 +2981,10 @@
 												src={img.imageUrl}
 												alt={element.name}
 												class="w-32 h-32 rounded-md object-cover cursor-pointer {img.isActive ? 'ring-2 ring-primary' : ''}"
-												onclick={() => setActiveElementImage(element.id, img.id)}
+												onclick={() => {
+													setActiveElementImage(element.id, img.id);
+													openLightbox(img.imageUrl);
+												}}
 											/>
 											{#if !img.isActive && element.images.length > 1}
 												<button
@@ -3957,3 +3972,30 @@
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Image Lightbox Modal -->
+{#if lightboxOpen && lightboxImageUrl}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+		onclick={closeLightbox}
+		onkeydown={(e) => e.key === 'Escape' && closeLightbox()}
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+	>
+		<div class="relative" onclick={(e) => e.stopPropagation()}>
+			<img
+				src={lightboxImageUrl}
+				alt="Enlarged view"
+				class="max-w-[80vw] max-h-[80vh] rounded-lg object-contain"
+			/>
+			<button
+				class="absolute -top-4 -right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors cursor-pointer"
+				onclick={closeLightbox}
+				aria-label="Close lightbox"
+			>
+				<X class="h-[60px] w-[60px]" />
+			</button>
+		</div>
+	</div>
+{/if}
