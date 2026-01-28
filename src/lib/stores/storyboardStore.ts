@@ -11,6 +11,7 @@ export interface SceneImage {
 	id: string;
 	imageUrl: string;
 	revisedPrompt?: string;
+	usedCharacterReference?: boolean;
 	isActive: boolean;
 	createdAt: Date;
 }
@@ -258,7 +259,7 @@ export function unassignElementFromScene(sceneId: string, elementId: string): vo
 }
 
 // Add image to scene
-export function addSceneImage(sceneId: string, imageUrl: string, revisedPrompt?: string): void {
+export function addSceneImage(sceneId: string, imageUrl: string, revisedPrompt?: string, usedCharacterReference?: boolean): void {
 	const imageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 	storyboardStore.update((state) => ({
@@ -273,6 +274,7 @@ export function addSceneImage(sceneId: string, imageUrl: string, revisedPrompt?:
 								id: imageId,
 								imageUrl,
 								revisedPrompt,
+								usedCharacterReference,
 								isActive: true,
 								createdAt: new Date()
 							}

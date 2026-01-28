@@ -14,6 +14,10 @@ export type { StorageAdapter } from './storage/adapter';
 export { initKlingClient } from './api/video';
 export { KlingClient } from './api/kling';
 
+// Image generation API with reference support
+export { FluxKontextClient } from './api/flux-kontext';
+export type { FluxKontextConfig, FluxKontextGenerateOptions } from './api/flux-kontext';
+
 export type {
   SidVidConfig,
   StoryOptions,
@@ -36,6 +40,12 @@ export type {
   SceneSlot,
   VideoPipeline,
   VideoSceneThumbnail,
+  // Flux Kontext types (for image generation with references)
+  FluxKontextModel,
+  FluxKontextAspectRatio,
+  FluxKontextOutputFormat,
+  FluxKontextImageOptions,
+  FluxKontextImage,
   // Project types (SCHEMAS-SPEC.md)
   StylePreset,
   Style,
@@ -65,4 +75,5 @@ export {
   characterOptionsSchema,
   sceneOptionsSchema,
   videoOptionsSchema,
+  fluxKontextImageOptionsSchema,
 } from './schemas';

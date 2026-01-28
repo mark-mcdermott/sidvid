@@ -2,11 +2,20 @@
 
 ## What is SidVid?
 
-SidVid is an open-source TypeScript library (~30% complete) for AI-powered video generation. It provides a headless, implementation-agnostic core that developers can integrate into their own projects, plus a reference UI and planned CLI for local development and testing.
+SidVid is an open-source TypeScript library (~30% complete) for AI-powered video generation, specifically designed for **character-driven content**. It provides a headless, implementation-agnostic core that developers can integrate into their own projects, plus a reference UI and planned CLI for local development and testing.
+
+## Target Use Cases
+
+SidVid is optimized for creating videos with characters:
+- **Animated shorts** with consistent characters
+- **Cartoon videos** with recurring cast
+- **Animated advertisements** featuring mascots or characters
+- **Explainer videos** with animated hosts
+- **Social media content** with character-driven narratives
 
 ## Core Value Proposition
 
-While SidVid integrates with ChatGPT, DALL-E, and Kling APIs, its real value lies in **state management and workflow orchestration** for the complete video creation process:
+While SidVid integrates with ChatGPT, DALL-E, Flux Kontext, and Kling APIs, its real value lies in **state management and workflow orchestration** for the complete video creation process:
 
 1. **Story text generation** - Generate narrative with scenes, characters, dialogue
 2. **World building** - Create and manage characters, locations, objects, and concepts
@@ -19,6 +28,13 @@ Each step can be:
 - Re-generated with new ChatGPT prompts
 - Branched from any point in history
 - Fine-tuned extensively or used with defaults
+
+### Character Consistency
+
+A key feature is **character consistency** via Flux Kontext:
+- In Production mode, scene images use character reference images
+- Maintains visual consistency of characters across all scenes
+- Toggle between Prototyping (fast, no consistency) and Production (consistent characters) modes
 
 SidVid brings all these individual steps into **one place with a smooth, intuitive workflow** that supports both quick generation and extensive iteration.
 
@@ -97,11 +113,13 @@ Command-line interface to match UI functionality:
 
 ### Current Workflow Stages
 
+The main workflow follows: **World → Storyboard → Video**
+
 **Story Stage:**
-- Generate new story from prompt
+- Generate new story from prompt with style preset (Anime, Photorealistic, etc.)
 - Edit existing story with new prompt
 - Edit story manually
-- Smart expand with AI
+- Smart expand with AI to add detail
 - Branch from any version in history
 - Auto-extracts world elements from story
 
@@ -115,26 +133,36 @@ World elements are reusable across scenes. Four types:
 Each element can:
 - Have description enhanced with ChatGPT
 - Have multiple images generated (latest is active by default)
-- Be dragged (via sidebar thumbnail) into scenes
-
-**Scene Stage:**
-- Compose scenes by assigning world elements
-- Generate poster images for each scene
-- Drag scenes to Storyboard
-- Manual generation trigger (not automatic)
+- Be assigned to scenes via the Elements sidebar
 
 **Storyboard Stage:**
-- Drag scenes from Scene section
-- Reorder scenes within storyboard
-- Reorder and preview
-- Preview storyboard
-- Send to video generation
+- Scenes auto-populated from story or created manually
+- Assign world elements to scenes
+- Generate poster images for each scene (uses Flux Kontext for character consistency in Production mode)
+- Reorder scenes with drag-and-drop
+- Preview storyboard sequence
 
 **Video Stage:**
-- Generate video from storyboard
+- Generate video from storyboard with Kling AI
 - Poll for completion status
 - Preview completed video
 - Download final output
+
+### UI Controls (Bottom Right)
+
+Three control buttons in the bottom-right corner:
+
+**Export Button** (Testing Mode only):
+- Exports current application state to clipboard/console
+- Useful for debugging and test development
+
+**Prototyping / Production Toggle**:
+- **Prototyping Mode (Orange)**: Fast generation with DALL-E only, no character consistency
+- **Production Mode (Green)**: Character consistency via Flux Kontext, uses reference images
+
+**Testing Mode Toggle** (Flask Icon):
+- Enables testing features for development
+- Shows Export button and debug info
 
 ## State Management
 
@@ -182,8 +210,9 @@ See `@.llm/context/STATE-WORKFLOW-SPEC.md` for complete state machine specificat
 
 ### API Integrations
 - **OpenAI ChatGPT** - Story generation, element enhancement, prompts
-- **OpenAI DALL-E 3** - Element and scene image generation
-- **Kling AI** - Video generation with audio
+- **OpenAI DALL-E 3** - Element and scene image generation (Prototyping mode)
+- **Flux Kontext** (via Kie.ai) - Scene image generation with character reference (Production mode)
+- **Kling AI** (via Kie.ai) - Video generation with audio
 
 ### State Management
 - Session-based workflow tracking

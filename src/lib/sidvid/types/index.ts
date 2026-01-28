@@ -1,5 +1,8 @@
 export interface SidVidConfig {
   openaiApiKey: string;
+  /** Kie.ai API key (used for Kling video and Flux Kontext image generation) */
+  kieApiKey?: string;
+  /** @deprecated Use kieApiKey instead */
   klingApiKey?: string;
   defaultModel?: string;
   defaultImageModel?: string;
@@ -291,6 +294,36 @@ export interface VideoOptions {
   /** Kling-specific: enable audio generation */
   sound?: boolean;
   model?: 'sora-2' | 'sora-2-pro' | 'kling-2.6';
+}
+
+// ===== Flux Kontext Image Generation Types =====
+
+export type FluxKontextModel = 'flux-kontext-pro' | 'flux-kontext-max';
+export type FluxKontextAspectRatio = '16:9' | '21:9' | '4:3' | '1:1' | '3:4' | '9:16' | '16:21';
+export type FluxKontextOutputFormat = 'jpeg' | 'png';
+
+export interface FluxKontextImageOptions {
+  /** Text description for generation or editing */
+  prompt: string;
+  /** Reference image URL for editing mode (maintains character consistency) */
+  referenceImageUrl?: string;
+  /** Aspect ratio */
+  aspectRatio?: FluxKontextAspectRatio;
+  /** Model: flux-kontext-pro (default) or flux-kontext-max for higher quality */
+  model?: FluxKontextModel;
+  /** Output format */
+  outputFormat?: FluxKontextOutputFormat;
+  /** Safety tolerance: 0-6 for generation, 0-2 for editing */
+  safetyTolerance?: number;
+  /** Enable prompt upsampling for better results */
+  promptUpsampling?: boolean;
+}
+
+export interface FluxKontextImage {
+  id: string;
+  status: 'generating' | 'completed' | 'failed';
+  imageUrl?: string;
+  progress: number;
 }
 
 export interface Video {

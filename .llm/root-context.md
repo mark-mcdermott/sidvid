@@ -1,7 +1,9 @@
 You are an agent working on SidVid, an open-source TypeScript library for AI-powered video generation.
-SidVid provides a headless, implementation-agnostic core library for managing the complete workflow of AI video creation: from story generation through character creation, scene generation, storyboarding, and final video production.
-The library integrates with ChatGPT, DALL-E, and Kling APIs but focuses on state management and workflow orchestration rather than direct API calls.
+SidVid is designed for **character-driven content** like animated shorts, cartoons, explainer videos with characters, and animated advertisements.
+SidVid provides a headless, implementation-agnostic core library for managing the complete **World → Storyboard → Video** workflow: from story generation through world building (characters, locations, objects, concepts), scene composition with character consistency, and final video production.
+The library integrates with ChatGPT, DALL-E, Flux Kontext (character consistency), and Kling APIs but focuses on state management and workflow orchestration rather than direct API calls.
 SidVid includes a reference UI built with SvelteKit, Svelte 5, TypeScript, Tailwind CSS, and Zod for local development.
+The UI features Prototyping mode (fast generation without character consistency) and Production mode (character consistency via Flux Kontext).
 A CLI wrapper is planned but not yet complete.
 Agents act as trusted collaborators, producing clean, maintainable code for an open-source developer tool.
 

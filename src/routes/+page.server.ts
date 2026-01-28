@@ -1,13 +1,19 @@
-import { SidVid, SessionManager, MemoryStorageAdapter, initKlingClient } from '$lib/sidvid';
+import { SidVid, SessionManager, MemoryStorageAdapter, initKlingClient, FluxKontextClient } from '$lib/sidvid';
 import { OPENAI_API_KEY } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 import type { Actions } from './$types';
 import { calculateSceneCount } from '$lib/sidvid/utils/story-helpers';
 
-// Initialize Kling client if API key is available
-const KLING_API_KEY = env.KLING_API_KEY;
-if (KLING_API_KEY) {
-	initKlingClient(KLING_API_KEY);
+// Initialize Kling client if API key is available (uses Kie.ai)
+const KIE_API_KEY = env.KLING_API_KEY || env.KIE_API_KEY;
+if (KIE_API_KEY) {
+	initKlingClient(KIE_API_KEY);
+}
+
+// Initialize Flux Kontext client for image generation with references
+let fluxKontextClient: FluxKontextClient | null = null;
+if (KIE_API_KEY) {
+	fluxKontextClient = new FluxKontextClient({ apiKey: KIE_API_KEY });
 }
 
 // Create a server-side storage adapter and session manager
@@ -495,7 +501,7 @@ export const actions = {
 			return { success: false, error: 'Kling provider requires a scene image URL', action: 'generateSceneVideo', sceneIndex };
 		}
 
-		if (provider === 'kling' && !KLING_API_KEY) {
+		if (provider === 'kling' && !KIE_API_KEY) {
 			console.log('[Video Server] Error: KLING_API_KEY not set');
 			return { success: false, error: 'KLING_API_KEY environment variable not set', action: 'generateSceneVideo', sceneIndex };
 		}
@@ -603,7 +609,7 @@ export const actions = {
 			return { success: false, error: 'Kling provider requires a scene image URL', action: 'generateVideo' };
 		}
 
-		if (provider === 'kling' && !KLING_API_KEY) {
+		if (provider === 'kling' && !KIE_API_KEY) {
 			console.log('[Video Server] Error: KLING_API_KEY not set');
 			return { success: false, error: 'KLING_API_KEY environment variable not set', action: 'generateVideo' };
 		}
@@ -674,6 +680,177 @@ export const actions = {
 				success: false,
 				error: error instanceof Error ? error.message : 'Failed to check video status',
 				action: 'checkVideoStatus'
+			};
+		}
+	},
+
+	// ========== Flux Kontext Image Generation (with reference support) ==========
+
+	/**
+	 * Generate an image using Flux Kontext.
+	 * Optionally provide a reference image URL for character consistency.
+	 */
+	generateFluxKontextImage: async ({ request }) => {
+		const data = await request.formData();
+		const prompt = data.get('prompt');
+		const referenceImageUrl = data.get('referenceImageUrl');
+		const aspectRatio = data.get('aspectRatio') || '16:9';
+		const model = data.get('model') || 'flux-kontext-pro';
+
+		console.log('[Flux Kontext Server] generateFluxKontextImage called with:', {
+			prompt: prompt?.toString().substring(0, 100),
+			referenceImageUrl: referenceImageUrl?.toString().substring(0, 50),
+			aspectRatio,
+			model
+		});
+
+		if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+			return { success: false, error: 'Prompt is required', action: 'generateFluxKontextImage' };
+		}
+
+		if (!fluxKontextClient) {
+			return {
+				success: false,
+				error: 'Flux Kontext not configured. Set KLING_API_KEY or KIE_API_KEY environment variable.',
+				action: 'generateFluxKontextImage'
+			};
+		}
+
+		try {
+			const image = await fluxKontextClient.generateImage({
+				prompt,
+				inputImage: referenceImageUrl && typeof referenceImageUrl === 'string' ? referenceImageUrl : undefined,
+				aspectRatio: aspectRatio as '16:9' | '21:9' | '4:3' | '1:1' | '3:4' | '9:16' | '16:21',
+				model: model as 'flux-kontext-pro' | 'flux-kontext-max'
+			});
+
+			console.log('[Flux Kontext Server] Image task created:', image.id);
+
+			return {
+				success: true,
+				taskId: image.id,
+				status: image.status,
+				progress: image.progress,
+				action: 'generateFluxKontextImage'
+			};
+		} catch (error) {
+			console.error('[Flux Kontext Server] Error generating image:', error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Failed to generate image',
+				action: 'generateFluxKontextImage'
+			};
+		}
+	},
+
+	/**
+	 * Generate a scene image with a character reference for consistency.
+	 * The character's appearance will be maintained in the scene.
+	 */
+	generateSceneWithCharacterReference: async ({ request }) => {
+		const data = await request.formData();
+		const scenePrompt = data.get('scenePrompt');
+		const characterImageUrl = data.get('characterImageUrl');
+		const slotId = data.get('slotId');
+		const aspectRatio = data.get('aspectRatio') || '16:9';
+
+		console.log('[Flux Kontext Server] generateSceneWithCharacterReference called with:', {
+			scenePrompt: scenePrompt?.toString().substring(0, 100),
+			characterImageUrl: characterImageUrl?.toString().substring(0, 50),
+			slotId,
+			aspectRatio
+		});
+
+		if (!scenePrompt || typeof scenePrompt !== 'string' || !scenePrompt.trim()) {
+			return { success: false, error: 'Scene prompt is required', action: 'generateSceneWithCharacterReference' };
+		}
+
+		if (!characterImageUrl || typeof characterImageUrl !== 'string') {
+			return { success: false, error: 'Character image URL is required', action: 'generateSceneWithCharacterReference' };
+		}
+
+		if (!fluxKontextClient) {
+			return {
+				success: false,
+				error: 'Flux Kontext not configured. Set KLING_API_KEY or KIE_API_KEY environment variable.',
+				action: 'generateSceneWithCharacterReference'
+			};
+		}
+
+		try {
+			const image = await fluxKontextClient.generateSceneWithReferences(
+				scenePrompt,
+				characterImageUrl,
+				{
+					aspectRatio: aspectRatio as '16:9' | '21:9' | '4:3' | '1:1' | '3:4' | '9:16' | '16:21',
+					model: 'flux-kontext-max' // Use max for better character consistency
+				}
+			);
+
+			console.log('[Flux Kontext Server] Scene with reference task created:', image.id);
+
+			return {
+				success: true,
+				taskId: image.id,
+				slotId: slotId ? String(slotId) : undefined,
+				status: image.status,
+				progress: image.progress,
+				action: 'generateSceneWithCharacterReference'
+			};
+		} catch (error) {
+			console.error('[Flux Kontext Server] Error generating scene with reference:', error);
+			return {
+				success: false,
+				slotId: slotId ? String(slotId) : undefined,
+				error: error instanceof Error ? error.message : 'Failed to generate scene with reference',
+				action: 'generateSceneWithCharacterReference'
+			};
+		}
+	},
+
+	/**
+	 * Check the status of a Flux Kontext image generation task.
+	 */
+	checkFluxKontextImageStatus: async ({ request }) => {
+		const data = await request.formData();
+		const taskId = data.get('taskId');
+		const slotId = data.get('slotId');
+
+		console.log('[Flux Kontext Server] checkFluxKontextImageStatus called with taskId:', taskId);
+
+		if (!taskId || typeof taskId !== 'string') {
+			return { success: false, error: 'Task ID is required', action: 'checkFluxKontextImageStatus' };
+		}
+
+		if (!fluxKontextClient) {
+			return {
+				success: false,
+				error: 'Flux Kontext not configured.',
+				action: 'checkFluxKontextImageStatus'
+			};
+		}
+
+		try {
+			const image = await fluxKontextClient.checkImageStatus(taskId);
+
+			console.log('[Flux Kontext Server] Image status:', image);
+
+			return {
+				success: true,
+				taskId: image.id,
+				slotId: slotId ? String(slotId) : undefined,
+				status: image.status,
+				progress: image.progress,
+				imageUrl: image.imageUrl,
+				action: 'checkFluxKontextImageStatus'
+			};
+		} catch (error) {
+			console.error('[Flux Kontext Server] Error checking image status:', error);
+			return {
+				success: false,
+				slotId: slotId ? String(slotId) : undefined,
+				error: error instanceof Error ? error.message : 'Failed to check image status',
+				action: 'checkFluxKontextImageStatus'
 			};
 		}
 	}

@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const sidVidConfigSchema = z.object({
   openaiApiKey: z.string().min(1, 'OpenAI API key is required'),
+  kieApiKey: z.string().optional(),
+  /** @deprecated Use kieApiKey instead */
   klingApiKey: z.string().optional(),
   defaultModel: z.string().optional(),
   defaultImageModel: z.string().optional(),
@@ -43,4 +45,14 @@ export const videoOptionsSchema = z.object({
   provider: z.enum(['mock', 'kling', 'sora']).optional().default('mock'),
   sound: z.boolean().optional().default(true),
   model: z.enum(['sora-2', 'sora-2-pro', 'kling-2.6']).optional().default('kling-2.6'),
+});
+
+export const fluxKontextImageOptionsSchema = z.object({
+  prompt: z.string().min(1, 'Prompt is required'),
+  referenceImageUrl: z.string().url().optional(),
+  aspectRatio: z.enum(['16:9', '21:9', '4:3', '1:1', '3:4', '9:16', '16:21']).optional().default('16:9'),
+  model: z.enum(['flux-kontext-pro', 'flux-kontext-max']).optional().default('flux-kontext-pro'),
+  outputFormat: z.enum(['jpeg', 'png']).optional().default('jpeg'),
+  safetyTolerance: z.number().int().min(0).max(6).optional().default(2),
+  promptUpsampling: z.boolean().optional().default(false),
 });

@@ -1,6 +1,27 @@
 # SidVid
 
-AI-powered video generation platform using ChatGPT, DALL-E 3 and Kling AI. Create at each stage from idea to finished product (story idea, character generation, still scene generation, storyboard drag and drop and final video) and the product from one stage is input for the next.
+AI-powered video generation platform for **character-driven content** like animated shorts, cartoons, explainer videos with characters, and animated advertisements. SidVid uses ChatGPT, DALL-E 3, Flux Kontext, and Kling AI to provide a complete workflow from story idea to finished video.
+
+## Target Use Cases
+
+- **Animated shorts** with consistent characters
+- **Cartoon videos** with recurring cast
+- **Animated advertisements** featuring mascots or characters
+- **Explainer videos** with animated hosts
+- **Social media content** with character-driven narratives
+
+## Workflow Overview
+
+SidVid provides a **World → Storyboard → Video** workflow:
+
+1. **Story**: Generate narrative with AI, including scenes, dialogue, and character metadata
+2. **World**: Create and manage world elements (characters, locations, objects, concepts) with AI-enhanced descriptions and generated images
+3. **Storyboard**: Compose scenes by assigning world elements, generate scene images, arrange in sequence
+4. **Video**: Generate final video from storyboard with Kling AI
+
+### Character Consistency
+
+SidVid supports **Flux Kontext** for character consistency across scenes. When in Production mode, scene images use character reference images to maintain visual consistency throughout the video.
 
 ## Architecture
 
@@ -377,38 +398,60 @@ The Web UI is a SvelteKit application that provides a visual interface for the l
 
 ### Using the Web UI
 
-#### Story Generation (`/story`)
-1. Select video length (2s - 30m)
-2. Enter a story prompt
-3. Click "Generate Story"
-4. View generated story with:
-   - Scene descriptions, dialogue, and action
-   - Extracted character metadata
-   - Scene visual metadata
+The Web UI follows a **World → Storyboard → Video** workflow with collapsible sections:
 
-**Story Editing:**
-- **Try Again**: Generate a new version with different length/prompt
-- **Edit Story Manually**: Edit the raw JSON directly
-- **Edit Story with Prompt**: Ask GPT-4 to modify the story
-- Click "Send to Character Generation" when done
+#### Story Section
+1. Select a visual style preset (Anime, Photorealistic, 3D Animated, etc.)
+2. Enter a story prompt describing your video concept
+3. Click "Generate Story" to create narrative with scenes and characters
+4. Edit story manually or with AI prompts
+5. Use "Smart Expand" to add detail to the narrative
 
-#### Character Generation (`/characters`)
+#### World Section
+World elements are reusable across scenes. Four types:
+- **Characters**: People, creatures, anything with agency
+- **Locations**: Places where scenes occur
+- **Objects**: Physical items, props, vehicles
+- **Concepts**: Abstract ideas key to the plot
 
-**Two workflows:**
+For each element:
+- **Enhance**: Expand description with ChatGPT
+- **Generate Image**: Create reference image with DALL-E 3
 
-1. **From Story** (recommended):
-   - Navigate from story page using "Send to Character Generation"
-   - Automatically loads all characters from story metadata
-   - Switch between characters using tabs
+#### Storyboard Section
+1. Scenes are auto-populated from story (or create manually)
+2. Assign world elements to scenes via the Elements sidebar
+3. Generate poster images for each scene
+4. Reorder scenes with drag-and-drop
 
-2. **Standalone**:
-   - Enter custom character descriptions
-   - Click "Add" to add to character list
+#### Video Section
+1. Review scene thumbnails from storyboard
+2. Click "Generate Video" to create video with Kling AI
+3. Preview and download final video
 
-**For each character:**
-- **Enhance Description**: Expand basic description using GPT-4
-- **Generate Image**: Create character image with DALL-E 3
-- View enhanced descriptions and generated images inline
+### UI Controls (Bottom Right)
+
+The Web UI includes three control buttons in the bottom-right corner:
+
+#### Export Button (Testing Mode only)
+- Exports current application state to clipboard/console
+- Useful for debugging and test development
+- Only visible when Testing Mode is enabled
+
+#### Prototyping / Production Toggle
+- **Prototyping Mode (Orange)**: Fast generation using DALL-E only
+  - Quicker scene image generation
+  - No character consistency across scenes
+  - Ideal for rapid iteration and concept exploration
+- **Production Mode (Green)**: Character consistency enabled via Flux Kontext
+  - Uses character reference images for scene generation
+  - Maintains visual consistency across all scenes
+  - Requires Kie.ai API key for Flux Kontext
+
+#### Testing Mode Toggle (Flask Icon)
+- Enables testing features for development
+- Shows Export button
+- Displays additional debug information
 
 ### Building the UI
 

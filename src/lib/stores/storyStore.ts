@@ -35,6 +35,8 @@ export interface StoryState {
 	editPrompt: string;
 	tryAgainPrompt: string;
 	tryAgainLength: { value: string; label: string };
+	/** Prototyping mode: faster generation without character consistency (uses DALL-E only) */
+	prototypingMode: boolean;
 }
 
 const initialState: StoryState = {
@@ -50,7 +52,8 @@ const initialState: StoryState = {
 	editedStoryContent: '',
 	editPrompt: '',
 	tryAgainPrompt: '',
-	tryAgainLength: { value: '5s', label: '5s' }
+	tryAgainLength: { value: '5s', label: '5s' },
+	prototypingMode: true
 };
 
 export const storyStore = writable<StoryState>(initialState);

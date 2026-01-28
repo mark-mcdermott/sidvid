@@ -6,7 +6,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap } from '@lucide/svelte';
 	import { ProgressBar } from '$lib/components/ui/progress-bar';
 	import { createTimingContext } from '$lib/utils/apiTiming';
 	import type { ApiCallType } from '$lib/sidvid/types';
@@ -93,6 +93,14 @@
 			localStorage.setItem('sidvid-testing-mode', String(testingMode));
 		}
 	}
+
+	// ========== AI Service Labels ==========
+	// Set to false to hide "Uses: ChatGPT", "Uses: DALL·E 3", etc. from section headers
+	const showAiServiceLabels = true;
+
+	// ========== Prompt Details ==========
+	// Set to false to hide "View prompt" expandable sections in World and Storyboard
+	const showPromptDetails = true;
 
 	// ========== Active Section State ==========
 	type Section = 'story' | 'world' | 'storyboard' | 'video';
@@ -730,6 +738,86 @@
 		autoGenerateStoryboardImages = true;
 	}
 
+	// Helper to get the first character image URL from assigned elements
+	function getFirstCharacterImageUrl(scene: typeof $storyboardStore.scenes[0]): string | null {
+		for (const elementId of scene.assignedElements) {
+			const element = $worldStore.elements.find(el => el.id === elementId);
+			if (element && element.type === 'character') {
+				const activeImage = element.images.find(img => img.isActive);
+				if (activeImage?.imageUrl) {
+					return activeImage.imageUrl;
+				}
+			}
+		}
+		return null;
+	}
+
+	// Poll Flux Kontext for image completion
+	async function pollFluxKontextImage(taskId: string, sceneId: string, maxAttempts = 40): Promise<string | null> {
+		for (let i = 0; i < maxAttempts; i++) {
+			const formData = new FormData();
+			formData.append('taskId', taskId);
+			formData.append('slotId', sceneId);
+
+			const response = await fetch('?/checkFluxKontextImageStatus', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+			let actionData: any = null;
+
+			// Parse SvelteKit devalue format
+			if (result.data) {
+				try {
+					const parsed = JSON.parse(result.data);
+					if (Array.isArray(parsed) && parsed.length > 0) {
+						const mainObj = parsed[0];
+						if (typeof mainObj === 'object' && mainObj !== null) {
+							const resolveValue = (val: any): any => {
+								if (typeof val === 'number' && parsed[val] !== undefined) {
+									const resolved = parsed[val];
+									if (typeof resolved === 'object' && resolved !== null) {
+										const resolvedObj: any = Array.isArray(resolved) ? [] : {};
+										for (const key in resolved) {
+											resolvedObj[key] = resolveValue(resolved[key]);
+										}
+										return resolvedObj;
+									}
+									return resolved;
+								}
+								return val;
+							};
+							actionData = {};
+							for (const key in mainObj) {
+								actionData[key] = resolveValue(mainObj[key]);
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Error parsing Flux Kontext status:', e);
+				}
+			} else if (result.success !== undefined) {
+				actionData = result;
+			}
+
+			if (actionData?.success) {
+				if (actionData.status === 'completed' && actionData.imageUrl) {
+					console.log('[Flux Kontext] Image completed:', actionData.imageUrl);
+					return actionData.imageUrl;
+				} else if (actionData.status === 'failed') {
+					console.error('[Flux Kontext] Image generation failed');
+					return null;
+				}
+			}
+
+			// Wait 3 seconds before polling again
+			await new Promise(resolve => setTimeout(resolve, 3000));
+		}
+		console.error('[Flux Kontext] Polling timed out');
+		return null;
+	}
+
 	// Generate a single storyboard scene image
 	async function generateStoryboardSceneImage(sceneId: string, isRetry = false): Promise<void> {
 		const scene = $storyboardStore.scenes.find(s => s.id === sceneId);
@@ -771,6 +859,78 @@
 
 			console.log('Generating storyboard image for scene:', scene.title, 'with prompt:', prompt.substring(0, 100) + '...');
 
+			// Check if we should use Flux Kontext with character references
+			// Use character references when NOT in prototyping mode (production mode = character consistency)
+			const characterImageUrl = !$storyStore.prototypingMode ? getFirstCharacterImageUrl(scene) : null;
+
+			if (characterImageUrl) {
+				// Use Flux Kontext with character reference for consistency
+				console.log('[Flux Kontext] Using character reference image:', characterImageUrl.substring(0, 50) + '...');
+
+				const formData = new FormData();
+				formData.append('scenePrompt', prompt);
+				formData.append('characterImageUrl', characterImageUrl);
+				formData.append('slotId', sceneId);
+				formData.append('aspectRatio', '16:9');
+
+				const response = await fetch('?/generateSceneWithCharacterReference', {
+					method: 'POST',
+					body: formData
+				});
+
+				const result = await response.json();
+				let actionData: any = null;
+
+				// Parse SvelteKit devalue format
+				if (result.data) {
+					try {
+						const parsed = JSON.parse(result.data);
+						if (Array.isArray(parsed) && parsed.length > 0) {
+							const mainObj = parsed[0];
+							if (typeof mainObj === 'object' && mainObj !== null) {
+								const resolveValue = (val: any): any => {
+									if (typeof val === 'number' && parsed[val] !== undefined) {
+										const resolved = parsed[val];
+										if (typeof resolved === 'object' && resolved !== null) {
+											const resolvedObj: any = Array.isArray(resolved) ? [] : {};
+											for (const key in resolved) {
+												resolvedObj[key] = resolveValue(resolved[key]);
+											}
+											return resolvedObj;
+										}
+										return resolved;
+									}
+									return val;
+								};
+								actionData = {};
+								for (const key in mainObj) {
+									actionData[key] = resolveValue(mainObj[key]);
+								}
+							}
+						}
+					} catch (e) {
+						console.error('Error parsing Flux Kontext result:', e);
+					}
+				} else if (result.success !== undefined) {
+					actionData = result;
+				}
+
+				if (actionData?.success && actionData?.taskId) {
+					console.log('[Flux Kontext] Task started, polling for completion...');
+					const imageUrl = await pollFluxKontextImage(actionData.taskId, sceneId);
+					if (imageUrl) {
+						addSceneImage(sceneId, imageUrl, prompt, true); // Character reference was used
+						console.log('Successfully added Flux Kontext image to scene:', scene.title);
+						return;
+					} else {
+						throw new Error('Flux Kontext image generation failed or timed out');
+					}
+				} else {
+					throw new Error(actionData?.error || 'Failed to start Flux Kontext task');
+				}
+			}
+
+			// Default: Use DALL-E via generateImage
 			const formData = new FormData();
 			formData.append('description', prompt);
 			formData.append('elementType', 'scene');
@@ -823,7 +983,7 @@
 			console.log('Parsed storyboard scene action data for', scene.title, ':', actionData);
 
 			if (actionData?.success && actionData?.character?.imageUrl) {
-				addSceneImage(sceneId, actionData.character.imageUrl, actionData.character.revisedPrompt);
+				addSceneImage(sceneId, actionData.character.imageUrl, actionData.character.revisedPrompt, false); // No character reference
 				console.log('Successfully added image to scene:', scene.title);
 			} else if (actionData?.error) {
 				if (!isRetry) {
@@ -2439,23 +2599,30 @@
 	});
 </script>
 
-<!-- Testing Mode Toggle -->
+<!-- Bottom Right Controls: Export, Prototyping, Test Mode -->
 <div class="fixed bottom-4 right-4 z-50 flex items-center gap-2">
 	{#if testingMode}
 		<button
 			onclick={exportCurrentState}
-			class="flex cursor-pointer items-center gap-2 rounded-full border border-blue-800 bg-blue-200 px-3 py-2 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-300"
+			class="flex cursor-pointer items-center rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"
 			title="Export current state to clipboard/console"
 		>
-			<Download class="!mr-0 h-4 w-4" />
+			<Download class="h-4 w-4" />
 		</button>
 	{/if}
 	<button
+		onclick={() => storyStore.update(s => ({ ...s, prototypingMode: !s.prototypingMode }))}
+		class="flex cursor-pointer items-center rounded-full p-2 transition-colors {$storyStore.prototypingMode ? 'border border-orange-700 bg-orange-200 text-orange-800' : 'text-muted-foreground hover:text-foreground'}"
+		title={$storyStore.prototypingMode ? 'Prototyping mode: Fast generation with DALL-E (no character consistency)' : 'Production mode: Character consistency enabled via Flux Kontext'}
+	>
+		<Zap class="h-4 w-4" />
+	</button>
+	<button
 		onclick={toggleTestingMode}
-		class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors {testingMode ? 'border-yellow-800 bg-yellow-200 text-yellow-800' : 'border-muted-foreground bg-muted text-muted-foreground hover:bg-muted/80'}"
+		class="flex cursor-pointer items-center rounded-full p-2 transition-colors {testingMode ? 'border border-yellow-800 bg-yellow-200 text-yellow-800' : 'text-muted-foreground hover:text-foreground'}"
 		title="Toggle testing mode"
 	>
-		<FlaskConical class="!mr-0 h-4 w-4" />
+		<FlaskConical class="h-4 w-4" />
 	</button>
 </div>
 
@@ -2494,6 +2661,9 @@
 					<div>
 						<h1 class="text-3xl font-bold mb-3">Story</h1>
 						<p class="text-muted-foreground">Create your story text</p>
+						{#if showAiServiceLabels}
+							<p class="text-muted-foreground text-sm">Uses: ChatGPT</p>
+						{/if}
 					</div>
 					{#if testingMode}
 						<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe', stories: [] }))} title="Insert test prompt and clear history">
@@ -2588,7 +2758,7 @@
 								Expanding...
 							{:else}
 								<Pencil class="h-4 w-4" />
-								Fine-tune
+								Fine-Tune First
 							{/if}
 						</Button>
 					</div>
@@ -2903,6 +3073,9 @@
 			<div>
 				<h1 class="text-3xl font-bold mb-3">World</h1>
 				<p class="text-muted-foreground">Create characters, locations, etc</p>
+				{#if showAiServiceLabels}
+					<p class="text-muted-foreground text-sm">Uses: DALL·E 3</p>
+				{/if}
 			</div>
 
 			<!-- Right Column: Content -->
@@ -3185,7 +3358,7 @@
 								{/if}
 
 								<!-- View Prompt (show if active image has revisedPrompt) -->
-								{#if element.images.length > 0}
+								{#if showPromptDetails && element.images.length > 0}
 									{@const activeImage = element.images.find(img => img.isActive) || element.images[element.images.length - 1]}
 									{#if activeImage?.revisedPrompt}
 										<details class="text-sm mt-2">
@@ -3285,6 +3458,9 @@
 				<div>
 					<h1 class="text-3xl font-bold mb-3">Storyboard</h1>
 					<p class="text-muted-foreground">Create and arrange your scenes</p>
+					{#if showAiServiceLabels}
+						<p class="text-muted-foreground text-sm">Uses: Flux Kontext</p>
+					{/if}
 				</div>
 			</div>
 
@@ -3299,12 +3475,14 @@
 				{/if}
 
 				<!-- Scene Cards Grid + New Scene Button -->
-				<div class="flex flex-wrap gap-4">
+				<div class="flex flex-wrap gap-4 items-start">
 					{#each activeScenes as scene, index (scene.id)}
 					{@const sceneImageUrl = getActiveSceneImageUrl(scene)}
 					{@const showText = sceneTextVisibility[scene.id] !== false}
+					{@const activeSceneImage = scene.images.find(img => img.isActive) || scene.images[scene.images.length - 1]}
+					<div class="w-72 flex flex-col">
 					<div
-						class="relative w-72 rounded-lg border bg-card overflow-hidden cursor-pointer transition-shadow hover:shadow-lg"
+						class="relative rounded-lg border bg-card overflow-hidden cursor-pointer transition-shadow hover:shadow-lg"
 						draggable="true"
 						ondragstart={(e) => handleStoryboardSceneDragStart(e, index)}
 						ondragover={handleStoryboardSceneDragOver}
@@ -3453,6 +3631,17 @@
 							</div>
 						{/if}
 					</div>
+					<!-- View Prompt (show if active scene image has revisedPrompt) -->
+					{#if showPromptDetails && scene.images.length > 0 && activeSceneImage?.revisedPrompt}
+						<details class="text-sm mt-2">
+							<summary class="cursor-pointer text-muted-foreground hover:text-foreground">View prompt</summary>
+							<div class="mt-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+								<p class="whitespace-pre-wrap">{activeSceneImage.revisedPrompt}</p>
+								<p class="mt-1 border-t border-muted pt-1">Character image passed as reference: {activeSceneImage.usedCharacterReference ? 'true' : 'false'}</p>
+							</div>
+						</details>
+					{/if}
+					</div>
 				{/each}
 
 					<!-- New Scene Button (at end of row) -->
@@ -3515,6 +3704,9 @@
 				<div>
 					<h1 class="text-3xl font-bold mb-3">Video</h1>
 					<p class="text-muted-foreground">Generate video clips from your scenes</p>
+					{#if showAiServiceLabels}
+						<p class="text-muted-foreground text-sm">Uses: Kling</p>
+					{/if}
 				</div>
 				{#if testingMode}
 					<Button variant="outline" size="sm" onclick={loadTestVideo} title="Load test data">
