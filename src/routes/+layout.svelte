@@ -29,7 +29,7 @@
 	} from '$lib/stores/worldStore';
 	import { apiTimingStore } from '$lib/stores/apiTimingStore';
 	import { initializeProjectStore } from '$lib/stores/projectStore';
-	import { Sun, Moon } from '@lucide/svelte';
+	import { Sun, Moon, LayoutDashboard, FolderKanban, BookOpen, Globe, LayoutGrid, Video } from '@lucide/svelte';
 
 	let { children } = $props();
 
@@ -51,12 +51,12 @@
 	let sidebarOpen = $state(!testingMode);
 
 	const menuItems = [
-		{ title: 'Dashboard', href: '/' },
-		{ title: 'Project', href: '/project' },
-		{ title: 'Story', href: '/story' },
-		{ title: 'World', href: '/world' },
-		{ title: 'Storyboard', href: '/storyboard' },
-		{ title: 'Video', href: '/video' }
+		{ title: 'Dashboard', href: '/', icon: LayoutDashboard },
+		{ title: 'Project', href: '/project', icon: FolderKanban },
+		{ title: 'Story', href: '/story', icon: BookOpen },
+		{ title: 'World', href: '/world', icon: Globe },
+		{ title: 'Storyboard', href: '/storyboard', icon: LayoutGrid },
+		{ title: 'Video', href: '/video', icon: Video }
 	];
 
 	onMount(async () => {
@@ -77,9 +77,9 @@
 <SidebarProvider bind:open={sidebarOpen}>
 	<Sidebar>
 		<SidebarHeader>
-			<div class="flex items-center gap-2 px-4 py-2">
+			<div class="flex items-center gap-2 px-4 py-6">
 				<a href="/" class="hover:opacity-80 transition-opacity">
-					<img src={darkMode ? "/logo-no-ice-white.png" : "/logo-no-ice.png"} alt="SidVid" class="h-[10.125rem]" />
+					<h1 class="text-4xl font-bold">SidVid</h1>
 				</a>
 			</div>
 		</SidebarHeader>
@@ -93,6 +93,7 @@
 									href={item.href}
 									class={$page.url.pathname === item.href ? 'font-bold' : ''}
 								>
+									<item.icon class="h-4 w-4" />
 									{item.title}
 								</SidebarMenuButton>
 							</SidebarMenuItem>
@@ -266,9 +267,6 @@
 			{/if}
 		</SidebarContent>
 		<SidebarFooter>
-			<div class="py-4 pr-4">
-				<img src="/sid.png" alt="Sid" class="w-full rounded-lg" />
-			</div>
 		</SidebarFooter>
 	</Sidebar>
 	<SidebarInset>
@@ -279,7 +277,7 @@
 			</div>
 			{#if !sidebar.open}
 				<a href="/" class="absolute left-1/2 -translate-x-1/2 hover:opacity-80 transition-opacity">
-					<img src={darkMode ? "/logo-white.png" : "/logo.png"} alt="SidVid" class="h-14" />
+					<h1 class="text-2xl font-bold">SidVid</h1>
 				</a>
 			{/if}
 			<button
