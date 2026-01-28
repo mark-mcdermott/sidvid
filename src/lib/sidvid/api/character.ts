@@ -57,10 +57,10 @@ export async function enhanceCharacterDescription(
 
 function buildCharacterPrompt(options: CharacterOptions): string {
   const styleMap = {
-    realistic: 'photorealistic, detailed, high quality photograph',
-    anime: 'anime style, vibrant colors, Japanese animation aesthetic',
-    cartoon: 'cartoon style, bold lines, colorful, animated',
-    cinematic: 'cinematic, dramatic lighting, movie quality, professional',
+    realistic: 'professional photograph shot on Canon EOS R5 with 85mm f/1.4 lens. Sharp focus, natural lighting, shallow depth of field, 8K resolution. Real photo with authentic skin textures and natural colors - not a painting or digital art',
+    anime: 'hand-drawn 2D anime illustration in the style of classic 1980s-1990s Japanese animation (Akira, Dragon Ball Z). Bold black ink outlines, cel-shaded flat colors, dramatic anime lighting, expressive face. 2D illustration only - absolutely no 3D render, no photorealism, no CGI, no realistic textures, no ray tracing',
+    cartoon: '3D animated character in the style of modern Pixar/Disney animation. Clean geometric forms, soft three-point lighting, exaggerated expressive features, vibrant saturated colors, smooth subsurface scattering on skin, award-winning animation studio quality rendering',
+    cinematic: 'cinematic film still shot on ARRIFLEX camera with anamorphic lenses. Dramatic key lighting with strong shadows, shallow depth of field, teal and orange color grading, film grain texture, movie poster quality, professional cinematography',
   };
 
   const styleDesc = styleMap[options.style || 'realistic'];
