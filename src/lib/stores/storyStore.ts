@@ -53,7 +53,7 @@ const initialState: StoryState = {
 	editPrompt: '',
 	tryAgainPrompt: '',
 	tryAgainLength: { value: '5s', label: '5s' },
-	prototypingMode: true
+	prototypingMode: false // Default to Production mode (character consistency)
 };
 
 export const storyStore = writable<StoryState>(initialState);
