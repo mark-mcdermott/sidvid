@@ -6,7 +6,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Volume2, VolumeX, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown } from '@lucide/svelte';
 	import { ProgressBar } from '$lib/components/ui/progress-bar';
 	import { createTimingContext } from '$lib/utils/apiTiming';
 	import type { ApiCallType } from '$lib/sidvid/types';
@@ -94,6 +94,25 @@
 		}
 	}
 
+	// ========== Prototyping Mode Persistence ==========
+	// Load prototyping mode preference from localStorage on init (default: false = Production mode)
+	if (browser) {
+		const savedPrototypingMode = localStorage.getItem('sidvid-prototyping-mode');
+		if (savedPrototypingMode !== null) {
+			storyStore.update(s => ({ ...s, prototypingMode: savedPrototypingMode === 'true' }));
+		}
+	}
+
+	function togglePrototypingMode() {
+		storyStore.update(s => {
+			const newValue = !s.prototypingMode;
+			if (browser) {
+				localStorage.setItem('sidvid-prototyping-mode', String(newValue));
+			}
+			return { ...s, prototypingMode: newValue };
+		});
+	}
+
 	// ========== AI Service Labels ==========
 	// Set to false to hide "Uses: ChatGPT", "Uses: DALL·E 3", etc. from section headers
 	const showAiServiceLabels = true;
@@ -105,6 +124,18 @@
 	// ========== Active Section State ==========
 	type Section = 'story' | 'world' | 'storyboard' | 'video';
 	let activeSection = $state<Section>('story');
+
+	// ========== Section Collapse State ==========
+	let sectionOpen = $state({
+		story: true,
+		world: true,
+		storyboard: true,
+		video: true
+	});
+
+	function toggleSection(section: Section) {
+		sectionOpen[section] = !sectionOpen[section];
+	}
 
 	// ========== Image Lightbox State ==========
 	let lightboxOpen = $state(false);
@@ -144,6 +175,7 @@
 	let tryAgainFormElement: HTMLFormElement | undefined = $state();
 	let smartExpandFormElement: HTMLFormElement | undefined = $state();
 	let shouldNavigateToCharactersAfterStory = $state(false);
+	let shouldGenerateVideoAfterStoryboard = $state(false);
 
 	// Derived value for the latest story object (stringified) - ensures we always get the current version for editing
 	let latestStoryForEdit = $derived(
@@ -202,6 +234,13 @@
 
 	function handleUseThisStory() {
 		shouldNavigateToCharactersAfterStory = true;
+		shouldGenerateVideoAfterStoryboard = true;
+		mainFormElement?.requestSubmit();
+	}
+
+	function handleFineTuneFirst() {
+		shouldNavigateToCharactersAfterStory = true;
+		shouldGenerateVideoAfterStoryboard = false;
 		mainFormElement?.requestSubmit();
 	}
 
@@ -499,6 +538,7 @@
 	let autoGenerateWorldElementImages = $state(false);
 	let pendingWorldElementIds = $state<string[]>([]);
 	let autoGenerateStoryboardImages = $state(false);
+	let autoGenerateVideo = $state(false);
 	let generatingStoryboardSceneIds = $state<Set<string>>(new Set());
 
 	// Track which elements have prompt textarea open
@@ -1037,6 +1077,15 @@
 		console.log('Starting parallel storyboard image generation for', scenesToGenerate.length, 'scenes:', scenesToGenerate.map(s => s.title));
 		await Promise.all(scenesToGenerate.map(scene => generateStoryboardSceneImage(scene.id)));
 		console.log('Storyboard image generation complete');
+
+		// After storyboard images are done, trigger video generation only if requested
+		if (shouldGenerateVideoAfterStoryboard) {
+			console.log('Triggering auto video generation');
+			shouldGenerateVideoAfterStoryboard = false;
+			autoGenerateVideo = true;
+		} else {
+			console.log('Skipping video generation (Fine-Tune First mode)');
+		}
 	}
 
 	// ========== Storyboard State ==========
@@ -1252,29 +1301,14 @@
 		lastProjectId = currentProjectId;
 	});
 
-	const mockScenes = [
-		{
-			id: 'mock-1',
-			imageUrl: 'https://picsum.photos/seed/capybara1/1280/720',
-			name: 'Cybernetic capybaras in neon-lit server room'
-		},
-		{
-			id: 'mock-2',
-			imageUrl: 'https://picsum.photos/seed/capybara2/1280/720',
-			name: 'Capybaras hacking mainframe terminal'
-		}
-	];
-
 	let sceneThumbnails = $derived(
-		$storyboardStore.wireframes.filter(wf => wf.scene !== null).length > 0
-			? $storyboardStore.wireframes
-					.filter(wf => wf.scene !== null)
-					.map(wf => ({
-						id: wf.id,
-						imageUrl: wf.scene!.imageUrl,
-						name: wf.scene!.name
-					}))
-			: mockScenes
+		$storyboardStore.wireframes
+			.filter(wf => wf.scene !== null)
+			.map(wf => ({
+				id: wf.id,
+				imageUrl: wf.scene!.imageUrl,
+				name: wf.scene!.name
+			}))
 	);
 
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -2022,6 +2056,18 @@
 		}
 	});
 
+	// Auto-generate video effect (triggered after storyboard images complete)
+	$effect(() => {
+		if (autoGenerateVideo && sceneThumbnails.length > 0 && !isVideoGenerating) {
+			console.log('Video generation effect triggered. sceneThumbnails.length:', sceneThumbnails.length);
+			autoGenerateVideo = false;
+			// Small delay to ensure storyboard images are saved and sceneVideos is synced
+			setTimeout(() => {
+				startGeneratingAllScenes();
+			}, 500);
+		}
+	});
+
 	// Character effects
 	$effect(() => {
 		if (form?.action === 'enhanceDescription' && form?.success && form?.enhancedText && form.enhancedText !== lastProcessedEnhancedText) {
@@ -2611,7 +2657,7 @@
 		</button>
 	{/if}
 	<button
-		onclick={() => storyStore.update(s => ({ ...s, prototypingMode: !s.prototypingMode }))}
+		onclick={togglePrototypingMode}
 		class="flex cursor-pointer items-center rounded-full p-2 transition-colors {$storyStore.prototypingMode ? 'border border-orange-700 bg-orange-200 text-orange-800' : 'text-muted-foreground hover:text-foreground'}"
 		title={$storyStore.prototypingMode ? 'Prototyping mode: Fast generation with DALL-E (no character consistency)' : 'Production mode: Character consistency enabled via Flux Kontext'}
 	>
@@ -2659,19 +2705,32 @@
 			<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
 				<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 					<div>
-						<h1 class="text-3xl font-bold mb-3">Story</h1>
-						<p class="text-muted-foreground">Create your story text</p>
-						{#if showAiServiceLabels}
-							<p class="text-muted-foreground text-sm">Uses: ChatGPT</p>
+						<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
+							<BookOpen class="h-7 w-7" />Story
+							<button
+								type="button"
+								onclick={() => toggleSection('story')}
+								class="ml-2 cursor-pointer hover:text-primary transition-colors"
+								title={sectionOpen.story ? 'Collapse section' : 'Expand section'}
+							>
+								<ChevronDown class="h-5 w-5 transition-transform duration-200 {sectionOpen.story ? '' : '-rotate-90'}" />
+							</button>
+						</h1>
+						{#if sectionOpen.story}
+							<p class="text-muted-foreground">Create your story text</p>
+							{#if showAiServiceLabels}
+								<p class="text-muted-foreground text-sm">Uses: ChatGPT</p>
+							{/if}
 						{/if}
 					</div>
-					{#if testingMode}
+					{#if testingMode && sectionOpen.story}
 						<Button variant="outline" size="sm" onclick={() => storyStore.update(s => ({ ...s, prompt: 'anime cartoon (akira drawing/animation/aesthetic style) cybernetic humanoid capybaras hacking into a dystopian government mainframe', stories: [] }))} title="Insert test prompt and clear history">
 							<FlaskConical class="!mr-0 h-4 w-4" />
 						</Button>
 					{/if}
 				</div>
 
+				{#if sectionOpen.story}
 				<div class="flex flex-col gap-4">
 				{#if form?.action === 'generateStory' && form?.error}
 					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -2752,10 +2811,10 @@
 								Generate Video
 							{/if}
 						</Button>
-						<Button type="submit" variant="outline" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
-							{#if $storyStore.isGenerating && !shouldNavigateToCharactersAfterStory}
+						<Button onclick={handleFineTuneFirst} variant="outline" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
+							{#if $storyStore.isGenerating && !shouldGenerateVideoAfterStoryboard}
 								<Loader2 class="h-4 w-4 animate-spin" />
-								Expanding...
+								Generating...
 							{:else}
 								<Pencil class="h-4 w-4" />
 								Fine-Tune First
@@ -3009,6 +3068,7 @@
 					{/if}
 				{/each}
 				</div>
+			{/if}
 			</div>
 		</form>
 
@@ -3071,14 +3131,27 @@
 		<div class="flex flex-col gap-4 sm:grid sm:grid-cols-[320px_1fr] sm:gap-8">
 			<!-- Left Column: Section Header -->
 			<div>
-				<h1 class="text-3xl font-bold mb-3">World</h1>
-				<p class="text-muted-foreground">Create characters, locations, etc</p>
-				{#if showAiServiceLabels}
-					<p class="text-muted-foreground text-sm">Uses: DALL·E 3</p>
+				<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
+					<Globe class="h-7 w-7" />World
+					<button
+						type="button"
+						onclick={() => toggleSection('world')}
+						class="ml-2 cursor-pointer hover:text-primary transition-colors"
+						title={sectionOpen.world ? 'Collapse section' : 'Expand section'}
+					>
+						<ChevronDown class="h-5 w-5 transition-transform duration-200 {sectionOpen.world ? '' : '-rotate-90'}" />
+					</button>
+				</h1>
+				{#if sectionOpen.world}
+					<p class="text-muted-foreground">Create characters, locations, etc</p>
+					{#if showAiServiceLabels}
+						<p class="text-muted-foreground text-sm">Uses: DALL·E 3</p>
+					{/if}
 				{/if}
 			</div>
 
 			<!-- Right Column: Content -->
+			{#if sectionOpen.world}
 			<div class="flex flex-col gap-4 w-full">
 				{#if form?.error && (form?.action === 'generateImage' || form?.action === 'enhanceDescription')}
 					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -3443,6 +3516,7 @@
 					</div>
 				{/if}
 			</div>
+			{/if}
 		</div>
 	</section>
 
@@ -3456,15 +3530,28 @@
 			<!-- Left Column: Section Header -->
 			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
-					<h1 class="text-3xl font-bold mb-3">Storyboard</h1>
-					<p class="text-muted-foreground">Create and arrange your scenes</p>
-					{#if showAiServiceLabels}
-						<p class="text-muted-foreground text-sm">Uses: Flux Kontext</p>
+					<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
+						<LayoutGrid class="h-7 w-7" />Storyboard
+						<button
+							type="button"
+							onclick={() => toggleSection('storyboard')}
+							class="ml-2 cursor-pointer hover:text-primary transition-colors"
+							title={sectionOpen.storyboard ? 'Collapse section' : 'Expand section'}
+						>
+							<ChevronDown class="h-5 w-5 transition-transform duration-200 {sectionOpen.storyboard ? '' : '-rotate-90'}" />
+						</button>
+					</h1>
+					{#if sectionOpen.storyboard}
+						<p class="text-muted-foreground">Create and arrange your scenes</p>
+						{#if showAiServiceLabels}
+							<p class="text-muted-foreground text-sm">Uses: Flux Kontext</p>
+						{/if}
 					{/if}
 				</div>
 			</div>
 
 			<!-- Right Column: Content -->
+			{#if sectionOpen.storyboard}
 			<div class="flex flex-col gap-4 w-full">
 				<!-- Timeline info -->
 				{#if activeScenes.length > 0}
@@ -3688,7 +3775,8 @@
 					</div>
 				{/if}
 			</div>
-		</div>
+			</div>
+			{/if}
 		</div>
 	</section>
 
@@ -3702,13 +3790,25 @@
 			<!-- Left Column: Section Header -->
 			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
-					<h1 class="text-3xl font-bold mb-3">Video</h1>
-					<p class="text-muted-foreground">Generate video clips from your scenes</p>
-					{#if showAiServiceLabels}
-						<p class="text-muted-foreground text-sm">Uses: Kling</p>
+					<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
+						<Video class="h-7 w-7" />Video
+						<button
+							type="button"
+							onclick={() => toggleSection('video')}
+							class="ml-2 cursor-pointer hover:text-primary transition-colors"
+							title={sectionOpen.video ? 'Collapse section' : 'Expand section'}
+						>
+							<ChevronDown class="h-5 w-5 transition-transform duration-200 {sectionOpen.video ? '' : '-rotate-90'}" />
+						</button>
+					</h1>
+					{#if sectionOpen.video}
+						<p class="text-muted-foreground">Generate video clips from your scenes</p>
+						{#if showAiServiceLabels}
+							<p class="text-muted-foreground text-sm">Uses: Kling</p>
+						{/if}
 					{/if}
 				</div>
-				{#if testingMode}
+				{#if testingMode && sectionOpen.video}
 					<Button variant="outline" size="sm" onclick={loadTestVideo} title="Load test data">
 						<FlaskConical class="!mr-0 h-4 w-4" />
 					</Button>
@@ -3716,6 +3816,7 @@
 			</div>
 
 			<!-- Right Column: Content -->
+			{#if sectionOpen.video}
 			<div class="flex flex-col gap-4 w-full xl:max-w-[32rem]">
 				{#if form?.error && (form?.action === 'generateSceneVideo' || form?.action === 'checkSceneVideoStatus')}
 					<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -3809,21 +3910,31 @@
 									></div>
 								</div>
 							</div>
+						{:else if sceneThumbnails[0]?.imageUrl}
+							<!-- Show first scene poster when not playing -->
+							<div class="absolute inset-0" data-video-poster>
+								<img
+									src={sceneThumbnails[0].imageUrl}
+									alt={sceneThumbnails[0].name}
+									class="w-full h-full object-contain"
+								/>
+							</div>
 						{:else}
-							<!-- Empty state with video icon when not playing -->
+							<!-- Empty state with video icon when no scenes -->
 							<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
-								<Video class="h-12 w-12 text-white/30" />
+								<Video class="h-8 w-8 text-white/50" />
 							</div>
 						{/if}
 					{:else}
 						<div class="absolute inset-0 flex items-center justify-center" data-video-placeholder>
-							<Video class="h-12 w-12 text-white/30" />
+							<Video class="h-8 w-8 text-white/50" />
 						</div>
 					{/if}
 				{/if}
 			</div>
 
-			{#if isVideoGenerating || completedVideos.length > 0}
+			<!-- Show thumbnail grid only during video generation (not after completion) -->
+			{#if isVideoGenerating}
 				<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 					{#each sceneVideos as sceneVideo, index}
 						<div
@@ -3954,6 +4065,8 @@
 				</div>
 			{/if}
 		</div>
+		{/if}
+	</div>
 	</section>
 </div>
 
