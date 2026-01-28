@@ -2666,15 +2666,8 @@
 		</button>
 	{/if}
 	<button
-		onclick={togglePrototypingMode}
-		class="flex cursor-pointer items-center rounded-full p-2 transition-colors {$storyStore.prototypingMode ? 'border border-orange-700 bg-orange-200 text-orange-800' : 'text-muted-foreground hover:text-foreground'}"
-		title={$storyStore.prototypingMode ? 'Prototyping mode: Fast generation with DALL-E (no character consistency)' : 'Production mode: Character consistency enabled via Flux Kontext'}
-	>
-		<Zap class="h-4 w-4" />
-	</button>
-	<button
 		onclick={toggleTestingMode}
-		class="flex cursor-pointer items-center rounded-full p-2 transition-colors {testingMode ? 'border border-yellow-800 bg-yellow-200 text-yellow-800' : 'text-muted-foreground hover:text-foreground'}"
+		class="flex cursor-pointer items-center rounded-full p-2 transition-colors {testingMode ? 'border border-yellow-800 bg-yellow-200 text-yellow-800' : 'text-background hover:text-foreground'}"
 		title="Toggle testing mode"
 	>
 		<FlaskConical class="h-4 w-4" />
@@ -2810,6 +2803,18 @@
 								</Select.Root>
 								<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 							</div>
+
+							<div>
+								<label class="mb-1 block text-sm font-medium">Prototype</label>
+								<button
+									type="button"
+									onclick={togglePrototypingMode}
+									class="flex cursor-pointer items-center rounded-full p-2 transition-colors {$storyStore.prototypingMode ? 'border border-orange-700 bg-orange-200 text-orange-800' : 'text-muted-foreground hover:text-foreground'}"
+									title={$storyStore.prototypingMode ? 'Prototyping mode: Fast generation with DALL-E (no character consistency)' : 'Production mode: Character consistency enabled via Flux Kontext'}
+								>
+									<Zap class="h-4 w-4" />
+								</button>
+							</div>
 						</div>
 
 						{#if $storyStore.selectedStyle === 'custom'}
@@ -2835,8 +2840,18 @@
 					</div>
 
 					<div class="flex gap-2">
+						<Button onclick={handleFineTuneFirst} disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
+							{#if $storyStore.isGenerating && !shouldGenerateVideoAfterStoryboard}
+								<Loader2 class="h-4 w-4 animate-spin" />
+								Generating...
+							{:else}
+								<Pencil class="h-4 w-4" />
+								Generate Story, World and Storyboard
+							{/if}
+						</Button>
 						<Button
 							onclick={handleUseThisStory}
+							variant="outline"
 							disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}
 						>
 							{#if $storyStore.isGenerating && shouldNavigateToCharactersAfterStory}
@@ -2844,16 +2859,7 @@
 								Generating...
 							{:else}
 								<Video class="h-4 w-4" />
-								Generate Video
-							{/if}
-						</Button>
-						<Button onclick={handleFineTuneFirst} variant="outline" disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
-							{#if $storyStore.isGenerating && !shouldGenerateVideoAfterStoryboard}
-								<Loader2 class="h-4 w-4 animate-spin" />
-								Generating...
-							{:else}
-								<Pencil class="h-4 w-4" />
-								Fine-Tune First
+								Generate Everything (Including Video)
 							{/if}
 						</Button>
 					</div>
@@ -3781,7 +3787,7 @@
 					</div>
 				</div>
 
-				<!-- Archived Scenes Section -->
+				<!-- Archived Scenes Section - commented out
 			<div class="w-full xl:max-w-[32rem] border-t pt-6 mt-6">
 				<h2 class="text-lg font-semibold mb-4">Archived Scenes</h2>
 				{#if archivedScenes.length === 0}
@@ -3811,6 +3817,7 @@
 					</div>
 				{/if}
 			</div>
+			-->
 			</div>
 			{/if}
 		</div>
@@ -4019,7 +4026,7 @@
 						Stop Preview
 					{:else}
 						<Play class="mr-2 h-4 w-4" />
-						Preview "Slideshow"
+						Slideshow Preview
 					{/if}
 				</Button>
 

@@ -463,7 +463,7 @@
 		</div>
 	</div>
 
-	<!-- Archived Scenes Section -->
+	<!-- Archived Scenes Section - commented out
 	<div class="border-t pt-6">
 		<h2 class="text-lg font-semibold mb-4">Archived Scenes</h2>
 		{#if archivedScenes.length === 0}
@@ -493,6 +493,7 @@
 			</div>
 		{/if}
 	</div>
+	-->
 </div>
 
 <!-- Scene Edit Modal -->

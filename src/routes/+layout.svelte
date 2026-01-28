@@ -102,8 +102,8 @@
 				</SidebarGroupContent>
 			</SidebarGroup>
 
+			<!-- World Elements section commented out
 			{#if $page.url.pathname === '/' || $page.url.pathname === '/storyboard'}
-				<!-- World Elements section for dashboard/storyboard pages -->
 				{@const characters = getElementsByType($worldStore.elements, 'character')}
 				{@const locations = getElementsByType($worldStore.elements, 'location')}
 				{@const objects = getElementsByType($worldStore.elements, 'object')}
@@ -254,6 +254,7 @@
 					</SidebarGroup>
 				{/if}
 			{/if}
+			-->
 
 			{#if $page.url.pathname === '/video'}
 				<SidebarGroup data-sidebar-section="video">

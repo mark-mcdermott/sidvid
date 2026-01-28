@@ -611,6 +611,7 @@
 						{/if}
 
 						{#if !$storyStore.isEditingManually && index === $storyStore.stories.length - 1}
+							<!-- Four action buttons commented out
 							<div class="flex gap-2">
 								<Button
 									type="button"
@@ -629,6 +630,7 @@
 								<Button onclick={startPromptEdit} variant="outline">Edit Story with Prompt</Button>
 								<Button href="/characters">Send to Character Generation</Button>
 							</div>
+							-->
 
 							{#if $storyStore.isEditingWithPrompt}
 								<form
