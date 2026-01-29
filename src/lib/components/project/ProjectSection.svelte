@@ -24,17 +24,10 @@
 
 	// Video/Scene Length Options
 	const lengthOptions = [
-		{ value: '2s', label: '2s' },
 		{ value: '5s', label: '5s' },
 		{ value: '10s', label: '10s' },
 		{ value: '15s', label: '15s' },
-		{ value: '30s', label: '30s' },
-		{ value: '1m', label: '1m' },
-		{ value: '2m', label: '2m' },
-		{ value: '5m', label: '5m' },
-		{ value: '10m', label: '10m' },
-		{ value: '15m', label: '15m' },
-		{ value: '30m', label: '30m' }
+		{ value: '20s', label: '20s' }
 	];
 
 	const sceneLengthOptions = [

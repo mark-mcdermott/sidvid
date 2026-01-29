@@ -76,10 +76,9 @@ core/
 │   │   └── index.ts         # Public exports
 │   │
 │   ├── routes/              # Web UI (SvelteKit)
-│   │   ├── story/           # Story generation page
-│   │   ├── characters/      # Character generation page
-│   │   ├── scenes/          # Scene pipeline page
-│   │   └── +layout.svelte   # App layout with sidebar
+│   │   ├── +page.svelte     # Single-page dashboard (Settings, Story, World, Storyboard, Video)
+│   │   ├── +layout.svelte   # App layout with mobile menu
+│   │   └── projects/        # All Projects page
 │   │
 │   └── cli/                 # CLI wrapper
 │       └── index.ts         # Command-line interface
@@ -398,14 +397,18 @@ The Web UI is a SvelteKit application that provides a visual interface for the l
 
 ### Using the Web UI
 
-The Web UI follows a **World → Storyboard → Video** workflow with collapsible sections:
+The Web UI is a **single-page dashboard** with collapsible sections for the complete workflow:
+
+#### Settings (Project Header)
+- **Project Name**: Name your video project
+- **Video Length**: Select duration (5s, 10s, 15s, or 20s)
+- **Style**: Choose visual style preset (Anime, Photorealistic, 3D Animated, etc.)
 
 #### Story Section
-1. Select a visual style preset (Anime, Photorealistic, 3D Animated, etc.)
-2. Enter a story prompt describing your video concept
-3. Click "Generate Story" to create narrative with scenes and characters
-4. Edit story manually or with AI prompts
-5. Use "Smart Expand" to add detail to the narrative
+1. Enter a story prompt describing your video concept
+2. Click "Generate Story" to create narrative with scenes and characters
+3. Edit story manually or with AI prompts
+4. Use "Smart Expand" to add detail to the narrative
 
 #### World Section
 World elements are reusable across scenes. Four types:
@@ -428,6 +431,9 @@ For each element:
 1. Review scene thumbnails from storyboard
 2. Click "Generate Video" to create video with Kling AI
 3. Preview and download final video
+
+#### Projects Page
+Access "All Projects" from the mobile menu to manage multiple projects.
 
 ### UI Controls (Bottom Right)
 

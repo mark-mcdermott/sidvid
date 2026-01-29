@@ -24,13 +24,9 @@ sidvid-core/
 │   │   └── index.ts         # Public exports
 │   │
 │   ├── routes/              # Reference UI (SvelteKit, not published)
-│   │   ├── +page.svelte     # Home/Story page
-│   │   ├── +layout.svelte   # App layout
-│   │   ├── story/           # Story generation (if separate page)
-│   │   ├── characters/      # Character generation page
-│   │   ├── scenes/          # Scene pipeline page
-│   │   ├── storyboard/      # Storyboard editor
-│   │   └── video/           # Video generation page
+│   │   ├── +page.svelte     # Single-page dashboard (Settings, Story, World, Storyboard, Video)
+│   │   ├── +layout.svelte   # App layout with mobile menu
+│   │   └── projects/        # All Projects page
 │   │
 │   ├── lib/                 # UI-specific shared code (not part of headless library)
 │   │   ├── components/      # Svelte UI components
@@ -92,10 +88,9 @@ This is the core library that gets published to npm. Framework-agnostic and usab
 
 Web interface for local development and testing. Not included in npm package.
 
-- `+page.svelte` - Page components
-- `+layout.svelte` - Layout components
-- Route structure mirrors workflow:
-  - Story → Characters → Scenes → Storyboard → Video
+- `+page.svelte` - Single-page dashboard with collapsible sections (Settings, Story, World, Storyboard, Video)
+- `+layout.svelte` - App layout with mobile menu navigation
+- `projects/` - All Projects page for managing multiple projects
 
 ### `/src/lib` - UI-Specific Code (Not Part of Headless Library)
 
