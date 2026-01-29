@@ -161,7 +161,7 @@
 		<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 			<div>
 				<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
-					<Settings class="h-7 w-7" />Settings
+					<Settings class="h-7 w-7" /><span class="ml-1">Settings</span>
 					<button
 						type="button"
 						onclick={() => sectionOpen = !sectionOpen}

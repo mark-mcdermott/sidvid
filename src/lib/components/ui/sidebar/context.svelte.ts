@@ -53,9 +53,8 @@ class SidebarState {
 	};
 
 	toggle = () => {
-		return this.#isMobile.current
-			? (this.openMobile = !this.openMobile)
-			: this.setOpen(!this.open);
+		// Always use setOpen for overlay-style sidebar behavior
+		return this.setOpen(!this.open);
 	};
 }
 

@@ -34,7 +34,7 @@
 		createNewProject,
 		loadProject
 	} from '$lib/stores/projectStore';
-	import { Sun, Moon, LayoutDashboard, FolderKanban, BookOpen, Globe, LayoutGrid, Video, Plus, Layers } from '@lucide/svelte';
+	import { Sun, Moon, LayoutDashboard, FolderKanban, BookOpen, Globe, LayoutGrid, Video, Plus, Layers, X } from '@lucide/svelte';
 
 	let { children } = $props();
 
@@ -52,11 +52,14 @@
 	// Testing mode: check localStorage to determine if sidebar should start closed
 	let testingMode = $state(browser ? localStorage.getItem('sidvid-testing-mode') === 'true' : false);
 
-	// Sidebar open state: closed by default in testing mode
-	let sidebarOpen = $state(!testingMode);
+	// Sidebar open state: always closed by default (overlay menu style)
+	let sidebarOpen = $state(false);
 
 	const menuItems = [
-		{ title: 'Dashboard', href: '/', icon: LayoutDashboard },
+		{ title: 'Dashboard', href: '/', icon: LayoutDashboard }
+	];
+
+	const bottomMenuItems = [
 		{ title: 'Projects', href: '/projects', icon: FolderKanban }
 	];
 
@@ -98,10 +101,17 @@
 <SidebarProvider bind:open={sidebarOpen}>
 	<Sidebar>
 		<SidebarHeader>
-			<div class="flex items-center gap-2 px-4 py-6">
+			<div class="flex items-center justify-between px-4 py-6">
 				<a href="/" class="hover:opacity-80 transition-opacity">
 					<h1 class="text-4xl font-bold">SidVid</h1>
 				</a>
+				<button
+					onclick={() => sidebarOpen = false}
+					class="cursor-pointer p-1 hover:opacity-70 transition-opacity"
+					title="Close menu"
+				>
+					<X class="h-6 w-6" />
+				</button>
 			</div>
 		</SidebarHeader>
 		<SidebarContent>
@@ -112,9 +122,9 @@
 							<SidebarMenuItem>
 								<SidebarMenuButton
 									href={item.href}
-									class={$page.url.pathname === item.href ? 'font-bold' : ''}
+									class="px-4 text-xl {$page.url.pathname === item.href ? 'font-bold' : ''}"
 								>
-									<item.icon class="h-4 w-4" />
+									<item.icon class="h-6 w-6" />
 									{item.title}
 								</SidebarMenuButton>
 							</SidebarMenuItem>
@@ -123,9 +133,20 @@
 							<SidebarMenuItem>
 								<SidebarMenuButton
 									href={item.href}
-									class="pl-8 text-muted-foreground hover:text-foreground"
+									class="!px-8 text-lg text-muted-foreground hover:text-foreground"
 								>
-									<item.icon class="h-4 w-4" />
+									<item.icon class="h-5 w-5" />
+									{item.title}
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+						{/each}
+						{#each bottomMenuItems as item}
+							<SidebarMenuItem>
+								<SidebarMenuButton
+									href={item.href}
+									class="px-4 text-xl {$page.url.pathname === item.href ? 'font-bold' : ''}"
+								>
+									<item.icon class="h-6 w-6" />
 									{item.title}
 								</SidebarMenuButton>
 							</SidebarMenuItem>
@@ -306,9 +327,9 @@
 		{@const sidebar = useSidebar()}
 		<header class="relative flex h-16 items-center justify-between border-b px-4">
 			<div class="flex items-center gap-3">
-				<SidebarTrigger />
+				<SidebarTrigger class="md:hidden" />
 				<!-- Project Name -->
-				<span class="text-sm font-medium">
+				<span class="text-sm font-medium ml-2">
 					{currentProject?.name ?? 'My Project'}
 				</span>
 				{#if hasMultipleProjects}

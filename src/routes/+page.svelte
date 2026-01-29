@@ -2640,7 +2640,7 @@
 				<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 					<div>
 						<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
-							<BookOpen class="h-7 w-7" />Story
+							<BookOpen class="h-7 w-7" /><span class="ml-1">Story</span>
 							<button
 								type="button"
 								onclick={() => toggleSection('story')}
@@ -2692,28 +2692,32 @@
 					</div>
 
 					<div class="flex gap-2">
-						<Button onclick={handleFineTuneFirst} disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
-							{#if $storyStore.isGenerating && !shouldGenerateVideoAfterStoryboard}
-								<Loader2 class="h-4 w-4 animate-spin" />
-								Generating...
-							{:else}
-								<Pencil class="h-4 w-4" />
-								Create Assets
-							{/if}
-						</Button>
-						<Button
-							onclick={handleUseThisStory}
-							variant="outline"
-							disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}
-						>
-							{#if $storyStore.isGenerating && shouldNavigateToCharactersAfterStory}
-								<Loader2 class="h-4 w-4 animate-spin" />
-								Generating...
-							{:else}
-								<Video class="h-4 w-4" />
-								Create Assets & Video
-							{/if}
-						</Button>
+						{#if !$storyStore.isGenerating || !shouldGenerateVideoAfterStoryboard}
+							<Button onclick={handleFineTuneFirst} disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
+								{#if $storyStore.isGenerating && !shouldGenerateVideoAfterStoryboard}
+									<Loader2 class="h-4 w-4 animate-spin" />
+									Generating...
+								{:else}
+									<Pencil class="h-4 w-4" />
+									Create Assets
+								{/if}
+							</Button>
+						{/if}
+						{#if !$storyStore.isGenerating || shouldGenerateVideoAfterStoryboard}
+							<Button
+								onclick={handleUseThisStory}
+								variant="outline"
+								disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}
+							>
+								{#if $storyStore.isGenerating && shouldNavigateToCharactersAfterStory}
+									<Loader2 class="h-4 w-4 animate-spin" />
+									Generating...
+								{:else}
+									<Video class="h-4 w-4" />
+									Create Assets & Video
+								{/if}
+							</Button>
+						{/if}
 					</div>
 					{#if $storyStore.isGenerating}
 						<ProgressBar type="generateStory" isActive={true} class="mt-2 max-w-md" />
@@ -3026,7 +3030,7 @@
 			<!-- Left Column: Section Header -->
 			<div>
 				<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
-					<Globe class="h-7 w-7" />World
+					<Globe class="h-7 w-7" /><span class="ml-1">World</span>
 					<button
 						type="button"
 						onclick={() => toggleSection('world')}
@@ -3433,7 +3437,7 @@
 			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
 					<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
-						<LayoutGrid class="h-7 w-7" />Storyboard
+						<LayoutGrid class="h-7 w-7" /><span class="ml-1">Storyboard</span>
 						<button
 							type="button"
 							onclick={() => toggleSection('storyboard')}
@@ -3695,7 +3699,7 @@
 			<div class="flex items-start justify-between sm:flex-col sm:gap-2">
 				<div>
 					<h1 class="text-3xl font-bold mb-3 flex items-center gap-2">
-						<Video class="h-7 w-7" />Video
+						<Video class="h-7 w-7" /><span class="ml-1">Video</span>
 						<button
 							type="button"
 							onclick={() => toggleSection('video')}
