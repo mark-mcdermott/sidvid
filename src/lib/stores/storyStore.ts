@@ -27,6 +27,7 @@ export interface StoryEntry {
 export interface StoryState {
 	prompt: string;
 	selectedLength: { value: string; label: string };
+	selectedSceneLength: { value: string; label: string };
 	selectedStyle: StylePreset;
 	customStylePrompt: string;
 	stories: StoryEntry[];
@@ -48,7 +49,8 @@ export interface StoryState {
 
 const initialState: StoryState = {
 	prompt: '',
-	selectedLength: { value: '5s', label: '5s' },
+	selectedLength: { value: '10s', label: '10s' },
+	selectedSceneLength: { value: '5s', label: '5s' },
 	selectedStyle: 'anime',
 	customStylePrompt: '',
 	stories: [],
@@ -59,7 +61,7 @@ const initialState: StoryState = {
 	editedStoryContent: '',
 	editPrompt: '',
 	tryAgainPrompt: '',
-	tryAgainLength: { value: '5s', label: '5s' },
+	tryAgainLength: { value: '10s', label: '10s' },
 	prototypingMode: false, // Default to Production mode (character consistency)
 	selectedProvider: 'kling', // Default to Kling AI for real video generation
 	enableSound: false // Default to audio disabled

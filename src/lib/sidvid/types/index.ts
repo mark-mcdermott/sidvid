@@ -420,7 +420,8 @@ export type ApiCallType =
   | 'enhanceDescription'
   | 'generateCharacter'
   | 'generateScene'
-  | 'generateVideo';
+  | 'generateVideo'
+  | 'generateWorldImage';
 
 /**
  * A single timing record for an API call
@@ -481,6 +482,7 @@ export const DEFAULT_TIMING_ESTIMATES: Record<ApiCallType, number> = {
   generateCharacter: 45000,  // 45 seconds
   generateScene: 45000,      // 45 seconds
   generateVideo: 300000,     // 5 minutes
+  generateWorldImage: 15000, // 15 seconds per image
 };
 
 /** Maximum number of timing records to keep per API call type */

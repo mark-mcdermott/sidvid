@@ -1,11 +1,10 @@
 /**
  * Calculate the appropriate number of scenes based on video length and scene duration
  *
- * Since Kling only supports 5-second clips, scenes = totalLength / sceneLength
- * with a minimum of 1 scene.
+ * Scenes = totalLength / sceneLength with a minimum of 1 scene.
  *
- * @param videoLength - Total video length (e.g., "5s", "30s", "1m")
- * @param sceneDuration - Duration per scene in seconds (default: 5s for Kling)
+ * @param videoLength - Total video length (e.g., "10s", "30s", "1m")
+ * @param sceneDuration - Duration per scene in seconds (default: 5s)
  */
 export function calculateSceneCount(videoLength: string, sceneDuration: number = 5): number {
   // Parse video length (e.g., "2s", "30s", "1m")
@@ -31,7 +30,7 @@ export function calculateSceneCount(videoLength: string, sceneDuration: number =
  */
 export function parseVideoLengthToSeconds(videoLength: string): number {
   const match = videoLength.match(/^(\d+)([sm])$/);
-  if (!match) return 5; // Default to 5 seconds
+  if (!match) return 10; // Default to 10 seconds
 
   const value = parseInt(match[1], 10);
   const unit = match[2];

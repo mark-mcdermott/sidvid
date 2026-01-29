@@ -6,10 +6,11 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { Loader2, Play, Pause, RotateCcw, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown, Info } from '@lucide/svelte';
+	import { Loader2, Play, Pause, RotateCcw, Check, X, Edit, FlaskConical, Pencil, Sparkles, Plus, Wand2, Video, Trash2, Download, Copy, Archive, ArchiveRestore, Eye, Type, Zap, BookOpen, Globe, LayoutGrid, ChevronDown, Info, User, MapPin, Film } from '@lucide/svelte';
 	import { ProgressBar } from '$lib/components/ui/progress-bar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { createTimingContext } from '$lib/utils/apiTiming';
+	import { apiTimingStore } from '$lib/stores/apiTimingStore';
 	import type { ApiCallType } from '$lib/sidvid/types';
 
 	// Stores
@@ -505,9 +506,30 @@
 	let lastProcessedWorldImageUrl = $state<string>('');
 	let autoGenerateWorldElementImages = $state(false);
 	let pendingWorldElementIds = $state<string[]>([]);
+	let pendingStoryboardData = $state<{
+		scenes: Array<{
+			title: string;
+			description: string;
+			dialog?: string;
+			action?: string;
+			assignedElements: string[];
+		}>;
+		localSlots: typeof localSlots;
+		sceneDuration: number;
+	} | null>(null);
 	let autoGenerateStoryboardImages = $state(false);
 	let autoGenerateVideo = $state(false);
 	let generatingStoryboardSceneIds = $state<Set<string>>(new Set());
+	let worldImagesEstimatedDurationMs = $state<number | undefined>(undefined);
+	let isWorldImagesGenerating = $state(false);
+	let worldElementLoadOrder = $state<string[]>([]); // Track order in which element images loaded
+	let worldImagesInitialCount = $state(0); // Track initial number of elements to generate (for progress bar width)
+
+	// Storyboard scene image generation tracking
+	let storyboardImagesEstimatedDurationMs = $state<number | undefined>(undefined);
+	let isStoryboardImagesGenerating = $state(false);
+	let storyboardSceneLoadOrder = $state<string[]>([]); // Track order in which scene images loaded
+	let storyboardImagesInitialCount = $state(0); // Track initial number of scenes to generate (for progress bar width)
 
 	// Track which elements have prompt textarea open
 	let worldShowPromptTextarea = $state<Set<string>>(new Set());
@@ -561,11 +583,11 @@
 
 	// Filter tabs
 	const worldFilterOptions: Array<{ value: ElementType | 'all'; label: string }> = [
-		{ value: 'all', label: 'All' },
+		// { value: 'all', label: 'All' },
 		{ value: 'character', label: 'Characters' },
-		{ value: 'location', label: 'Locations' },
-		{ value: 'object', label: 'Objects' },
-		{ value: 'concept', label: 'Concepts' }
+		{ value: 'location', label: 'Locations' }
+		// { value: 'object', label: 'Objects' },
+		// { value: 'concept', label: 'Concepts' }
 	];
 
 	// Type select options
@@ -583,11 +605,52 @@
 			: $worldStore.elements.filter((el) => el.type === $worldStore.filterType)
 	);
 
+	// Separate loaded and loading elements for left-to-right loading effect
+	// Sort so characters are always on the left, locations on the right
+	// Within each type, maintain load order
+	let loadedWorldElements = $derived.by(() => {
+		const loaded = filteredWorldElements.filter((el) => el.images.length > 0);
+		const typeOrder: Record<string, number> = { character: 0, location: 1, object: 2, concept: 3 };
+
+		return loaded.sort((a, b) => {
+			// First, sort by type (characters before locations)
+			const typeA = typeOrder[a.type] ?? 99;
+			const typeB = typeOrder[b.type] ?? 99;
+			if (typeA !== typeB) return typeA - typeB;
+
+			// Within the same type, sort by load order
+			const aIndex = worldElementLoadOrder.indexOf(a.id);
+			const bIndex = worldElementLoadOrder.indexOf(b.id);
+			if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+			if (aIndex !== -1) return -1;
+			if (bIndex !== -1) return 1;
+			return 0;
+		});
+	});
+	let loadingWorldElements = $derived(
+		filteredWorldElements.filter((el) => el.images.length === 0)
+	);
+	// Get placeholder icons: show icons for types still loading, sorted with characters first then locations
+	let placeholderIcons = $derived(
+		[...loadingWorldElements]
+			.sort((a, b) => {
+				// Characters first, then locations, then others
+				const typeOrder: Record<string, number> = { character: 0, location: 1, object: 2, concept: 3 };
+				return (typeOrder[a.type] ?? 99) - (typeOrder[b.type] ?? 99);
+			})
+			.map((el) => el.type)
+	);
+
 	// Get counts by type
 	let characterCount = $derived(getElementsByType($worldStore.elements, 'character').length);
 	let locationCount = $derived(getElementsByType($worldStore.elements, 'location').length);
 	let objectCount = $derived(getElementsByType($worldStore.elements, 'object').length);
 	let conceptCount = $derived(getElementsByType($worldStore.elements, 'concept').length);
+
+	// Count character slots (loaded + placeholders) for filter button positioning
+	let loadedCharacterCount = $derived(loadedWorldElements.filter((el) => el.type === 'character').length);
+	let characterPlaceholderCount = $derived(placeholderIcons.filter((type) => type === 'character').length);
+	let totalCharacterSlots = $derived(loadedCharacterCount + characterPlaceholderCount);
 
 	function handleAddWorldElement() {
 		if (customElementName.trim() && customElementDescription.trim()) {
@@ -700,6 +763,10 @@
 
 			if (actionData?.success && actionData?.character?.imageUrl) {
 				addElementImage(elementId, actionData.character.imageUrl, actionData.character.revisedPrompt);
+				// Track load order for left-to-right display
+				if (!worldElementLoadOrder.includes(elementId)) {
+					worldElementLoadOrder = [...worldElementLoadOrder, elementId];
+				}
 			} else if (actionData?.error) {
 				// API returned an error
 				if (!isRetry) {
@@ -738,11 +805,50 @@
 			return element && element.images.length === 0;
 		});
 
+		if (elementsToGenerate.length === 0) {
+			// No elements to generate, skip to storyboard
+			if (pendingStoryboardData) {
+				localSlots = pendingStoryboardData.localSlots;
+				resetStoryboardStore();
+				initializeScenesFromStory(pendingStoryboardData.scenes, pendingStoryboardData.sceneDuration);
+				pendingStoryboardData = null;
+			}
+			autoGenerateStoryboardImages = true;
+			return;
+		}
+
+		// Reset load order tracking for new generation
+		worldElementLoadOrder = [];
+		worldImagesInitialCount = elementsToGenerate.length;
+
+		// Calculate estimated duration: single image time * number of images (parallel but still takes time)
+		const singleImageEstimate = apiTimingStore.getEstimatedDuration('generateWorldImage');
+		worldImagesEstimatedDurationMs = singleImageEstimate * elementsToGenerate.length;
+		isWorldImagesGenerating = true;
+
+		// Start timing tracking
+		const timing = createTimingContext('generateWorldImage');
+		timing.start();
+
 		console.log('Starting parallel image generation for', elementsToGenerate.length, 'elements');
 		await Promise.all(elementsToGenerate.map(elementId => generateWorldElementImage(elementId)));
 
-		// After world element images are done, trigger storyboard image generation
-		console.log('World element images complete, starting storyboard image generation');
+		// Complete timing (divide by element count to get per-image average for future estimates)
+		timing.complete(true);
+		isWorldImagesGenerating = false;
+
+		// After world element images are done, initialize storyboard if deferred
+		console.log('World element images complete');
+		if (pendingStoryboardData) {
+			console.log('Initializing deferred storyboard with', pendingStoryboardData.scenes.length, 'scenes');
+			localSlots = pendingStoryboardData.localSlots;
+			resetStoryboardStore();
+			initializeScenesFromStory(pendingStoryboardData.scenes, pendingStoryboardData.sceneDuration);
+			pendingStoryboardData = null;
+		}
+
+		// Now trigger storyboard image generation
+		console.log('Starting storyboard image generation');
 		autoGenerateStoryboardImages = true;
 	}
 
@@ -928,6 +1034,10 @@
 					const imageUrl = await pollFluxKontextImage(actionData.taskId, sceneId);
 					if (imageUrl) {
 						addSceneImage(sceneId, imageUrl, prompt, true); // Character reference was used
+						// Track load order for left-to-right display
+						if (!storyboardSceneLoadOrder.includes(sceneId)) {
+							storyboardSceneLoadOrder = [...storyboardSceneLoadOrder, sceneId];
+						}
 						console.log('Successfully added Flux Kontext image to scene:', scene.title);
 						return;
 					} else {
@@ -992,6 +1102,10 @@
 
 			if (actionData?.success && actionData?.character?.imageUrl) {
 				addSceneImage(sceneId, actionData.character.imageUrl, actionData.character.revisedPrompt, false); // No character reference
+				// Track load order for left-to-right display
+				if (!storyboardSceneLoadOrder.includes(sceneId)) {
+					storyboardSceneLoadOrder = [...storyboardSceneLoadOrder, sceneId];
+				}
 				console.log('Successfully added image to scene:', scene.title);
 			} else if (actionData?.error) {
 				if (!isRetry) {
@@ -1042,8 +1156,25 @@
 			return;
 		}
 
+		// Reset scene load order tracking for new generation
+		storyboardSceneLoadOrder = [];
+		storyboardImagesInitialCount = scenesToGenerate.length;
+
+		// Calculate estimated duration: single scene time * number of scenes
+		const singleSceneEstimate = apiTimingStore.getEstimatedDuration('generateScene');
+		storyboardImagesEstimatedDurationMs = singleSceneEstimate * scenesToGenerate.length;
+		isStoryboardImagesGenerating = true;
+
+		// Start timing tracking
+		const timing = createTimingContext('generateScene');
+		timing.start();
+
 		console.log('Starting parallel storyboard image generation for', scenesToGenerate.length, 'scenes:', scenesToGenerate.map(s => s.title));
 		await Promise.all(scenesToGenerate.map(scene => generateStoryboardSceneImage(scene.id)));
+
+		// Complete timing
+		timing.complete(true);
+		isStoryboardImagesGenerating = false;
 		console.log('Storyboard image generation complete');
 
 		// After storyboard images are done, trigger video generation only if requested
@@ -1082,6 +1213,21 @@
 	let archivedScenes = $derived(getArchivedScenes($storyboardStore.scenes));
 	let totalStoryboardDuration = $derived(getTotalDuration($storyboardStore.scenes));
 	let hasStoryboardContent = $derived(activeScenes.length > 0);
+
+	// Separate loaded and loading storyboard scenes
+	// Loaded scenes sorted by scene number (extracted from title like "Scene 1", "Scene 2", etc.)
+	let loadedStoryboardScenes = $derived.by(() => {
+		const loaded = activeScenes.filter((scene) => scene.images.length > 0);
+		return loaded.sort((a, b) => {
+			// Extract scene number from title (e.g., "Scene 1" -> 1)
+			const numA = parseInt(a.title.replace(/\D/g, '')) || 0;
+			const numB = parseInt(b.title.replace(/\D/g, '')) || 0;
+			return numA - numB;
+		});
+	});
+	let loadingStoryboardScenes = $derived(
+		activeScenes.filter((scene) => scene.images.length === 0)
+	);
 
 	// Get world element by ID
 	function getWorldElement(id: string) {
@@ -1231,6 +1377,7 @@
 	let sceneVideos = $state<SceneVideo[]>([]);
 	let currentGeneratingIndex = $state<number>(-1);
 	let isVideoGenerating = $state(false);
+	let videoEstimatedDurationMs = $state<number | undefined>(undefined);
 	let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 	let selectedProvider = $derived($storyStore.selectedProvider);
@@ -1298,6 +1445,8 @@
 	);
 
 	let hasScenes = $derived(sceneThumbnails.length > 0);
+	let hasAnyVideoLoaded = $derived(sceneVideos.some(sv => sv.videoUrl !== null));
+	let hasMultipleScenes = $derived(sceneVideos.length > 1);
 	let totalVideoDuration = $derived(sceneVideos.length * 5);
 
 	// Calculate current preview scene index based on currentTime and scene durations
@@ -1338,6 +1487,14 @@
 	}
 
 	async function startGeneratingAllScenes() {
+		// Calculate estimated duration BEFORE setting isVideoGenerating
+		// so the progress bar has the correct value when it renders
+		const singleVideoEstimate = apiTimingStore.getEstimatedDuration('generateVideo');
+		// Ensure minimum 60 seconds per scene to avoid unreasonably short estimates from bad data
+		const minEstimatePerScene = 60000; // 60 seconds minimum per scene
+		const estimatePerScene = Math.max(singleVideoEstimate, minEstimatePerScene);
+		videoEstimatedDurationMs = estimatePerScene * sceneVideos.length;
+
 		isVideoGenerating = true;
 		currentGeneratingIndex = 0;
 
@@ -1386,13 +1543,16 @@
 	}
 
 	function handleVideoEnded() {
-		if (currentPlayingIndex < completedVideos.length - 1) {
+		// Check if there are more videos to play in sequence
+		if (currentPlayingIndex < sceneVideos.length - 1 && sceneVideos[currentPlayingIndex + 1]?.videoUrl) {
 			currentPlayingIndex++;
 			setTimeout(() => {
 				videoElement?.play();
 			}, 100);
 		} else {
+			// All videos finished - reset to beginning for next playback
 			isPlaying = false;
+			currentPlayingIndex = 0;
 		}
 	}
 
@@ -1838,7 +1998,7 @@
 							stories: [...state.stories, {
 								story: form.story!,
 								prompt: storyPrompt,
-								length: state.selectedLength?.label || '5s'
+								length: state.selectedLength?.label || '10s'
 							}],
 							isEditingManually: false,
 							isEditingWithPrompt: false,
@@ -1852,7 +2012,7 @@
 							stories: [...state.stories, {
 								story: form.story!,
 								prompt: storyPrompt,
-								length: (state.isTryingAgain ? state.tryAgainLength?.label : state.selectedLength?.label) || '5s'
+								length: (state.isTryingAgain ? state.tryAgainLength?.label : state.selectedLength?.label) || '10s'
 							}],
 							isEditingManually: false,
 							editedStoryContent: ''
@@ -1883,7 +2043,7 @@
 						}
 					}
 					if (form.story!.scenes && form.story!.scenes.length > 0) {
-						localSlots = form.story!.scenes.map((scene, index) => ({
+						const newLocalSlots = form.story!.scenes.map((scene, index) => ({
 							id: `slot-local-${Date.now()}-${index}`,
 							storySceneIndex: index,
 							storyScene: scene,
@@ -1935,17 +2095,25 @@
 							};
 						});
 
-						// Reset and initialize storyboard with new scenes
-						resetStoryboardStore();
 						// Calculate per-scene duration based on total video length
 						const sceneDuration = calculateSceneDuration($storyStore.selectedLength.value, storyboardScenes.length);
-						initializeScenesFromStory(storyboardScenes, sceneDuration);
-						console.log('Initialized storyboard with', storyboardScenes.length, 'scenes, each', sceneDuration, 'seconds');
 
-						// If no new world elements to generate images for, directly trigger storyboard image generation
-						// (otherwise, storyboard images will be triggered after world images complete)
-						if (!autoGenerateWorldElementImages) {
-							console.log('No new world elements - directly triggering storyboard image generation');
+						// If world element images are being generated, defer storyboard initialization
+						// until they complete. Otherwise, initialize immediately.
+						if (autoGenerateWorldElementImages) {
+							// Store data to initialize storyboard after world images complete
+							pendingStoryboardData = {
+								scenes: storyboardScenes,
+								localSlots: newLocalSlots,
+								sceneDuration
+							};
+							console.log('Deferring storyboard initialization until world images complete');
+						} else {
+							// No world images to generate - initialize storyboard immediately
+							localSlots = newLocalSlots;
+							resetStoryboardStore();
+							initializeScenesFromStory(storyboardScenes, sceneDuration);
+							console.log('Initialized storyboard with', storyboardScenes.length, 'scenes, each', sceneDuration, 'seconds');
 							autoGenerateStoryboardImages = true;
 						}
 					}
@@ -2050,6 +2218,10 @@
 			const element = $worldStore.elements.find(el => el.id === activeElementId);
 			if (element && form.character.imageUrl) {
 				addElementImage(activeElementId, form.character.imageUrl, form.character.revisedPrompt);
+				// Track load order for left-to-right display
+				if (!worldElementLoadOrder.includes(activeElementId)) {
+					worldElementLoadOrder = [...worldElementLoadOrder, activeElementId];
+				}
 				// Reset activeElementId after processing
 				activeElementId = null;
 			}
@@ -2674,8 +2846,8 @@
 
 				{#if $storyStore.stories.length === 0}
 					<div class="w-full xl:max-w-[32rem]">
-						<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
-						<input type="hidden" name="sceneLength" value={'5s'} />
+						<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '10s'} />
+						<input type="hidden" name="sceneLength" value={$storyStore.selectedSceneLength?.value || '5s'} />
 						<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 						{#if $storyStore.selectedStyle === 'custom'}
 							<input type="hidden" name="customStylePrompt" value={$storyStore.customStylePrompt} />
@@ -2691,36 +2863,29 @@
 						/>
 					</div>
 
-					<div class="flex gap-2">
-						{#if !$storyStore.isGenerating || !shouldGenerateVideoAfterStoryboard}
-							<Button onclick={handleFineTuneFirst} disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}>
-								{#if $storyStore.isGenerating && !shouldGenerateVideoAfterStoryboard}
-									<Loader2 class="h-4 w-4 animate-spin" />
-									Generating...
-								{:else}
-									<Pencil class="h-4 w-4" />
-									Create Assets
-								{/if}
+					{#if !$storyStore.isGenerating}
+						<div class="flex gap-2 items-center">
+							<Button onclick={handleFineTuneFirst} disabled={!$storyStore.prompt.trim()}>
+								<Pencil class="h-4 w-4" />
+								Create Assets
 							</Button>
-						{/if}
-						{#if !$storyStore.isGenerating || shouldGenerateVideoAfterStoryboard}
 							<Button
 								onclick={handleUseThisStory}
 								variant="outline"
-								disabled={$storyStore.isGenerating || !$storyStore.prompt.trim()}
+								disabled={!$storyStore.prompt.trim()}
 							>
-								{#if $storyStore.isGenerating && shouldNavigateToCharactersAfterStory}
-									<Loader2 class="h-4 w-4 animate-spin" />
-									Generating...
-								{:else}
-									<Video class="h-4 w-4" />
-									Create Assets & Video
-								{/if}
+								<Video class="h-4 w-4" />
+								Create Assets & Video
 							</Button>
-						{/if}
-					</div>
-					{#if $storyStore.isGenerating}
-						<ProgressBar type="generateStory" isActive={true} class="mt-2 max-w-md" />
+						</div>
+					{:else}
+						<div class="w-full xl:max-w-[32rem]">
+							<span class="flex items-center gap-2 text-base text-muted-foreground mb-1">
+								<Loader2 class="h-5 w-5 animate-spin" />
+								Generating...
+							</span>
+							<ProgressBar type="generateStory" isActive={true} />
+						</div>
 					{/if}
 				{/if}
 
@@ -2876,7 +3041,8 @@
 					{/if}
 
 					{#if !$storyStore.isEditingManually && index === $storyStore.stories.length - 1}
-						<div class="flex gap-2">
+						<!-- Story action buttons commented out for now -->
+						<!-- <div class="flex gap-2">
 							<Button
 								type="button"
 								onclick={startTryAgain}
@@ -2903,7 +3069,7 @@
 								<Wand2 class="h-4 w-4" />
 								Smart Expand
 							</Button>
-						</div>
+						</div> -->
 
 						{#if $storyStore.isEditingWithPrompt}
 							<form
@@ -2936,7 +3102,7 @@
 										Describe the changes you want to make to the story
 									</p>
 									<input type="hidden" name="currentStory" value="" />
-									<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '5s'} />
+									<input type="hidden" name="length" value={$storyStore.selectedLength?.value || '10s'} />
 									<input type="hidden" name="style" value={$storyStore.selectedStyle} />
 									<input type="hidden" name="customStylePrompt" value={$storyStore.customStylePrompt} />
 									<Textarea
@@ -2958,7 +3124,13 @@
 										</Button>
 									</div>
 									{#if $storyStore.isGenerating}
-										<ProgressBar type="editStory" isActive={true} class="mt-2" />
+										<div class="mt-2">
+											<span class="flex items-center gap-2 text-base text-muted-foreground mb-1">
+												<Loader2 class="h-5 w-5 animate-spin" />
+												Generating...
+											</span>
+											<ProgressBar type="editStory" isActive={true} />
+										</div>
 									{/if}
 								</div>
 							</form>
@@ -3057,9 +3229,9 @@
 					</div>
 				{/if}
 
-				<!-- Filter Tabs - only show when elements exist -->
-				{#if $worldStore.elements.length > 0}
-				<div class="flex flex-wrap gap-2">
+				<!-- Filter Tabs - only show when all elements have finished loading -->
+				{#if $worldStore.elements.length > 0 && loadingWorldElements.length === 0}
+				<div class="flex flex-wrap gap-4">
 					{#each worldFilterOptions as option}
 						{@const count =
 							option.value === 'all'
@@ -3071,10 +3243,15 @@
 										: option.value === 'object'
 											? objectCount
 											: conceptCount}
+						{@const locationMargin = option.value === 'location' && totalCharacterSlots > 1
+							? (totalCharacterSlots - 1) * 176
+							: 0}
 						<Button
 							variant={$worldStore.filterType === option.value ? 'default' : 'outline'}
 							size="sm"
 							onclick={() => setFilterType(option.value)}
+							class="w-40 justify-center"
+							style={locationMargin > 0 ? `margin-left: ${locationMargin}px` : ''}
 						>
 							{#if option.value !== 'all'}
 								<span
@@ -3091,33 +3268,36 @@
 				</div>
 				{/if}
 
-				<!-- Element Cards (show all elements) -->
+				<!-- Element Cards - loaded cards first (left), then placeholders (right) -->
 				<div class="flex flex-wrap gap-4">
-				{#each filteredWorldElements as element}
+				<!-- Loaded element cards -->
+				{#each loadedWorldElements as element}
 						<div
-							class="flex flex-col gap-3 rounded-md border p-4 w-80 flex-shrink-0"
+							class="flex flex-col gap-3 rounded-md border p-4 w-40 flex-shrink-0"
 							style="border-left: 4px solid {ELEMENT_TYPE_COLORS[element.type]};"
 							data-element-content={element.id}
 						>
 							<div class="flex items-start justify-between gap-2">
 								<div class="flex-1 min-w-0">
-									<h2 class="text-base font-semibold truncate">{element.name}</h2>
-									<span
+									<h2 class="text-xs font-semibold line-clamp-2 min-h-8">{element.name}</h2>
+									<!-- Badge commented out for now -->
+									<!-- <span
 										class="rounded-full px-2 py-0.5 text-xs text-black inline-block mt-1"
 										style="background-color: {ELEMENT_TYPE_COLORS[element.type]};"
 									>
 										{ELEMENT_TYPE_LABELS[element.type]}
-									</span>
+									</span> -->
 									<p class="text-xs text-muted-foreground mt-1 line-clamp-2">{element.description}</p>
 								</div>
-								<Button
+								<!-- Trash button commented out for now -->
+								<!-- <Button
 									variant="ghost"
 									size="icon"
 									onclick={() => handleDeleteWorldElement(element.id)}
 									class="text-destructive hover:text-destructive flex-shrink-0"
 								>
 									<Trash2 class="h-4 w-4" />
-								</Button>
+								</Button> -->
 							</div>
 
 							{#if element.enhancedDescription && element.enhancedDescription !== element.description}
@@ -3190,8 +3370,8 @@
 							<div class="flex flex-col gap-2">
 								<div class="flex flex-wrap gap-1">
 									{#if !element.isEnhanced}
-										<!-- Initial Enhance Description button -->
-										<form
+										<!-- Initial Enhance Description button - commented out for now -->
+										<!-- <form
 											method="POST"
 											action="?/enhanceDescription"
 											use:enhance={() => {
@@ -3219,7 +3399,7 @@
 													Enhance Description
 												{/if}
 											</Button>
-										</form>
+										</form> -->
 									{:else if !worldShowPromptTextarea.has(element.id)}
 										<!-- Smart Improve and Improve With Prompt buttons -->
 										<form
@@ -3260,7 +3440,8 @@
 										</Button>
 									{/if}
 
-									<form
+									<!-- Generate Image button - commented out for now -->
+									<!-- <form
 										method="POST"
 										action="?/generateImage"
 										use:enhance={() => {
@@ -3284,7 +3465,7 @@
 												Generate Image
 											{/if}
 										</Button>
-									</form>
+									</form> -->
 								</div>
 
 								{#if worldShowPromptTextarea.has(element.id)}
@@ -3343,7 +3524,38 @@
 							</div>
 						</div>
 				{/each}
+				<!-- Placeholder cards for elements still loading -->
+				{#each placeholderIcons as iconType}
+						<div
+							class="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30 p-4 w-40 flex-shrink-0 bg-muted/10"
+							style="min-height: 180px;"
+						>
+							{#if iconType === 'character'}
+								<User class="h-10 w-10 text-muted-foreground/40" />
+							{:else if iconType === 'location'}
+								<MapPin class="h-10 w-10 text-muted-foreground/40" />
+							{:else}
+								<Loader2 class="h-10 w-10 text-muted-foreground/40 animate-spin" />
+							{/if}
+						</div>
+				{/each}
 				</div>
+
+				<!-- Progress bar for world element image generation -->
+				{#if isWorldImagesGenerating && loadingWorldElements.length > 0}
+					{@const progressBarWidth = (worldImagesInitialCount * 160) + ((worldImagesInitialCount - 1) * 16)}
+					<div class="mt-4" style="width: {progressBarWidth}px;">
+						<span class="flex items-center gap-2 text-base text-muted-foreground mb-1">
+							<Loader2 class="h-5 w-5 animate-spin" />
+							Generating...
+						</span>
+						<ProgressBar
+							type="generateWorldImage"
+							isActive={true}
+							estimatedDurationMs={worldImagesEstimatedDurationMs}
+						/>
+					</div>
+				{/if}
 
 				<!-- Add Element Forms (dynamically rendered) -->
 				{#each addElementForms as form}
@@ -3398,7 +3610,7 @@
 				{/each}
 
 				<!-- Add Element Button - only show when elements exist or forms are open -->
-				{#if $worldStore.elements.length > 0 || addElementForms.length > 0}
+				<!-- {#if $worldStore.elements.length > 0 || addElementForms.length > 0}
 				<Button
 					variant="outline"
 					onclick={addNewElementForm}
@@ -3407,18 +3619,19 @@
 					<Plus class="mr-2 h-4 w-4" />
 					Add Element
 				</Button>
-				{/if}
+				{/if} -->
 
 				<!-- Empty State - dashed + box when no elements and no forms -->
 				{#if $worldStore.elements.length === 0 && addElementForms.length === 0}
 					<div
-						class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
+						class="w-40 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
+						style="min-height: 180px;"
 						onclick={addNewElementForm}
 						role="button"
 						tabindex="0"
 						title="Add element"
 					>
-						<Plus class="h-12 w-12 text-muted-foreground" />
+						<Plus class="h-10 w-10 text-muted-foreground" />
 					</div>
 				{/if}
 			</div>
@@ -3469,7 +3682,8 @@
 
 				<!-- Scene Cards Grid + New Scene Button -->
 				<div class="flex flex-wrap gap-4 items-start">
-					{#each activeScenes as scene, index (scene.id)}
+					<!-- Loaded scene cards (sorted by scene number) -->
+					{#each loadedStoryboardScenes as scene, index (scene.id)}
 					{@const sceneImageUrl = getActiveSceneImageUrl(scene)}
 					{@const showText = sceneTextVisibility[scene.id] !== false}
 					{@const activeSceneImage = scene.images.find(img => img.isActive) || scene.images[scene.images.length - 1]}
@@ -3602,11 +3816,13 @@
 						{/if}
 
 						<!-- Status indicator -->
+						<!-- Loading spinner commented out
 						{#if scene.status === 'generating' || generatingStoryboardSceneIds.has(scene.id)}
 							<div class="absolute inset-0 flex items-center justify-center bg-black/50">
 								<Loader2 class="h-8 w-8 animate-spin text-white" />
 							</div>
-						{:else if scene.status === 'failed' && scene.error}
+						{:else -->
+						{#if scene.status === 'failed' && scene.error}
 							<div class="absolute inset-0 flex flex-col items-center justify-center bg-red-900/80 p-2">
 								<X class="h-6 w-6 text-red-300 mb-1" />
 								<p class="text-red-100 text-xs text-center line-clamp-3">{scene.error}</p>
@@ -3637,7 +3853,17 @@
 					</div>
 				{/each}
 
-					<!-- New Scene Button (at end of row) -->
+					<!-- Placeholder cards for scenes still loading -->
+					{#each loadingStoryboardScenes as scene (scene.id)}
+						<div
+							class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/10 flex items-center justify-center"
+						>
+							<Film class="h-6 w-6 text-muted-foreground/40" />
+						</div>
+					{/each}
+
+					<!-- New Scene Button (at end of row) - only show when storyboard is empty -->
+					{#if activeScenes.length === 0}
 					<div
 						class="w-72 aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 flex items-center justify-center cursor-pointer hover:border-muted-foreground/50 hover:bg-muted/20 transition-colors"
 						onclick={handleAddScene}
@@ -3650,7 +3876,24 @@
 					>
 						<Plus class="h-12 w-12 text-muted-foreground" />
 					</div>
+					{/if}
 				</div>
+
+				<!-- Progress bar for storyboard scene image generation -->
+				{#if isStoryboardImagesGenerating && loadingStoryboardScenes.length > 0}
+					{@const progressBarWidth = (storyboardImagesInitialCount * 288) + ((storyboardImagesInitialCount - 1) * 16)}
+					<div class="mt-4" style="width: {progressBarWidth}px;">
+						<span class="flex items-center gap-2 text-base text-muted-foreground mb-1">
+							<Loader2 class="h-5 w-5 animate-spin" />
+							Generating...
+						</span>
+						<ProgressBar
+							type="generateScene"
+							isActive={true}
+							estimatedDurationMs={storyboardImagesEstimatedDurationMs}
+						/>
+					</div>
+				{/if}
 
 				<!-- Archived Scenes Section - commented out
 			<div class="w-full xl:max-w-[32rem] border-t pt-6 mt-6">
@@ -3749,21 +3992,20 @@
 						<track kind="captions" />
 					</video>
 				{:else if isVideoGenerating}
-					<div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-						<Loader2 class="h-12 w-12 animate-spin text-white mb-4" data-spinner />
-						<p class="text-white text-sm">
-							Generating scene {currentGeneratingIndex + 1} of {sceneVideos.length}
-						</p>
-						<div class="w-48 h-2 bg-gray-700 rounded-full mt-2">
-							<div
-								class="h-full bg-primary rounded-full transition-all"
-								style="width: {Math.max(5, calculatedProgress)}%"
-							></div>
+					<!-- Show first scene thumbnail while generating -->
+					{#if sceneThumbnails[0]?.imageUrl}
+						<div class="absolute inset-0">
+							<img
+								src={sceneThumbnails[0].imageUrl}
+								alt={sceneThumbnails[0].name}
+								class="w-full h-full object-contain"
+							/>
 						</div>
-						<p class="text-white/70 text-xs mt-1">
-							Overall: {calculatedProgress}%
-						</p>
-					</div>
+					{:else}
+						<div class="absolute inset-0 flex items-center justify-center">
+							<Video class="h-8 w-8 text-white/50" />
+						</div>
+					{/if}
 				{:else}
 					{#if sceneThumbnails.length > 0}
 						{#if $storyboardStore.isPlaying && currentPreviewSceneIndex >= 0 && sceneThumbnails[currentPreviewSceneIndex]}
@@ -3776,14 +4018,13 @@
 								/>
 								<!-- Scene indicator overlay -->
 								<div class="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg">
-									<p class="text-sm font-medium">Scene {currentPreviewSceneIndex + 1} of {sceneThumbnails.length}</p>
-									<p class="text-xs text-white/70">{sceneThumbnails[currentPreviewSceneIndex].name}</p>
+									<p class="text-sm">{sceneThumbnails[currentPreviewSceneIndex].name}</p>
 								</div>
 								<!-- Progress bar -->
 								<div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
 									<div
 										class="h-full bg-primary transition-all duration-100"
-										style="width: {($storyboardStore.currentTime % 5) / 5 * 100}%"
+										style="width: {$storyboardStore.totalDuration > 0 ? ($storyboardStore.currentTime / $storyboardStore.totalDuration * 100) : 0}%"
 									></div>
 								</div>
 							</div>
@@ -3795,6 +4036,15 @@
 									alt={sceneThumbnails[0].name}
 									class="w-full h-full object-contain"
 								/>
+								<!-- Slideshow Preview button overlay -->
+								{#if !hasAnyVideoLoaded && hasMultipleScenes && !isVideoGenerating}
+									<div class="absolute inset-0 flex items-center justify-center">
+										<Button variant="outline" onclick={() => togglePlayback()} class="bg-black/50 hover:bg-black/70 text-white border-white/30">
+											<Play class="mr-2 h-4 w-4" />
+											Slideshow Preview
+										</Button>
+									</div>
+								{/if}
 							</div>
 						{:else}
 							<!-- Empty state with video icon when no scenes -->
@@ -3810,7 +4060,22 @@
 				{/if}
 			</div>
 
-			<!-- Show thumbnail grid only during video generation (not after completion) -->
+			<!-- Progress bar for video generation -->
+			{#if isVideoGenerating}
+				<div class="mt-4" style="width: 800px; max-width: 100%;">
+					<span class="flex items-center gap-2 text-base text-muted-foreground mb-1">
+						<Loader2 class="h-5 w-5 animate-spin" />
+						Generating...
+					</span>
+					<ProgressBar
+						type="generateVideo"
+						isActive={true}
+						estimatedDurationMs={videoEstimatedDurationMs}
+					/>
+				</div>
+			{/if}
+
+			<!-- Show thumbnail grid only during video generation (not after completion) - commented out
 			{#if isVideoGenerating}
 				<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 					{#each sceneVideos as sceneVideo, index}
@@ -3846,6 +4111,7 @@
 					{/each}
 				</div>
 			{/if}
+			-->
 
 			{#each sceneVideos.filter(sv => sv.error) as errorScene}
 				<div class="text-red-500 text-sm">
@@ -3854,47 +4120,36 @@
 			{/each}
 
 			{#if hasScenes}
-			<div class="flex items-center justify-center gap-2">
-				<Button variant="outline" onclick={() => togglePlayback()} disabled={!hasScenes}>
-					{#if $storyboardStore.isPlaying}
+			<div class="flex items-center justify-start gap-2">
+				{#if $storyboardStore.isPlaying}
+					<Button variant="outline" onclick={() => togglePlayback()}>
 						<Pause class="mr-2 h-4 w-4" />
 						Stop Preview
-					{:else}
-						<Play class="mr-2 h-4 w-4" />
-						Slideshow Preview
-					{/if}
-				</Button>
-
-				{#if !allCompleted}
-					<Button
-						onclick={startGeneratingAllScenes}
-						disabled={isVideoGenerating || !hasScenes}
-						data-generate-video
-					>
-						{#if isVideoGenerating}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" data-spinner />
-							Generating {currentGeneratingIndex + 1}/{sceneVideos.length}...
-						{:else}
-							Generate Video
-						{/if}
-					</Button>
-				{:else}
-					<Button onclick={handleRegenerate} variant="outline">
-						<RotateCcw class="mr-2 h-4 w-4" />
-						Regenerate
 					</Button>
 				{/if}
 
+				{#if hasScenes && !isVideoGenerating && !hasAnyVideoLoaded && !$storyboardStore.isPlaying}
+					<Button
+						onclick={startGeneratingAllScenes}
+						data-generate-video
+					>
+						Generate Video
+					</Button>
+				{/if}
+
+				<!-- Download Selected button - commented out
 				{#if selectedVideoCompleted}
 					<Button onclick={downloadVideo} variant="outline">
 						<Download class="mr-2 h-4 w-4" />
 						Download Selected
 					</Button>
 				{/if}
-				{#if allCompleted}
+				-->
+
+				{#if hasAnyVideoLoaded}
 					<Button onclick={downloadAllVideos}>
 						<Download class="mr-2 h-4 w-4" />
-						Download All
+						Download
 					</Button>
 				{/if}
 			</div>

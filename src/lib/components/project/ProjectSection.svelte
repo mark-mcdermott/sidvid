@@ -40,7 +40,7 @@
 	];
 
 	let selectedLengthValue = $state($storyStore.selectedLength.value);
-	let selectedSceneLengthValue = $state('5s');
+	let selectedSceneLengthValue = $state($storyStore.selectedSceneLength.value);
 	let selectedStyleValue = $state<StylePreset>($storyStore.selectedStyle);
 	let selectedProviderValue = $state<VideoProvider>($storyStore.selectedProvider);
 	let prototypingModeValue = $state($storyStore.prototypingMode);
@@ -73,6 +73,20 @@
 
 	$effect(() => {
 		selectedLengthValue = $storyStore.selectedLength.value;
+	});
+
+	$effect(() => {
+		const selectedOption = sceneLengthOptions.find(opt => opt.value === selectedSceneLengthValue);
+		if (selectedOption && selectedOption.value !== $storyStore.selectedSceneLength.value) {
+			storyStore.update(state => ({
+				...state,
+				selectedSceneLength: selectedOption
+			}));
+		}
+	});
+
+	$effect(() => {
+		selectedSceneLengthValue = $storyStore.selectedSceneLength.value;
 	});
 
 	$effect(() => {

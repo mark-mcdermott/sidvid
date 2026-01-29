@@ -229,7 +229,7 @@ export class StoryManager {
 
 		const newScene: ProjectStoryScene = {
 			...scene,
-			duration: scene.duration ?? 5 // Default to 5 seconds per spec
+			duration: scene.duration ?? 5 // Default to 5 seconds
 		};
 
 		current.scenes.push(newScene);
