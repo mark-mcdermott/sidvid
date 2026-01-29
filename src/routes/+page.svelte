@@ -73,6 +73,7 @@
 	// Utils
 	import { truncateTitle } from '$lib/sidvid/utils/conversation-helpers';
 	import { calculateSceneDuration } from '$lib/sidvid/utils/story-helpers';
+	import { assembleVideoClips, revokeBlobUrl } from '$lib/utils/videoAssembly';
 	import type { SceneSlot, Story } from '$lib/sidvid';
 	import type { ActionData } from './$types';
 	import { browser } from '$app/environment';
@@ -1391,6 +1392,11 @@
 	let currentPlayingIndex = $state(0);
 	let isPlaying = $state(false);
 
+	// Assembled (stitched) video state
+	let assembledVideoUrl = $state<string | null>(null);
+	let isAssemblingVideo = $state(false);
+	let assemblyError = $state<string | null>(null);
+
 	// Track project changes to reset video state
 	// NOTE: lastProjectId must NOT be $state - updating it inside $effect would cause infinite loop
 	let lastProjectId: string | null = null;
@@ -1404,6 +1410,13 @@
 			// calculatedProgress is derived from sceneVideos, so resetting sceneVideos resets it
 			currentPlayingIndex = 0;
 			isPlaying = false;
+			// Reset assembled video state
+			if (assembledVideoUrl) {
+				revokeBlobUrl(assembledVideoUrl);
+				assembledVideoUrl = null;
+			}
+			isAssemblingVideo = false;
+			assemblyError = null;
 			if (pollInterval) {
 				clearInterval(pollInterval);
 				pollInterval = null;
@@ -1432,8 +1445,9 @@
 		sceneVideos.length > 0 && sceneVideos.every(sv => sv.status === 'completed')
 	);
 
+	// Use assembled video if available, otherwise fall back to individual scene videos
 	let currentVideoUrl = $derived(
-		sceneVideos[currentPlayingIndex]?.videoUrl || null
+		assembledVideoUrl || sceneVideos[currentPlayingIndex]?.videoUrl || null
 	);
 
 	let completedVideos = $derived(
@@ -1523,6 +1537,10 @@
 			isVideoGenerating = false;
 			currentGeneratingIndex = -1;
 			stopPolling();
+			// All scenes complete - trigger video assembly if multiple scenes
+			if (sceneVideos.length > 1 && sceneVideos.every(sv => sv.status === 'completed' && sv.videoUrl)) {
+				assembleAllVideos();
+			}
 			return;
 		}
 
@@ -1542,8 +1560,42 @@
 		}
 	}
 
+	async function assembleAllVideos() {
+		// Don't assemble if already assembling or already assembled
+		if (isAssemblingVideo || assembledVideoUrl) return;
+
+		const clips = sceneVideos
+			.filter(sv => sv.videoUrl)
+			.map(sv => ({ url: sv.videoUrl!, duration: 5 }));
+
+		if (clips.length < 2) return; // Need at least 2 clips to assemble
+
+		console.log(`[Video] Starting assembly of ${clips.length} clips`);
+		isAssemblingVideo = true;
+		assemblyError = null;
+
+		const result = await assembleVideoClips(clips);
+
+		isAssemblingVideo = false;
+
+		if (result.success && result.blobUrl) {
+			console.log('[Video] Assembly successful');
+			assembledVideoUrl = result.blobUrl;
+		} else {
+			console.error('[Video] Assembly failed:', result.error);
+			assemblyError = result.error || 'Failed to assemble videos';
+			// Fall back to sequential playback - videos will still work individually
+		}
+	}
+
 	function handleVideoEnded() {
-		// Check if there are more videos to play in sequence
+		// If using assembled video, just stop playback
+		if (assembledVideoUrl) {
+			isPlaying = false;
+			return;
+		}
+
+		// Check if there are more videos to play in sequence (fallback for non-assembled)
 		if (currentPlayingIndex < sceneVideos.length - 1 && sceneVideos[currentPlayingIndex + 1]?.videoUrl) {
 			currentPlayingIndex++;
 			setTimeout(() => {
@@ -1561,6 +1613,14 @@
 			clearTimeout(retryTimeoutId);
 			retryTimeoutId = null;
 		}
+
+		// Reset assembled video
+		if (assembledVideoUrl) {
+			revokeBlobUrl(assembledVideoUrl);
+			assembledVideoUrl = null;
+		}
+		isAssemblingVideo = false;
+		assemblyError = null;
 
 		sceneVideos = sceneVideos.map(sv => ({
 			...sv,
@@ -1596,6 +1656,18 @@
 	}
 
 	async function downloadAllVideos() {
+		// Prefer assembled video if available
+		if (assembledVideoUrl) {
+			const link = document.createElement('a');
+			link.href = assembledVideoUrl;
+			link.download = `sidvid-video-${Date.now()}.mp4`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			return;
+		}
+
+		// Fall back to individual scene downloads
 		const completedVideos = sceneVideos.filter(sv => sv.videoUrl);
 		if (completedVideos.length === 0) return;
 
@@ -1618,6 +1690,12 @@
 	}
 
 	function loadTestVideos() {
+		// Reset assembled video first
+		if (assembledVideoUrl) {
+			revokeBlobUrl(assembledVideoUrl);
+			assembledVideoUrl = null;
+		}
+
 		sceneVideos = sceneVideos.map((sv, idx) => ({
 			...sv,
 			videoUrl: idx === 0
@@ -1628,6 +1706,11 @@
 		}));
 		isVideoGenerating = false;
 		stopPolling();
+
+		// Trigger assembly for test videos if multiple scenes
+		if (sceneVideos.length > 1) {
+			assembleAllVideos();
+		}
 	}
 
 	// ========== Test Data ==========
@@ -1992,6 +2075,13 @@
 						resetStoryboardStore();
 						localSlots = [];
 						sceneVideos = [];
+						// Reset assembled video
+						if (assembledVideoUrl) {
+							revokeBlobUrl(assembledVideoUrl);
+							assembledVideoUrl = null;
+						}
+						isAssemblingVideo = false;
+						assemblyError = null;
 
 						storyStore.update(state => ({
 							...state,
@@ -2565,6 +2655,13 @@
 			resetStoryboardStore();
 			localSlots = [];
 			sceneVideos = [];
+			// Reset assembled video
+			if (assembledVideoUrl) {
+				revokeBlobUrl(assembledVideoUrl);
+				assembledVideoUrl = null;
+			}
+			isAssemblingVideo = false;
+			assemblyError = null;
 
 			// Update the story
 			storyStore.update(state => {
@@ -4072,6 +4169,23 @@
 						isActive={true}
 						estimatedDurationMs={videoEstimatedDurationMs}
 					/>
+				</div>
+			{/if}
+
+			<!-- Progress indicator for video assembly -->
+			{#if isAssemblingVideo}
+				<div class="mt-4" style="width: 800px; max-width: 100%;">
+					<span class="flex items-center gap-2 text-base text-muted-foreground">
+						<Loader2 class="h-5 w-5 animate-spin" />
+						Stitching videos...
+					</span>
+				</div>
+			{/if}
+
+			<!-- Assembly error message -->
+			{#if assemblyError}
+				<div class="mt-2 text-sm text-amber-600">
+					Video stitching failed: {assemblyError}. Videos will play sequentially instead.
 				</div>
 			{/if}
 
